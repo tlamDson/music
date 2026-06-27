@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  ORG_ADMIN
+  STORE_ADMIN
+}
+
+enum SyncMode {
+  TIGHT
+  LOOSE
+}
+
+enum SyncGroupStatus {
+  PLAYING
+  PAUSED
+  STOPPED
+}
+
+enum PlaylistScope {
+  ORG
+  STORE
+}
+
+enum TrackSource {
+  SELF_HOSTED
+  EXTERNAL
+}
+
+enum ExternalProvider {
+  SPOTIFY
+  YOUTUBE
+  SOUNDCLOUD
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users      User[]
+  stores     Store[]
+  syncGroups SyncGroup[]
+  folders    Folder[]
+  playlists  Playlist[]
+  tracks     Track[]
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  name           String
+  role           UserRole
+  organizationId String?
+  storeId        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  store        Store?        @relation(fields: [storeId], references: [id])
+  auditLogs    AuditLog[]
+}
+
+model Store {
+  id             String   @id @default(cuid())
+  name           String
+  organizationId String
+  syncGroupId    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  syncGroup     SyncGroup?     @relation(fields: [syncGroupId], references: [id])
+  users         User[]
+  storeOverride StoreOverride?
+}
+
+model SyncGroup {
+  id             String          @id @default(cuid())
+  name           String
+  organizationId String
+  mode           SyncMode        @default(LOOSE)
+  status         SyncGroupStatus @default(STOPPED)
+  currentTrackId String?
+  trackIndex     Int             @default(0)
+  startedAtTs    BigInt?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  stores       Store[]
+}
+
+model StoreOverride {
+  id                String    @id @default(cuid())
+  storeId           String    @unique
+  isOverridden      Boolean   @default(false)
+  overrideTrackId   String?
+  overridePlaylistId String?
+  overriddenAt      DateTime?
+  rejoinedAt        DateTime?
+
+  store Store @relation(fields: [storeId], references: [id])
+}
+
+model Folder {
+  id             String        @id @default(cuid())
+  name           String
+  scope          PlaylistScope
+  organizationId String
+  storeId        String?
+  createdAt      DateTime      @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  playlists    Playlist[]
+}
+
+model Playlist {
+  id             String        @id @default(cuid())
+  name           String
+  scope          PlaylistScope
+  folderId       String?
+  organizationId String
+  storeId        String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  folder         Folder?         @relation(fields: [folderId], references: [id])
+  playlistTracks PlaylistTrack[]
+}
+
+model Track {
+  id               String            @id @default(cuid())
+  title            String
+  artist           String?
+  durationMs       Int
+  source           TrackSource
+  s3Key            String?
+  externalProvider ExternalProvider?
+  externalId       String?
+  organizationId   String
+  createdAt        DateTime          @default(now())
+
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  playlistTracks PlaylistTrack[]
+}
+
+model PlaylistTrack {
+  id         String @id @default(cuid())
+  playlistId String
+  trackId    String
+  position   Int
+
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, position])
+  @@index([playlistId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([userId])
+}
