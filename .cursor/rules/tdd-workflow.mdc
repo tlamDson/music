@@ -1,0 +1,82 @@
+---
+description: Bắt buộc TDD cho mọi feature mới; test phải pass trước khi merge PR vào develop
+globs: apps/backend/**,apps/web/**,packages/shared/**
+alwaysApply: true
+---
+
+# TDD Workflow (Red-Green-Refactor)
+
+Với MỌI feature mới hoặc bug fix, tuân thủ đúng thứ tự sau:
+
+## Quy trình bắt buộc
+
+1. **Tạo nhánh feature từ develop**
+   ```bash
+   git checkout develop
+   git checkout -b feature/<tên-feature>
+   ```
+
+2. **RED - Viết test FAIL trước. KHÔNG viết implementation.**
+   - Backend: `apps/backend/test/unit/<module>.service.spec.ts`
+   - Frontend: `apps/web/__tests__/unit/<Component>.test.tsx`
+   - Chạy test, xác nhận thấy đỏ (import error hoặc assertion fail là đúng).
+
+3. **GREEN - Code tối thiểu để pass.**
+   - Không thêm logic chưa có test bao phủ.
+
+4. **REFACTOR - Cải thiện code, chạy lại toàn bộ test, không được break.**
+
+5. **Tạo PR vào `develop`** -> CI tự chạy lint + unit + integration.
+   - PR sẽ bị block nếu CI fail.
+
+## Lệnh test local
+
+```bash
+# Backend
+pnpm --filter backend test:unit          # chạy một lần
+pnpm --filter backend test:unit --watch  # watch mode khi code
+pnpm --filter backend test:integration
+pnpm --filter backend test:e2e
+
+# Frontend
+pnpm --filter web test
+pnpm --filter web test:e2e               # Playwright
+```
+
+## Mock pattern - Backend (NestJS)
+
+```typescript
+// Dùng jest-mock-extended cho Prisma
+import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = mockDeep<PrismaClient>();
+// Không dùng real DB trong unit test
+```
+
+## Mock pattern - Frontend (MSW)
+
+```typescript
+// Dùng MSW để mock API trong integration test
+// Không mock module trực tiếp nếu có thể dùng MSW
+import { http, HttpResponse } from 'msw';
+import { server } from '@/test/mocks/server';
+
+server.use(
+  http.get('/api/v1/playlists', () => HttpResponse.json({ data: [] }))
+);
+```
+
+## Tiêu chuẩn chất lượng (CI enforce)
+
+- Coverage >= 80% cho mọi file mới (cấu hình trong jest.config.ts).
+- Mỗi test độc lập: reset state trong `beforeEach` / `afterEach`.
+- Assertion phải cụ thể, test hành vi - không test implementation detail.
+- Không commit code mới thiếu test: PR sẽ bị block khi coverage thấp hơn ngưỡng.
+
+## Không chấp nhận
+
+- `expect(x).toBeTruthy()` không có context rõ ràng.
+- Test phụ thuộc thứ tự chạy.
+- Mock quá nhiều làm test không còn kiểm tra được gì thực sự.
+- Skip test bằng `test.skip` mà không có comment giải thích lý do.

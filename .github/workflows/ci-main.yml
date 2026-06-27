@@ -1,0 +1,128 @@
+name: CI - Main (Full)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  full-ci:
+    name: Full CI + E2E + Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: cafe_music_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: bitnami/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cafe_music_test
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-main-access-secret-long-enough
+      JWT_REFRESH_SECRET: ci-main-refresh-secret-long-enough
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: ap-southeast-1
+      S3_BUCKET: cafe-music-test
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_FORCE_PATH_STYLE: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint + Typecheck
+        run: pnpm turbo lint typecheck
+
+      - name: Unit Tests
+        run: pnpm turbo test:unit
+        env:
+          CI: true
+
+      - name: Integration Tests
+        run: pnpm turbo test:integration
+        env:
+          CI: true
+
+      - name: Run DB migrations
+        run: pnpm --filter backend prisma migrate deploy
+
+      - name: Build all apps
+        run: pnpm turbo build
+
+      - name: Start backend for E2E
+        run: pnpm --filter backend start:prod &
+        env:
+          PORT: 4000
+          NODE_ENV: test
+
+      - name: Wait for backend ready
+        run: npx wait-on http://localhost:4000/api/health --timeout 30000
+
+      - name: E2E Tests - Backend (supertest)
+        run: pnpm --filter backend test:e2e
+        env:
+          CI: true
+
+      - name: Install Playwright browsers
+        run: pnpm --filter web exec playwright install --with-deps chromium
+
+      - name: E2E Tests - Frontend (Playwright)
+        run: pnpm --filter web test:e2e
+        env:
+          CI: true
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: apps/web/playwright-report/
+          retention-days: 14
