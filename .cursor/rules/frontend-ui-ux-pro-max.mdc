@@ -1,0 +1,34 @@
+---
+description: Bắt buộc dùng UI UX Pro Max làm nguồn design system cho mọi thay đổi frontend
+globs: apps/web/**,apps/mobile/**,design-system/**,**/*.tsx,**/*.jsx,**/*.css
+alwaysApply: true
+---
+
+# Frontend phải lấy file từ UI UX Pro Max
+
+Mọi thay đổi frontend (tạo mới hoặc chỉnh sửa UI ở `apps/web`, `apps/mobile`) BẮT BUỘC tham chiếu design system từ skill `ui-ux-pro-max`. Không tự bịa màu/font/spacing.
+
+## Quy trình bắt buộc trước khi viết/sửa UI
+
+1. Đọc `design-system/MASTER.md` (nguồn sự thật về màu, typography, spacing, component).
+2. Nếu đang làm 1 trang cụ thể, kiểm tra `design-system/pages/<page-name>.md`. Nếu tồn tại, rule trong file trang ưu tiên ghi đè MASTER.
+3. Nếu chưa có design system hoặc cần style/màu/typography mới, sinh từ skill thay vì tự nghĩ:
+
+```bash
+python .cursor/skills/ui-ux-pro-max/scripts/search.py "<mô tả sản phẩm/trang>" --design-system --persist -p "Cafe Music"
+python .cursor/skills/ui-ux-pro-max/scripts/search.py "<truy vấn>" --domain style
+python .cursor/skills/ui-ux-pro-max/scripts/search.py "<truy vấn>" --stack react
+```
+
+(Trên Windows dùng `python`, không phải `python3`.)
+
+## Checklist pre-delivery (áp dụng cho mọi UI)
+
+- Không dùng emoji làm icon; dùng SVG (Heroicons/Lucide).
+- `cursor-pointer` trên mọi phần tử click được.
+- Hover state có transition mượt (150-300ms).
+- Tương phản chữ tối thiểu 4.5:1.
+- Focus state nhìn thấy được khi điều hướng bàn phím.
+- Tôn trọng `prefers-reduced-motion`.
+- Responsive tại 375px, 768px, 1024px, 1440px.
+- Tránh anti-pattern theo ngành đã nêu trong design system (vd gradient tím/hồng kiểu AI).
