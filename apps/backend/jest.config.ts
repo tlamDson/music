@@ -14,7 +14,7 @@ const config: Config = {
   testEnvironment: 'node',
   collectCoverageFrom: ['src/**/*.ts', '!src/main.ts', '!src/**/*.module.ts'],
   coverageDirectory: 'coverage/unit',
-  coverageThresholds: {
+  coverageThreshold: {
     global: {
       lines: 80,
       functions: 80,

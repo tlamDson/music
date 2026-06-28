@@ -7,7 +7,7 @@ const config: Config = {
   displayName: 'web:unit',
   testEnvironment: 'jsdom',
   testMatch: ['<rootDir>/__tests__/unit/**/*.test.{ts,tsx}'],
-  setupFilesAfterFramework: ['<rootDir>/jest.setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@cafe-music/shared(.*)$': '<rootDir>/../../packages/shared/src$1',
@@ -18,7 +18,7 @@ const config: Config = {
     '!src/app/layout.tsx',
   ],
   coverageDirectory: 'coverage',
-  coverageThresholds: {
+  coverageThreshold: {
     global: {
       lines: 80,
       functions: 80,
