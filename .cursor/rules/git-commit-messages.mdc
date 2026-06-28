@@ -1,0 +1,67 @@
+---
+description: Quy ước commit message cho Cafe Music — imperative mood, mô tả rõ thay đổi
+globs: "**/*"
+alwaysApply: true
+---
+
+# Git Commit Message Convention
+
+Mỗi commit phải hoàn thành câu: *"If applied, this commit will… **[message]**"*
+
+## Format
+
+```
+<verb> <what changed> [optional: context/scope]
+```
+
+Không dùng prefix `feat:`/`fix:` trong commit (dành cho PR title). Commit message ngắn, một dòng.
+
+## Verbs chuẩn
+
+| Verb | Dùng khi |
+|------|----------|
+| `add` | Thêm file, test, endpoint, component mới |
+| `fix` | Sửa bug |
+| `update` | Cải thiện logic/UI hiện có (không phải bug) |
+| `remove` | Xóa code/file không còn dùng |
+| `refactor` | Đổi cấu trúc, không đổi behavior |
+| `test` | Chỉ thay đổi test |
+| `docs` | Chỉ thay đổi tài liệu |
+| `chore` | CI, config, dependencies |
+
+## Ví dụ đúng
+
+```bash
+add unit test for playlist store admin RBAC scope
+fix websocket clock-sync offset on reconnect
+update player bar to show override state from sync group
+refactor auth guard to use shared JwtPayload type
+test: add Playwright e2e for dashboard login flow
+docs: add developer guide git flow section
+chore: remove hardcoded secrets from ci workflows
+```
+
+## Ví dụ sai — KHÔNG dùng
+
+```bash
+fix bug
+update code
+WIP
+added stuff
+feat: auth   # prefix feat/fix chỉ dùng ở PR title
+Fixed login  # không dùng past tense
+```
+
+## TDD: commit theo phase
+
+Khi làm feature lớn, có thể tách commit theo TDD phase (cùng nhánh):
+
+1. `test: add failing unit tests for sync override endpoint`
+2. `add sync override endpoint for store admin`
+3. `refactor sync service extract override logic`
+
+## Không commit
+
+- File `.env`, credentials, tokens
+- `node_modules/`, `dist/`, `.next/`, coverage reports
+- File không liên quan đến task hiện tại

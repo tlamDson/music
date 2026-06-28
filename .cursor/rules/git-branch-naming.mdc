@@ -1,0 +1,41 @@
+---
+description: Quy ước đặt tên nhánh Git cho Cafe Music — bắt buộc khi tạo branch mới
+globs: "**/*"
+alwaysApply: true
+---
+
+# Git Branch Naming Convention
+
+Luôn tạo nhánh từ `develop` mới nhất. Không push trực tiếp lên `main`.
+
+## Format
+
+```
+<type>/<short-kebab-case-description>
+```
+
+## Types
+
+| Type | Khi nào dùng | Ví dụ |
+|------|--------------|-------|
+| `feature/` | Feature mới | `feature/auth-login`, `feature/sync-tight-mode` |
+| `fix/` | Sửa bug | `fix/player-autoplay-unlock`, `fix/playlist-rbac-scope` |
+| `test/` | Chỉ thêm/sửa tests | `test/auth-service`, `test/player-bar-component` |
+| `docs/` | Tài liệu | `docs/developer-guide`, `docs/api-readme` |
+| `chore/` | CI, config, tooling | `chore/ci-pnpm-version`, `chore/docker-compose` |
+
+## Quy tắc
+
+- Chữ thường, phân tách bằng `-`
+- Mô tả cụ thể phạm vi task — không dùng `feature/update`, `fix/bug`, `feature/wip`
+- Một nhánh = một task/PR logic
+- Backend scope: ghi rõ module nếu có (`feature/sync-override`, `feature/playlists-crud`)
+- Frontend scope: ghi rõ trang/component nếu có (`feature/player-bar`, `feature/dashboard-playlist-list`)
+
+## Lệnh chuẩn
+
+```bash
+git checkout develop
+git pull origin develop
+git checkout -b feature/<tên>
+```

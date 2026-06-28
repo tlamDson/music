@@ -103,6 +103,7 @@ model SyncGroup {
 
   organization Organization @relation(fields: [organizationId], references: [id])
   stores       Store[]
+  schedules    PlaylistSchedule[]
 }
 
 model StoreOverride {
@@ -142,6 +143,7 @@ model Playlist {
   organization   Organization    @relation(fields: [organizationId], references: [id])
   folder         Folder?         @relation(fields: [folderId], references: [id])
   playlistTracks PlaylistTrack[]
+  schedules      PlaylistSchedule[]
 }
 
 model Track {
@@ -187,4 +189,19 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([userId])
+}
+
+model PlaylistSchedule {
+  id             String   @id @default(cuid())
+  syncGroupId    String
+  playlistId     String
+  cronExpression String
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  syncGroup SyncGroup @relation(fields: [syncGroupId], references: [id])
+  playlist  Playlist  @relation(fields: [playlistId], references: [id])
+
+  @@index([syncGroupId])
 }

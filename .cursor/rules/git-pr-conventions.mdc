@@ -1,0 +1,92 @@
+---
+description: Quy ước tạo Pull Request cho Cafe Music — title, description, target branch
+globs: "**/*"
+alwaysApply: true
+---
+
+# Pull Request Convention
+
+Mọi thay đổi code merge qua PR. Không push trực tiếp lên `main`.
+
+## Target branch
+
+| Loại PR | Base branch |
+|---------|-------------|
+| Feature, fix, test, docs, chore hàng ngày | `develop` |
+| Release production | `develop` → `main` |
+
+**Mặc định luôn target `develop`** trừ khi user yêu cầu release.
+
+## PR Title Format
+
+```
+<type>: <short description>
+```
+
+| Type | Dùng khi | Ví dụ |
+|------|----------|-------|
+| `feat:` | Feature mới | `feat: add store admin playlist override` |
+| `fix:` | Bug fix | `fix: player seek on tight sync reconnect` |
+| `test:` | Chỉ tests | `test: auth service login validation unit tests` |
+| `docs:` | Tài liệu | `docs: add developer guide` |
+| `chore:` | CI, tooling, deps | `chore: fix pnpm version in github actions` |
+| `refactor:` | Refactor không đổi behavior | `refactor: extract sync state to redis service` |
+
+- Title ngắn (< 72 ký tự), mô tả **what + scope**
+- Không dùng `WIP`, `Update`, `Fix bug`
+
+## PR Description Template
+
+Luôn dùng format này khi tạo PR (gh pr create hoặc GitHub UI):
+
+```markdown
+## Summary
+- <bullet 1: thay đổi chính>
+- <bullet 2: lý do / impact>
+- <bullet 3 nếu cần>
+
+## Test plan
+- [ ] Unit tests added/updated (TDD: RED → GREEN)
+- [ ] `pnpm turbo test:unit` pass locally
+- [ ] No `.env` or secrets committed
+- [ ] UI follows design-system/cafe-music/MASTER.md (if frontend)
+
+## Screenshots
+<!-- UI changes only -->
+```
+
+## CI requirement
+
+PR phải pass status check trước khi merge:
+
+```
+Lint + Unit Tests
+```
+
+Branch protection trên `main` cũng dùng check name này.
+
+## Pre-merge checklist (AI tự verify trước khi suggest merge)
+
+- [ ] Nhánh tạo từ `develop` mới nhất
+- [ ] Commit messages tuân thủ git-commit-messages rule
+- [ ] Có test cho logic mới (TDD workflow)
+- [ ] Không có hardcoded secrets
+- [ ] PR target đúng branch (`develop` cho feature work)
+
+## gh CLI example
+
+```bash
+gh pr create --base develop --head feature/my-feature \
+  --title "feat: add sync override for store admin" \
+  --body "$(cat <<'EOF'
+## Summary
+- Add POST /api/v1/sync/stores/:id/override endpoint
+- Store admin can play birthday track without affecting other stores
+
+## Test plan
+- [x] Unit tests added (RED → GREEN)
+- [x] pnpm turbo test:unit pass locally
+- [x] No secrets committed
+EOF
+)"
+```

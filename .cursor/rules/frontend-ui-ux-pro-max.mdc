@@ -10,8 +10,8 @@ Mọi thay đổi frontend (tạo mới hoặc chỉnh sửa UI ở `apps/web`, 
 
 ## Quy trình bắt buộc trước khi viết/sửa UI
 
-1. Đọc `design-system/MASTER.md` (nguồn sự thật về màu, typography, spacing, component).
-2. Nếu đang làm 1 trang cụ thể, kiểm tra `design-system/pages/<page-name>.md`. Nếu tồn tại, rule trong file trang ưu tiên ghi đè MASTER.
+1. Đọc `design-system/cafe-music/MASTER.md` (nguồn sự thật về màu, typography, spacing, component).
+2. Nếu đang làm 1 trang cụ thể, kiểm tra `design-system/cafe-music/pages/<page-name>.md`. Nếu tồn tại, rule trong file trang ưu tiên ghi đè MASTER.
 3. Nếu chưa có design system hoặc cần style/màu/typography mới, sinh từ skill thay vì tự nghĩ:
 
 ```bash
