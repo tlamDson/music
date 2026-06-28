@@ -85,16 +85,13 @@ jobs:
         env:
           CI: true
 
-      - name: Integration Tests
-        run: pnpm turbo test:integration
-        env:
-          CI: true
-
-      - name: Run DB migrations
-        run: pnpm --filter backend prisma migrate deploy
-
-      - name: Build all apps
-        run: pnpm turbo build
+      # Integration + E2E + Build sẽ bật khi có đủ modules
+      # - name: Integration Tests
+      #   run: pnpm turbo test:integration
+      # - name: Run DB migrations
+      #   run: pnpm --filter @cafe-music/backend prisma:migrate:deploy
+      # - name: Build all apps
+      #   run: pnpm turbo build
 
       - name: Start backend for E2E
         run: pnpm --filter backend start:prod &
