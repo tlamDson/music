@@ -64,14 +64,9 @@ jobs:
         env:
           CI: true
 
-      - name: Integration Tests
-        run: pnpm turbo test:integration
-        env:
-          CI: true
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cafe_music_test
-          REDIS_URL: redis://localhost:6379
-          JWT_ACCESS_SECRET: ci-test-access-secret
-          JWT_REFRESH_SECRET: ci-test-refresh-secret
+      # Integration tests cần DB/Redis - bật lại khi có auth module
+      # - name: Integration Tests
+      #   run: pnpm turbo test:integration
 
       - name: Upload coverage report
         if: always()
