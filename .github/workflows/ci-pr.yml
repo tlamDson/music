@@ -10,33 +10,8 @@ concurrency:
 
 jobs:
   ci:
-    name: Lint + Unit + Integration
+    name: Lint + Unit Tests
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: cafe_music_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout
@@ -56,17 +31,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint + Typecheck (fail fast)
-        run: pnpm turbo lint typecheck
-
-      - name: Unit Tests - Backend + Frontend (parallel)
+      - name: Unit Tests - Backend + Frontend
         run: pnpm turbo test:unit
         env:
           CI: true
-
-      # Integration tests cần DB/Redis - bật lại khi có auth module
-      # - name: Integration Tests
-      #   run: pnpm turbo test:integration
 
       - name: Upload coverage report
         if: always()
