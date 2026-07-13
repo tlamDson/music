@@ -46,7 +46,11 @@ describe('SyncService', () => {
     id: 'playlist-1',
     name: 'Test',
     playlistTracks: [
-      { trackId: 'track-1', position: 0, track: { id: 'track-1', s3Key: 'org-1/tracks/song.mp3' } },
+      {
+        trackId: 'track-1',
+        position: 0,
+        track: { id: 'track-1', s3Key: 'org-1/tracks/song.mp3' },
+      },
     ],
   };
 
@@ -83,19 +87,37 @@ describe('SyncService', () => {
     it('should set Redis state and broadcast now-playing event', async () => {
       prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
       prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
-      prisma.syncGroup.update.mockResolvedValue({ ...mockGroup, status: 'PLAYING' } as any);
+      prisma.syncGroup.update.mockResolvedValue({
+        ...mockGroup,
+        status: 'PLAYING',
+      } as any);
 
-      await service.play('group-1', { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' }, orgAdminUser);
+      await service.play(
+        'group-1',
+        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
+        orgAdminUser,
+      );
 
-      expect(redis.setGroupState).toHaveBeenCalledWith('group-1', expect.objectContaining({ isPlaying: true }));
-      expect(gateway.broadcastToGroup).toHaveBeenCalledWith('group-1', 'now-playing', expect.any(Object));
+      expect(redis.setGroupState).toHaveBeenCalledWith(
+        'group-1',
+        expect.objectContaining({ isPlaying: true }),
+      );
+      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
+        'group-1',
+        'now-playing',
+        expect.any(Object),
+      );
     });
 
     it('should throw NotFoundException when group does not exist', async () => {
       prisma.syncGroup.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.play('nonexistent', { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' }, orgAdminUser),
+        service.play(
+          'nonexistent',
+          { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
+          orgAdminUser,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -104,7 +126,10 @@ describe('SyncService', () => {
     it('should set store override in Redis and disconnect store from sync group', async () => {
       await service.override('store-1', { trackId: 'track-2' }, storeAdminUser);
 
-      expect(redis.setStoreOverride).toHaveBeenCalledWith('store-1', expect.objectContaining({ isOverridden: true }));
+      expect(redis.setStoreOverride).toHaveBeenCalledWith(
+        'store-1',
+        expect.objectContaining({ isOverridden: true }),
+      );
     });
   });
 
@@ -122,7 +147,10 @@ describe('SyncService', () => {
         status: 'PLAYING',
       });
 
-      prisma.store.findFirst.mockResolvedValue({ id: 'store-1', syncGroupId: 'group-1' } as any);
+      prisma.store.findFirst.mockResolvedValue({
+        id: 'store-1',
+        syncGroupId: 'group-1',
+      } as any);
 
       await service.rejoin('store-1', storeAdminUser);
 

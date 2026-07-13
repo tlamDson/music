@@ -2,7 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from './redis.service';
 import { SyncGateway } from './sync.gateway';
-import { JwtPayload, PlayGroupDto, OverrideDto, SyncGroupState } from '@cafe-music/shared';
+import {
+  JwtPayload,
+  PlayGroupDto,
+  OverrideDto,
+  SyncGroupState,
+} from '@cafe-music/shared';
 
 @Injectable()
 export class SyncService {
@@ -30,7 +35,8 @@ export class SyncService {
     if (!playlist) throw new NotFoundException('Playlist not found');
 
     const trackEntry = playlist.playlistTracks[dto.trackIndex ?? 0];
-    if (!trackEntry) throw new NotFoundException('Track not found at given index');
+    if (!trackEntry)
+      throw new NotFoundException('Track not found at given index');
 
     const serverTs = Date.now();
     const state: SyncGroupState = {
@@ -77,12 +83,22 @@ export class SyncService {
 
     const state = await this.redis.getGroupState(groupId);
     if (state) {
-      const pausedState = { ...state, isPlaying: false, status: 'PAUSED' as const };
+      const pausedState = {
+        ...state,
+        isPlaying: false,
+        status: 'PAUSED' as const,
+      };
       await this.redis.setGroupState(groupId, pausedState);
     }
 
-    await this.prisma.syncGroup.update({ where: { id: groupId }, data: { status: 'PAUSED' } });
-    this.gateway.broadcastToGroup(groupId, 'paused', { groupId, serverTs: Date.now() });
+    await this.prisma.syncGroup.update({
+      where: { id: groupId },
+      data: { status: 'PAUSED' },
+    });
+    this.gateway.broadcastToGroup(groupId, 'paused', {
+      groupId,
+      serverTs: Date.now(),
+    });
     return { groupId, status: 'PAUSED' };
   }
 
@@ -93,7 +109,8 @@ export class SyncService {
     if (!group) throw new NotFoundException('Sync group not found');
 
     const state = await this.redis.getGroupState(groupId);
-    if (!state?.playlistId) throw new NotFoundException('No active playlist in group');
+    if (!state?.playlistId)
+      throw new NotFoundException('No active playlist in group');
 
     const playlist = await this.prisma.playlist.findFirst({
       where: { id: state.playlistId },
@@ -102,12 +119,15 @@ export class SyncService {
     if (!playlist) throw new NotFoundException('Playlist not found');
 
     const nextIndex = (state.trackIndex + 1) % playlist.playlistTracks.length;
-    const nextTrack = playlist.playlistTracks[nextIndex];
 
-    return this.play(groupId, { playlistId: state.playlistId, trackIndex: nextIndex, mode: state.mode }, user);
+    return this.play(
+      groupId,
+      { playlistId: state.playlistId, trackIndex: nextIndex, mode: state.mode },
+      user,
+    );
   }
 
-  async override(storeId: string, dto: OverrideDto, user: JwtPayload) {
+  async override(storeId: string, dto: OverrideDto, _user: JwtPayload) {
     const overrideData = {
       storeId,
       isOverridden: true,

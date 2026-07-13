@@ -5,10 +5,7 @@ import { SchedulerController } from './scheduler.controller';
 import { SyncModule } from '../sync/sync.module';
 
 @Module({
-  imports: [
-    ScheduleModule.forRoot(),
-    SyncModule,
-  ],
+  imports: [ScheduleModule.forRoot(), SyncModule],
   providers: [SchedulerService],
   controllers: [SchedulerController],
 })

@@ -17,11 +17,19 @@ export class PlaylistsService {
 
   async create(dto: CreatePlaylistDto, user: JwtPayload) {
     if (dto.scope === 'ORG' && user.role !== 'ORG_ADMIN') {
-      throw new ForbiddenException('Only ORG_ADMIN can create org-scoped playlists');
+      throw new ForbiddenException(
+        'Only ORG_ADMIN can create org-scoped playlists',
+      );
     }
     if (dto.scope === 'STORE') {
-      if (user.role === 'STORE_ADMIN' && dto.storeId && dto.storeId !== user.storeId) {
-        throw new ForbiddenException('STORE_ADMIN can only create playlists for their own store');
+      if (
+        user.role === 'STORE_ADMIN' &&
+        dto.storeId &&
+        dto.storeId !== user.storeId
+      ) {
+        throw new ForbiddenException(
+          'STORE_ADMIN can only create playlists for their own store',
+        );
       }
     }
 
@@ -82,7 +90,9 @@ export class PlaylistsService {
     if (!playlist) throw new NotFoundException('Playlist not found');
 
     if (playlist.scope === 'ORG' && user.role !== 'ORG_ADMIN') {
-      throw new ForbiddenException('Only ORG_ADMIN can update org-scoped playlists');
+      throw new ForbiddenException(
+        'Only ORG_ADMIN can update org-scoped playlists',
+      );
     }
 
     return this.prisma.playlist.update({ where: { id }, data: dto });
@@ -96,7 +106,9 @@ export class PlaylistsService {
     if (!playlist) throw new NotFoundException('Playlist not found');
 
     if (playlist.scope === 'ORG' && user.role !== 'ORG_ADMIN') {
-      throw new ForbiddenException('Only ORG_ADMIN can delete org-scoped playlists');
+      throw new ForbiddenException(
+        'Only ORG_ADMIN can delete org-scoped playlists',
+      );
     }
 
     await this.prisma.playlist.delete({ where: { id } });
@@ -110,14 +122,20 @@ export class PlaylistsService {
 
     if (!playlist) throw new NotFoundException('Playlist not found');
 
-    const count = await this.prisma.playlistTrack.count({ where: { playlistId } });
+    const count = await this.prisma.playlistTrack.count({
+      where: { playlistId },
+    });
 
     return this.prisma.playlistTrack.create({
       data: { playlistId, trackId, position: count },
     });
   }
 
-  async reorderTracks(playlistId: string, orderedTrackIds: string[], user: JwtPayload) {
+  async reorderTracks(
+    playlistId: string,
+    orderedTrackIds: string[],
+    user: JwtPayload,
+  ) {
     const playlist = await this.prisma.playlist.findFirst({
       where: { id: playlistId, organizationId: user.organizationId! },
     });
@@ -143,7 +161,9 @@ export class PlaylistsService {
 
     if (!playlist) throw new NotFoundException('Playlist not found');
 
-    await this.prisma.playlistTrack.deleteMany({ where: { playlistId, trackId } });
+    await this.prisma.playlistTrack.deleteMany({
+      where: { playlistId, trackId },
+    });
     return { message: 'Track removed from playlist' };
   }
 }

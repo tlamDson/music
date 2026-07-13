@@ -12,6 +12,6 @@ export class ZodValidationPipe implements PipeTransform {
         errors: result.error.flatten().fieldErrors,
       });
     }
-    return result.data;
+    return result.data as unknown;
   }
 }

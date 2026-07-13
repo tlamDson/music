@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginSchema, RefreshTokenSchema } from '@cafe-music/shared';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -9,13 +9,24 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body(new ZodValidationPipe(LoginSchema)) body: { email: string; password: string }) {
+  login(
+    @Body(new ZodValidationPipe(LoginSchema))
+    body: {
+      email: string;
+      password: string;
+    },
+  ) {
     return this.authService.login(body);
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  refresh(@Body(new ZodValidationPipe(RefreshTokenSchema)) body: { refreshToken: string }) {
+  refresh(
+    @Body(new ZodValidationPipe(RefreshTokenSchema))
+    body: {
+      refreshToken: string;
+    },
+  ) {
     return this.authService.refreshTokens(body.refreshToken);
   }
 }

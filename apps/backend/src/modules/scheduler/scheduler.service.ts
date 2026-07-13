@@ -41,7 +41,10 @@ export class SchedulerService {
             systemPayload,
           );
         } catch (err) {
-          this.logger.error(`Failed to auto-play schedule ${schedule.id}:`, err);
+          this.logger.error(
+            `Failed to auto-play schedule ${schedule.id}:`,
+            err,
+          );
         }
       }
     }
@@ -54,8 +57,10 @@ export class SchedulerService {
 
       const [minutePart, hourPart] = parts;
 
-      const matchMinute = minutePart === '*' || parseInt(minutePart) === now.getMinutes();
-      const matchHour = hourPart === '*' || parseInt(hourPart) === now.getHours();
+      const matchMinute =
+        minutePart === '*' || parseInt(minutePart) === now.getMinutes();
+      const matchHour =
+        hourPart === '*' || parseInt(hourPart) === now.getHours();
 
       return matchMinute && matchHour;
     } catch {

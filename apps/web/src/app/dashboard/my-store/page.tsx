@@ -26,7 +26,7 @@ export default function MyStorePage() {
 
   const { offset, measureOffset } = useClockOffset();
   const storeId = user?.storeId ?? '';
-  const { isConnected, nowPlaying, isPlaying } = useSync({
+  const { isConnected, nowPlaying } = useSync({
     storeId,
     token,
     audioRef,
@@ -43,11 +43,13 @@ export default function MyStorePage() {
 
     void measureOffset();
 
-    api.get<StoreStatus>(`/stores/${user.storeId}/status`)
+    api
+      .get<StoreStatus>(`/stores/${user.storeId}/status`)
       .then(setStatus)
       .catch(() => null);
 
-    api.get<ApiResponse<Playlist[]>>('/playlists')
+    api
+      .get<ApiResponse<Playlist[]>>('/playlists')
       .then((res) => setPlaylists(res.data))
       .catch(() => []);
   }, [user, measureOffset]);
@@ -82,9 +84,7 @@ export default function MyStorePage() {
 
   if (!user?.storeId) {
     return (
-      <div style={{ color: 'var(--color-foreground)' }}>
-        No store assigned to your account.
-      </div>
+      <div style={{ color: 'var(--color-foreground)' }}>No store assigned to your account.</div>
     );
   }
 
@@ -109,7 +109,9 @@ export default function MyStorePage() {
       >
         <div
           className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: isConnected ? 'var(--color-accent)' : 'var(--color-destructive)' }}
+          style={{
+            backgroundColor: isConnected ? 'var(--color-accent)' : 'var(--color-destructive)',
+          }}
         />
         <div>
           <p className="text-sm font-medium" style={{ color: 'var(--color-foreground)' }}>
@@ -119,8 +121,8 @@ export default function MyStorePage() {
             {status?.override?.isOverridden
               ? 'Overriding — playing independently'
               : status?.syncGroupId
-              ? 'In sync group'
-              : 'Not in any sync group'}
+                ? 'In sync group'
+                : 'Not in any sync group'}
           </p>
         </div>
       </div>
@@ -129,11 +131,20 @@ export default function MyStorePage() {
       {nowPlaying && (
         <div
           className="p-4 rounded-xl"
-          style={{ backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)' }}
+          style={{
+            backgroundColor: 'rgba(34,197,94,0.08)',
+            border: '1px solid rgba(34,197,94,0.3)',
+          }}
         >
-          <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-accent)' }}>NOW PLAYING</p>
-          <p className="text-sm" style={{ color: 'var(--color-foreground)' }}>{nowPlaying.trackId}</p>
-          <p className="text-xs mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>Mode: {nowPlaying.mode} · offset: {offset}ms</p>
+          <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-accent)' }}>
+            NOW PLAYING
+          </p>
+          <p className="text-sm" style={{ color: 'var(--color-foreground)' }}>
+            {nowPlaying.trackId}
+          </p>
+          <p className="text-xs mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+            Mode: {nowPlaying.mode} · offset: {offset}ms
+          </p>
         </div>
       )}
 
@@ -157,19 +168,29 @@ export default function MyStorePage() {
                 value={selectedPlaylist}
                 onChange={(e) => setSelectedPlaylist(e.target.value)}
                 className="px-4 py-2 rounded-lg text-sm outline-none cursor-pointer"
-                style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-foreground)', border: '1px solid var(--color-border)' }}
+                style={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-foreground)',
+                  border: '1px solid var(--color-border)',
+                }}
                 aria-label="Select override playlist"
               >
                 <option value="">— Select playlist (optional) —</option>
                 {playlists.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
               <button
                 onClick={() => void handleOverride()}
                 disabled={overriding}
                 className="w-full py-2 rounded-lg text-sm font-medium cursor-pointer transition-all hover:opacity-80"
-                style={{ backgroundColor: 'var(--color-destructive)', color: 'white', opacity: overriding ? 0.6 : 1 }}
+                style={{
+                  backgroundColor: 'var(--color-destructive)',
+                  color: 'white',
+                  opacity: overriding ? 0.6 : 1,
+                }}
               >
                 {overriding ? 'Overriding...' : 'Override Sync Group'}
               </button>
@@ -178,7 +199,11 @@ export default function MyStorePage() {
             <div className="flex flex-col gap-3">
               <div
                 className="p-3 rounded-lg text-sm"
-                style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-destructive)' }}
+                style={{
+                  backgroundColor: 'rgba(239,68,68,0.1)',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  color: 'var(--color-destructive)',
+                }}
               >
                 Currently overriding sync group
               </div>

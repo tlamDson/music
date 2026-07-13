@@ -10,6 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { JwtPayload } from '@cafe-music/shared';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -24,22 +25,26 @@ export class SyncGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private config: ConfigService,
   ) {}
 
-  async handleConnection(client: Socket) {
+  handleConnection(client: Socket) {
     try {
       const token =
         (client.handshake.auth['token'] as string) ||
-        (client.handshake.headers['authorization'] as string)?.replace('Bearer ', '');
+        (client.handshake.headers['authorization'] as string)?.replace(
+          'Bearer ',
+          '',
+        );
 
       if (!token) {
         client.disconnect();
         return;
       }
 
-      const payload = this.jwtService.verify(token, {
+      const payload = this.jwtService.verify<JwtPayload>(token, {
         secret: this.config.get<string>('JWT_ACCESS_SECRET'),
       });
 
-      client.data['user'] = payload;
+      const data = client.data as { user?: JwtPayload };
+      data.user = payload;
     } catch {
       client.disconnect();
     }
@@ -50,13 +55,19 @@ export class SyncGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('join-group')
-  handleJoinGroup(@ConnectedSocket() client: Socket, @MessageBody() data: { groupId: string }) {
+  handleJoinGroup(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { groupId: string },
+  ) {
     void client.join(`sync-group:${data.groupId}`);
     return { event: 'joined', data: { groupId: data.groupId } };
   }
 
   @SubscribeMessage('leave-group')
-  handleLeaveGroup(@ConnectedSocket() client: Socket, @MessageBody() data: { groupId: string }) {
+  handleLeaveGroup(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { groupId: string },
+  ) {
     void client.leave(`sync-group:${data.groupId}`);
     return { event: 'left', data: { groupId: data.groupId } };
   }
@@ -67,6 +78,9 @@ export class SyncGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('clock-sync')
   handleClockSync(@MessageBody() data: { clientTs: number }) {
-    return { event: 'clock-sync', data: { clientTs: data.clientTs, serverTs: Date.now() } };
+    return {
+      event: 'clock-sync',
+      data: { clientTs: data.clientTs, serverTs: Date.now() },
+    };
   }
 }

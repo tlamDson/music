@@ -1,5 +1,18 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, ParseUUIDPipe } from '@nestjs/common';
-import { UsersService, CreateUserSchema, UpdateUserSchema } from './users.service';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import {
+  UsersService,
+  CreateUserSchema,
+  UpdateUserSchema,
+} from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -21,7 +34,8 @@ export class UsersController {
 
   @Post()
   create(
-    @Body(new ZodValidationPipe(CreateUserSchema)) dto: z.infer<typeof CreateUserSchema>,
+    @Body(new ZodValidationPipe(CreateUserSchema))
+    dto: z.infer<typeof CreateUserSchema>,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.usersService.create(dto, user);
@@ -30,7 +44,8 @@ export class UsersController {
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body(new ZodValidationPipe(UpdateUserSchema)) dto: z.infer<typeof UpdateUserSchema>,
+    @Body(new ZodValidationPipe(UpdateUserSchema))
+    dto: z.infer<typeof UpdateUserSchema>,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.usersService.update(id, dto, user);
