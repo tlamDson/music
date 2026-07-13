@@ -61,3 +61,7 @@ prisma/generated/
 # Claude Code — personal/machine-local, không chia sẻ team
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Python bytecode
+__pycache__/
+*.pyc
