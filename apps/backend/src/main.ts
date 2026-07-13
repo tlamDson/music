@@ -16,8 +16,13 @@ async function bootstrap() {
     }),
   );
 
+  const corsOrigins =
+    process.env.NODE_ENV === 'production'
+      ? [process.env.WEB_URL || 'http://localhost:3000']
+      : true; // allow all origins in development
+
   app.enableCors({
-    origin: process.env.WEB_URL || 'http://localhost:3000',
+    origin: corsOrigins,
     credentials: true,
   });
 
@@ -26,4 +31,4 @@ async function bootstrap() {
   console.log(`Backend running on http://localhost:${port}${API_PREFIX}`);
 }
 
-bootstrap();
+void bootstrap();
