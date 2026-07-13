@@ -57,3 +57,7 @@ prisma/generated/
 
 # MinIO / S3 local data
 .minio/
+
+# Claude Code — personal/machine-local, không chia sẻ team
+CLAUDE.local.md
+.claude/settings.local.json
