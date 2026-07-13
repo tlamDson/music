@@ -39,7 +39,8 @@ export class PlaylistsController {
 
   @Post()
   create(
-    @Body(new ZodValidationPipe(CreatePlaylistSchema)) dto: z.infer<typeof CreatePlaylistSchema>,
+    @Body(new ZodValidationPipe(CreatePlaylistSchema))
+    dto: z.infer<typeof CreatePlaylistSchema>,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.playlistsService.create(dto, user);
@@ -47,7 +48,8 @@ export class PlaylistsController {
 
   @Get()
   findAll(
-    @Query(new ZodValidationPipe(PaginationSchema)) query: { page: number; limit: number },
+    @Query(new ZodValidationPipe(PaginationSchema))
+    query: { page: number; limit: number },
     @CurrentUser() user: JwtPayload,
   ) {
     return this.playlistsService.findAll(user, query);
@@ -64,7 +66,8 @@ export class PlaylistsController {
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body(new ZodValidationPipe(UpdatePlaylistSchema)) dto: z.infer<typeof UpdatePlaylistSchema>,
+    @Body(new ZodValidationPipe(UpdatePlaylistSchema))
+    dto: z.infer<typeof UpdatePlaylistSchema>,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.playlistsService.update(id, dto, user);

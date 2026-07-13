@@ -35,7 +35,10 @@ describe('TracksService', () => {
   beforeEach(async () => {
     const prismaMock = mockDeep<PrismaClient>();
     const s3Mock = {
-      uploadFile: jest.fn().mockResolvedValue({ key: 'org-1/tracks/uuid.mp3', url: 'https://s3/file.mp3' }),
+      uploadFile: jest.fn().mockResolvedValue({
+        key: 'org-1/tracks/uuid.mp3',
+        url: 'https://s3/file.mp3',
+      }),
       getPresignedUrl: jest.fn().mockResolvedValue('https://s3/presigned-url'),
       deleteFile: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<S3Service>;
@@ -55,28 +58,57 @@ describe('TracksService', () => {
 
   describe('upload validation', () => {
     it('should throw BadRequestException for non-audio file', async () => {
-      const invalidFile = { mimetype: 'image/jpeg', size: 1000, buffer: Buffer.from(''), originalname: 'photo.jpg' } as Express.Multer.File;
+      const invalidFile = {
+        mimetype: 'image/jpeg',
+        size: 1000,
+        buffer: Buffer.from(''),
+        originalname: 'photo.jpg',
+      } as Express.Multer.File;
 
       await expect(
-        service.create({ title: 'Test', artist: 'Artist' }, invalidFile, mockJwtPayload),
+        service.create(
+          { title: 'Test', artist: 'Artist' },
+          invalidFile,
+          mockJwtPayload,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException for file exceeding max size', async () => {
-      const bigFile = { mimetype: 'audio/mpeg', size: 60 * 1024 * 1024, buffer: Buffer.from(''), originalname: 'big.mp3' } as Express.Multer.File;
+      const bigFile = {
+        mimetype: 'audio/mpeg',
+        size: 60 * 1024 * 1024,
+        buffer: Buffer.from(''),
+        originalname: 'big.mp3',
+      } as Express.Multer.File;
 
       await expect(
-        service.create({ title: 'Test', artist: 'Artist' }, bigFile, mockJwtPayload),
+        service.create(
+          { title: 'Test', artist: 'Artist' },
+          bigFile,
+          mockJwtPayload,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should upload valid mp3 and save track metadata', async () => {
-      const validFile = { mimetype: 'audio/mpeg', size: 5 * 1024 * 1024, buffer: Buffer.from(''), originalname: 'song.mp3' } as Express.Multer.File;
+      const validFile = {
+        mimetype: 'audio/mpeg',
+        size: 5 * 1024 * 1024,
+        buffer: Buffer.from(''),
+        originalname: 'song.mp3',
+      } as Express.Multer.File;
       prisma.track.create.mockResolvedValue(mockTrack as any);
 
-      const result = await service.create({ title: 'Test Song', artist: 'Test Artist' }, validFile, mockJwtPayload);
+      const result = await service.create(
+        { title: 'Test Song', artist: 'Test Artist' },
+        validFile,
+        mockJwtPayload,
+      );
 
-      expect(s3.uploadFile).toHaveBeenCalledWith(expect.objectContaining({ organizationId: 'org-1' }));
+      expect(s3.uploadFile).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: 'org-1' }),
+      );
       expect(prisma.track.create).toHaveBeenCalled();
       expect(result).toMatchObject({ title: 'Test Song' });
     });
@@ -95,7 +127,9 @@ describe('TracksService', () => {
     it('should throw NotFoundException if track not in org', async () => {
       prisma.track.findFirst.mockResolvedValue(null);
 
-      await expect(service.getStreamUrl('track-1', mockJwtPayload)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getStreamUrl('track-1', mockJwtPayload),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

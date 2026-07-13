@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -34,8 +44,9 @@ export class SchedulerController {
 
   @Post()
   create(
-    @Body(new ZodValidationPipe(CreateScheduleSchema)) dto: z.infer<typeof CreateScheduleSchema>,
-    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(CreateScheduleSchema))
+    dto: z.infer<typeof CreateScheduleSchema>,
+    @CurrentUser() _user: JwtPayload,
   ) {
     return this.prisma.playlistSchedule.create({
       data: dto,

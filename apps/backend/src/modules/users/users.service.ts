@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '@cafe-music/shared';
@@ -28,14 +32,23 @@ export class UsersService {
   async findAll(user: JwtPayload) {
     const users = await this.prisma.user.findMany({
       where: { organizationId: user.organizationId! },
-      select: { id: true, email: true, name: true, role: true, storeId: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        storeId: true,
+        createdAt: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
     return { data: users };
   }
 
   async create(dto: CreateUserDto, user: JwtPayload) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (existing) throw new ConflictException('Email already in use');
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -49,7 +62,14 @@ export class UsersService {
         organizationId: user.organizationId!,
         storeId: dto.storeId ?? null,
       },
-      select: { id: true, email: true, name: true, role: true, storeId: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        storeId: true,
+        createdAt: true,
+      },
     });
 
     return created;

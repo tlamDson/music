@@ -32,9 +32,16 @@ export class RedisService {
     await this.client.del(`sync-group:${groupId}:state`);
   }
 
-  async setStoreOverride(storeId: string, override: StoreOverride): Promise<void> {
+  async setStoreOverride(
+    storeId: string,
+    override: StoreOverride,
+  ): Promise<void> {
     const key = `store:${storeId}:override`;
-    await this.client.setex(key, this.GROUP_STATE_TTL, JSON.stringify(override));
+    await this.client.setex(
+      key,
+      this.GROUP_STATE_TTL,
+      JSON.stringify(override),
+    );
   }
 
   async getStoreOverride(storeId: string): Promise<StoreOverride | null> {

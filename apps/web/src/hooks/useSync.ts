@@ -20,11 +20,11 @@ interface SyncState {
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:3001';
 
-export function useSync({ storeId, token, audioRef, clockOffset = 0 }: UseSyncOptions): SyncState {
+export function useSync({ token, audioRef, clockOffset = 0 }: UseSyncOptions): SyncState {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<WsNowPlayingPayload | null>(null);
-  const [groupState, setGroupState] = useState<Partial<SyncGroupState> | null>(null);
+  const [groupState] = useState<Partial<SyncGroupState> | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const handleNowPlaying = useCallback(

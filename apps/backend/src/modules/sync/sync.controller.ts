@@ -1,11 +1,23 @@
-import { Controller, Post, Get, Body, Param, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  UseGuards,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { SyncService } from './sync.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { PlayGroupSchema, OverrideSchema, JwtPayload } from '@cafe-music/shared';
+import {
+  PlayGroupSchema,
+  OverrideSchema,
+  JwtPayload,
+} from '@cafe-music/shared';
 import { z } from 'zod';
 
 @Controller('sync')
@@ -17,7 +29,8 @@ export class SyncController {
   @Roles('ORG_ADMIN')
   play(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body(new ZodValidationPipe(PlayGroupSchema)) dto: z.infer<typeof PlayGroupSchema>,
+    @Body(new ZodValidationPipe(PlayGroupSchema))
+    dto: z.infer<typeof PlayGroupSchema>,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.syncService.play(id, dto, user);
@@ -25,18 +38,27 @@ export class SyncController {
 
   @Post('groups/:id/pause')
   @Roles('ORG_ADMIN')
-  pause(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+  pause(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
     return this.syncService.pause(id, user);
   }
 
   @Post('groups/:id/skip')
   @Roles('ORG_ADMIN')
-  skip(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+  skip(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
     return this.syncService.skip(id, user);
   }
 
   @Get('groups/:id/state')
-  getState(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+  getState(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
     return this.syncService.getGroupState(id, user);
   }
 
@@ -44,7 +66,8 @@ export class SyncController {
   @Roles('ORG_ADMIN', 'STORE_ADMIN')
   override(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body(new ZodValidationPipe(OverrideSchema)) dto: z.infer<typeof OverrideSchema>,
+    @Body(new ZodValidationPipe(OverrideSchema))
+    dto: z.infer<typeof OverrideSchema>,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.syncService.override(id, dto, user);
@@ -52,7 +75,10 @@ export class SyncController {
 
   @Post('stores/:id/rejoin')
   @Roles('ORG_ADMIN', 'STORE_ADMIN')
-  rejoin(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload) {
+  rejoin(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
     return this.syncService.rejoin(id, user);
   }
 

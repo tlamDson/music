@@ -9,7 +9,14 @@ import { S3Service } from './s3.service';
 import { JwtPayload, CreateTrackMetaDto } from '@cafe-music/shared';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
-const ALLOWED_MIMETYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/flac', 'audio/ogg', 'audio/aac'];
+const ALLOWED_MIMETYPES = [
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/wav',
+  'audio/flac',
+  'audio/ogg',
+  'audio/aac',
+];
 
 @Injectable()
 export class TracksService {
@@ -18,12 +25,20 @@ export class TracksService {
     private s3: S3Service,
   ) {}
 
-  async create(dto: CreateTrackMetaDto, file: Express.Multer.File, user: JwtPayload) {
+  async create(
+    dto: CreateTrackMetaDto,
+    file: Express.Multer.File,
+    user: JwtPayload,
+  ) {
     if (!ALLOWED_MIMETYPES.includes(file.mimetype)) {
-      throw new BadRequestException(`Invalid file type: ${file.mimetype}. Only audio files are allowed.`);
+      throw new BadRequestException(
+        `Invalid file type: ${file.mimetype}. Only audio files are allowed.`,
+      );
     }
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException(`File too large. Max size is ${MAX_FILE_SIZE / 1024 / 1024}MB.`);
+      throw new BadRequestException(
+        `File too large. Max size is ${MAX_FILE_SIZE / 1024 / 1024}MB.`,
+      );
     }
 
     const key = `${user.organizationId}/tracks/${randomUUID()}-${file.originalname.replace(/\s+/g, '_')}`;
@@ -66,7 +81,9 @@ export class TracksService {
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.track.count({ where: { organizationId: user.organizationId! } }),
+      this.prisma.track.count({
+        where: { organizationId: user.organizationId! },
+      }),
     ]);
 
     return { data, meta: { page, limit, total } };
