@@ -26,8 +26,13 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     const prismaMock = mockDeep<PrismaClient>();
-    const jwtMock = { sign: jest.fn().mockReturnValue('mock-token'), verify: jest.fn() } as unknown as jest.Mocked<JwtService>;
-    const configMock = { get: jest.fn().mockReturnValue('secret') } as unknown as jest.Mocked<ConfigService>;
+    const jwtMock = {
+      sign: jest.fn().mockReturnValue('mock-token'),
+      verify: jest.fn(),
+    } as unknown as jest.Mocked<JwtService>;
+    const configMock = {
+      get: jest.fn().mockReturnValue('secret'),
+    } as unknown as jest.Mocked<ConfigService>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -50,7 +55,10 @@ describe('AuthService', () => {
       // mock bcrypt compare to return true
       jest.spyOn(require('bcrypt'), 'compare').mockResolvedValue(true as never);
 
-      const result = await service.login({ email: 'admin@cafe.com', password: 'password123' });
+      const result = await service.login({
+        email: 'admin@cafe.com',
+        password: 'password123',
+      });
 
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
@@ -67,7 +75,9 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException when password is wrong', async () => {
       prisma.user.findUnique.mockResolvedValue(mockUser as any);
-      jest.spyOn(require('bcrypt'), 'compare').mockResolvedValue(false as never);
+      jest
+        .spyOn(require('bcrypt'), 'compare')
+        .mockResolvedValue(false as never);
 
       await expect(
         service.login({ email: 'admin@cafe.com', password: 'wrongpassword' }),
@@ -77,7 +87,13 @@ describe('AuthService', () => {
 
   describe('validateToken', () => {
     it('should return user when token is valid', async () => {
-      const payload = { sub: 'user-1', email: 'admin@cafe.com', role: 'ORG_ADMIN', organizationId: 'org-1', storeId: null };
+      const payload = {
+        sub: 'user-1',
+        email: 'admin@cafe.com',
+        role: 'ORG_ADMIN' as const,
+        organizationId: 'org-1',
+        storeId: null,
+      };
       prisma.user.findUnique.mockResolvedValue(mockUser as any);
 
       const result = await service.validateJwtPayload(payload);
@@ -86,7 +102,13 @@ describe('AuthService', () => {
     });
 
     it('should return null when user not found', async () => {
-      const payload = { sub: 'non-existent', email: 'x@x.com', role: 'ORG_ADMIN', organizationId: 'org-1', storeId: null };
+      const payload = {
+        sub: 'non-existent',
+        email: 'x@x.com',
+        role: 'ORG_ADMIN' as const,
+        organizationId: 'org-1',
+        storeId: null,
+      };
       prisma.user.findUnique.mockResolvedValue(null);
 
       const result = await service.validateJwtPayload(payload);

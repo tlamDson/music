@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 
 describe('App (e2e)', () => {
@@ -20,6 +20,9 @@ describe('App (e2e)', () => {
   });
 
   it('/api/health (GET)', () => {
-    return request(app.getHttpServer()).get('/api/health').expect(200).expect({ status: 'ok' });
+    return request(app.getHttpServer())
+      .get('/api/health')
+      .expect(200)
+      .expect({ status: 'ok' });
   });
 });
