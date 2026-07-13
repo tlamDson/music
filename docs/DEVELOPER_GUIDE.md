@@ -8,13 +8,13 @@ Nền tảng phát nhạc đồng bộ cho chuỗi quán cafe. Monorepo TypeScri
 
 ### Prerequisites
 
-| Tool | Version | Dùng cho |
-|------|---------|----------|
-| Node.js | >= 20 LTS | Backend, web, build |
-| pnpm | >= 11 | Quản lý monorepo |
-| Git | latest | Version control |
-| Docker Desktop | latest | Postgres, Redis, MinIO (dev) |
-| Python | 3.x | UI UX Pro Max design system scripts |
+| Tool           | Version   | Dùng cho                            |
+| -------------- | --------- | ----------------------------------- |
+| Node.js        | >= 20 LTS | Backend, web, build                 |
+| pnpm           | >= 11     | Quản lý monorepo                    |
+| Git            | latest    | Version control                     |
+| Docker Desktop | latest    | Postgres, Redis, MinIO (dev)        |
+| Python         | 3.x       | UI UX Pro Max design system scripts |
 
 **Cài đặt nhanh (Windows):**
 
@@ -57,13 +57,24 @@ docker compose up -d
 
 Services:
 
-| Service | URL / Port | Mục đích |
-|---------|------------|----------|
-| PostgreSQL | `localhost:5432` | Database chính |
-| PostgreSQL (test) | `localhost:5433` | Integration tests |
-| Redis | `localhost:6379` | Sync state, pub/sub |
-| MinIO | `http://localhost:9000` | S3-compatible storage |
-| MinIO Console | `http://localhost:9001` | Quản lý bucket |
+| Service           | URL / Port              | Mục đích              |
+| ----------------- | ----------------------- | --------------------- |
+| PostgreSQL        | `localhost:5432`        | Database chính        |
+| PostgreSQL (test) | `localhost:5433`        | Integration tests     |
+| Redis             | `localhost:6379`        | Sync state, pub/sub   |
+| MinIO             | `http://localhost:9000` | S3-compatible storage |
+| MinIO Console     | `http://localhost:9001` | Quản lý bucket        |
+
+### Database Schema (dev)
+
+Dev dùng `prisma db push` để đồng bộ schema (chưa dùng migrations):
+
+```bash
+pnpm --filter @cafe-music/backend exec prisma db push
+pnpm --filter @cafe-music/backend prisma:seed
+```
+
+> Migrations sẽ được baseline (`prisma migrate dev`) trước release production đầu tiên. Không tự tạo migration lẻ khi chưa có baseline.
 
 ### Environment Files
 
@@ -107,15 +118,15 @@ develop  ←  feature/*  (PR + CI pass)
 main     ←  develop    (PR + CI pass, production-ready)
 ```
 
-| Nhánh | Mục đích |
-|-------|----------|
-| `main` | Production-ready. Chỉ merge từ `develop`. Có branch protection. |
-| `develop` | Integration branch. Mọi feature PR merge vào đây. |
-| `feature/*` | Làm việc hàng ngày. Tạo từ `develop`. |
-| `fix/*` | Bug fix. Tạo từ `develop` (hoặc `main` nếu hotfix production). |
-| `test/*` | Thêm/sửa tests. |
-| `chore/*` | CI, tooling, config. |
-| `docs/*` | Tài liệu. |
+| Nhánh       | Mục đích                                                        |
+| ----------- | --------------------------------------------------------------- |
+| `main`      | Production-ready. Chỉ merge từ `develop`. Có branch protection. |
+| `develop`   | Integration branch. Mọi feature PR merge vào đây.               |
+| `feature/*` | Làm việc hàng ngày. Tạo từ `develop`.                           |
+| `fix/*`     | Bug fix. Tạo từ `develop` (hoặc `main` nếu hotfix production).  |
+| `test/*`    | Thêm/sửa tests.                                                 |
+| `chore/*`   | CI, tooling, config.                                            |
+| `docs/*`    | Tài liệu.                                                       |
 
 ### Step by Step
 
@@ -142,22 +153,23 @@ git push -u origin feature/auth-module
 
 ### Branch Naming Convention
 
-| Type | Format | Example |
-|------|--------|---------|
-| New feature | `feature/<description>` | `feature/sync-engine` |
-| Bug fix | `fix/<description>` | `fix/player-autoplay-unlock` |
-| Add tests | `test/<module>` | `test/playlists-service` |
-| Docs | `docs/<name>` | `docs/developer-guide` |
-| CI/CD, tooling | `chore/<description>` | `chore/ci-github-actions` |
+| Type           | Format                  | Example                      |
+| -------------- | ----------------------- | ---------------------------- |
+| New feature    | `feature/<description>` | `feature/sync-engine`        |
+| Bug fix        | `fix/<description>`     | `fix/player-autoplay-unlock` |
+| Add tests      | `test/<module>`         | `test/playlists-service`     |
+| Docs           | `docs/<name>`           | `docs/developer-guide`       |
+| CI/CD, tooling | `chore/<description>`   | `chore/ci-github-actions`    |
 
 **Quy tắc:**
+
 - Chữ thường, dùng dấu `-` phân tách từ
 - Ngắn gọn, mô tả đúng phạm vi task
 - Không dùng tên chung chung: `feature/update`, `fix/bug`
 
 ### Writing Good Commit Messages
 
-Viết ở **imperative mood** — hoàn thành câu: *"If applied, this commit will… **[your message]**"*
+Viết ở **imperative mood** — hoàn thành câu: _"If applied, this commit will… **[your message]**"_
 
 **Good**
 
@@ -178,12 +190,12 @@ added stuff
 
 **Scope gợi ý theo app:**
 
-| Prefix ngầm | Ví dụ |
-|-------------|-------|
-| Backend module | `add sync override endpoint for store admin` |
-| Frontend UI | `add player bar component with override button` |
-| Shared types | `add PlayGroupDto schema to shared package` |
-| CI/docs | `chore: simplify ci-pr workflow to unit tests only` |
+| Prefix ngầm    | Ví dụ                                               |
+| -------------- | --------------------------------------------------- |
+| Backend module | `add sync override endpoint for store admin`        |
+| Frontend UI    | `add player bar component with override button`     |
+| Shared types   | `add PlayGroupDto schema to shared package`         |
+| CI/docs        | `chore: simplify ci-pr workflow to unit tests only` |
 
 ---
 
@@ -201,11 +213,11 @@ Chi tiết: [`.cursor/rules/tdd-workflow.mdc`](../.cursor/rules/tdd-workflow.mdc
 
 ### Test Locations
 
-| Layer | Backend | Frontend |
-|-------|---------|----------|
-| Unit | `apps/backend/test/unit/<module>.service.spec.ts` | `apps/web/__tests__/unit/<Component>.test.tsx` |
-| Integration | `apps/backend/test/integration/` | `apps/web/__tests__/integration/` |
-| E2E | `apps/backend/test/e2e/` | `apps/web/__tests__/e2e/` (Playwright) |
+| Layer       | Backend                                           | Frontend                                       |
+| ----------- | ------------------------------------------------- | ---------------------------------------------- |
+| Unit        | `apps/backend/test/unit/<module>.service.spec.ts` | `apps/web/__tests__/unit/<Component>.test.tsx` |
+| Integration | `apps/backend/test/integration/`                  | `apps/web/__tests__/integration/`              |
+| E2E         | `apps/backend/test/e2e/`                          | `apps/web/__tests__/e2e/` (Playwright)         |
 
 ### Run Tests Locally
 
@@ -229,12 +241,12 @@ pnpm --filter @cafe-music/web test:e2e
 
 ### When Does CI Run?
 
-| Event | Workflow | Job name | Chạy? |
-|-------|----------|----------|-------|
-| Push to `feature/*` | — | — | No |
-| Open PR → `develop` | `CI - PR Check` | `Lint + Unit Tests` | Yes |
-| Open PR → `main` | `CI - PR Check` | `Lint + Unit Tests` | Yes |
-| Push to `main` | `CI - Main (Full)` | `Full CI + Unit Tests` | Yes |
+| Event               | Workflow           | Job name               | Chạy? |
+| ------------------- | ------------------ | ---------------------- | ----- |
+| Push to `feature/*` | —                  | —                      | No    |
+| Open PR → `develop` | `CI - PR Check`    | `Lint + Unit Tests`    | Yes   |
+| Open PR → `main`    | `CI - PR Check`    | `Lint + Unit Tests`    | Yes   |
+| Push to `main`      | `CI - Main (Full)` | `Full CI + Unit Tests` | Yes   |
 
 ### Viewing Test Results
 
@@ -271,27 +283,30 @@ Lint + Unit Tests
 
 ### PR Title Convention
 
-| Type | Format | Example |
-|------|--------|---------|
-| Feature | `feat: <mô tả ngắn>` | `feat: add store admin playlist override` |
-| Fix | `fix: <mô tả ngắn>` | `fix: player seek position on tight sync mode` |
-| Test | `test: <module/scope>` | `test: auth service login validation` |
-| Docs | `docs: <mô tả>` | `docs: add developer guide` |
-| Chore | `chore: <mô tả>` | `chore: update ci-pr workflow` |
+| Type    | Format                 | Example                                        |
+| ------- | ---------------------- | ---------------------------------------------- |
+| Feature | `feat: <mô tả ngắn>`   | `feat: add store admin playlist override`      |
+| Fix     | `fix: <mô tả ngắn>`    | `fix: player seek position on tight sync mode` |
+| Test    | `test: <module/scope>` | `test: auth service login validation`          |
+| Docs    | `docs: <mô tả>`        | `docs: add developer guide`                    |
+| Chore   | `chore: <mô tả>`       | `chore: update ci-pr workflow`                 |
 
 ### PR Description Template
 
 ```markdown
 ## Summary
+
 - <1-3 bullet points: thay đổi gì và tại sao>
 
 ## Test plan
+
 - [ ] Unit tests added/updated (RED → GREEN)
 - [ ] `pnpm turbo test:unit` pass locally
 - [ ] No secrets or .env files committed
 - [ ] UI changes follow design-system/cafe-music/MASTER.md (if applicable)
 
 ## Screenshots (if UI)
+
 <!-- attach screenshots -->
 ```
 
@@ -356,16 +371,16 @@ cafe-music/
 
 ### Key Directories Explained
 
-| Path | Mô tả |
-|------|-------|
-| `apps/backend/src/modules/` | Mỗi domain một module NestJS (service, controller, test riêng) |
-| `apps/backend/prisma/schema.prisma` | Schema DB: org, store, playlist, track, sync group |
-| `apps/web/src/app/player/` | Trang phát nhạc tại quầy — kết nối WebSocket |
-| `apps/web/src/app/dashboard/` | Admin điều khiển playlist, sync group |
-| `packages/shared/` | DTO Zod + TypeScript types dùng chung — đổi ở đây, BE và FE cùng sync |
-| `design-system/cafe-music/MASTER.md` | Nguồn sự thật UI — đọc trước khi code frontend |
-| `.cursor/rules/` | Quy tắc bắt buộc cho AI assistant trong Cursor |
-| `.github/workflows/` | CI tự chạy khi PR/push |
+| Path                                 | Mô tả                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------- |
+| `apps/backend/src/modules/`          | Mỗi domain một module NestJS (service, controller, test riêng)        |
+| `apps/backend/prisma/schema.prisma`  | Schema DB: org, store, playlist, track, sync group                    |
+| `apps/web/src/app/player/`           | Trang phát nhạc tại quầy — kết nối WebSocket                          |
+| `apps/web/src/app/dashboard/`        | Admin điều khiển playlist, sync group                                 |
+| `packages/shared/`                   | DTO Zod + TypeScript types dùng chung — đổi ở đây, BE và FE cùng sync |
+| `design-system/cafe-music/MASTER.md` | Nguồn sự thật UI — đọc trước khi code frontend                        |
+| `.cursor/rules/`                     | Quy tắc bắt buộc cho AI assistant trong Cursor                        |
+| `.github/workflows/`                 | CI tự chạy khi PR/push                                                |
 
 ---
 
@@ -387,10 +402,10 @@ Chi tiết: [`.cursor/rules/frontend-ui-ux-pro-max.mdc`](../.cursor/rules/fronte
 
 ## 7. API Overview (Staging / Local)
 
-| Environment | API Base | Web |
-|-------------|----------|-----|
-| Local | `http://localhost:4000/api/v1` | `http://localhost:3000` |
-| Production | TBD | TBD |
+| Environment | API Base                       | Web                     |
+| ----------- | ------------------------------ | ----------------------- |
+| Local       | `http://localhost:4000/api/v1` | `http://localhost:3000` |
+| Production  | TBD                            | TBD                     |
 
 **Ví dụ local:**
 
