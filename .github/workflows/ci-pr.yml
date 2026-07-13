@@ -30,6 +30,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm turbo lint
+        env:
+          CI: true
+
       - name: Unit Tests - Backend + Frontend
         run: pnpm turbo test:unit
         env:

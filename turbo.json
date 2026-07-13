@@ -19,6 +19,7 @@
     },
     "test:unit": {
       "cache": true,
+      "dependsOn": ["^build"],
       "inputs": ["src/**", "test/unit/**", "__tests__/unit/**"],
       "outputs": ["coverage/**", ".turbo/**"]
     },
