@@ -12,7 +12,6 @@ const config: Config = {
     '^@cafe-music/shared(.*)$': '<rootDir>/../../packages/shared/src$1',
   },
   testEnvironment: 'node',
-  runInBand: true,
   testTimeout: 60000,
 };
 
