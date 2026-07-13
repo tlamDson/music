@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import type { JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -14,7 +15,9 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto): Promise<AuthTokens> {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
@@ -26,11 +29,13 @@ export class AuthService {
 
   async refreshTokens(refreshToken: string): Promise<AuthTokens> {
     try {
-      const payload = this.jwtService.verify(refreshToken, {
+      const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
         secret: this.config.get<string>('JWT_REFRESH_SECRET'),
       });
 
-      const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
       if (!user) throw new UnauthorizedException('User not found');
 
       return this.generateTokens(user);
@@ -40,7 +45,9 @@ export class AuthService {
   }
 
   async validateJwtPayload(payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
     return user ?? null;
   }
 
@@ -59,16 +66,27 @@ export class AuthService {
       storeId: user.storeId,
     };
 
-    const accessToken = this.jwtService.sign(payload, {
-      secret: this.config.get<string>('JWT_ACCESS_SECRET'),
-      expiresIn: this.config.get<string>('JWT_ACCESS_TTL') ?? '15m',
-    });
+    const accessToken = this.jwtService.sign(
+      { ...payload },
+      {
+        secret: this.config.get<string>('JWT_ACCESS_SECRET'),
+        expiresIn: this.ttl('JWT_ACCESS_TTL', '15m'),
+      },
+    );
 
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.config.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.config.get<string>('JWT_REFRESH_TTL') ?? '7d',
-    });
+    const refreshToken = this.jwtService.sign(
+      { ...payload },
+      {
+        secret: this.config.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: this.ttl('JWT_REFRESH_TTL', '7d'),
+      },
+    );
 
     return { accessToken, refreshToken };
+  }
+
+  private ttl(key: string, fallback: string): JwtSignOptions['expiresIn'] {
+    return (this.config.get<string>(key) ??
+      fallback) as JwtSignOptions['expiresIn'];
   }
 }
