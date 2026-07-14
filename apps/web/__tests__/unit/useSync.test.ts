@@ -1,5 +1,12 @@
 import { renderHook, act } from '@testing-library/react';
 import { useSync } from '../../src/hooks/useSync';
+import { api } from '../../src/lib/api-client';
+
+// Mock api client (dùng để lấy syncGroupId của store)
+jest.mock('../../src/lib/api-client', () => ({
+  api: { get: jest.fn() },
+}));
+const mockApiGet = api.get as jest.Mock;
 
 // Mock socket.io-client
 const mockSocket = {
@@ -37,7 +44,11 @@ describe('useSync hook', () => {
     const { io } = require('socket.io-client') as { io: jest.Mock };
 
     renderHook(() =>
-      useSync({ storeId: 'store-1', token: 'test-token', audioRef: { current: mockAudio as unknown as HTMLAudioElement } }),
+      useSync({
+        storeId: 'store-1',
+        token: 'test-token',
+        audioRef: { current: mockAudio as unknown as HTMLAudioElement },
+      }),
     );
 
     expect(io).toHaveBeenCalledWith(
@@ -53,7 +64,11 @@ describe('useSync hook', () => {
     });
 
     renderHook(() =>
-      useSync({ storeId: 'store-1', token: 'test-token', audioRef: { current: mockAudio as unknown as HTMLAudioElement } }),
+      useSync({
+        storeId: 'store-1',
+        token: 'test-token',
+        audioRef: { current: mockAudio as unknown as HTMLAudioElement },
+      }),
     );
 
     const nowPlayingPayload = {
@@ -73,6 +88,53 @@ describe('useSync hook', () => {
     expect(mockAudio.play).toHaveBeenCalled();
   });
 
+  it('should join the sync group room after connect', async () => {
+    const listeners: Record<string, (...args: unknown[]) => void> = {};
+    mockSocket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
+      listeners[event] = cb;
+    });
+    mockApiGet.mockResolvedValue({ storeId: 'store-1', syncGroupId: 'group-1' });
+
+    renderHook(() =>
+      useSync({
+        storeId: 'store-1',
+        token: 'test-token',
+        audioRef: { current: mockAudio as unknown as HTMLAudioElement },
+      }),
+    );
+
+    await act(async () => {
+      listeners['connect']?.();
+      await Promise.resolve();
+    });
+
+    expect(mockApiGet).toHaveBeenCalledWith('/stores/store-1/status');
+    expect(mockSocket.emit).toHaveBeenCalledWith('join-group', { groupId: 'group-1' });
+  });
+
+  it('should not join any room when store has no sync group', async () => {
+    const listeners: Record<string, (...args: unknown[]) => void> = {};
+    mockSocket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
+      listeners[event] = cb;
+    });
+    mockApiGet.mockResolvedValue({ storeId: 'store-1', syncGroupId: null });
+
+    renderHook(() =>
+      useSync({
+        storeId: 'store-1',
+        token: 'test-token',
+        audioRef: { current: mockAudio as unknown as HTMLAudioElement },
+      }),
+    );
+
+    await act(async () => {
+      listeners['connect']?.();
+      await Promise.resolve();
+    });
+
+    expect(mockSocket.emit).not.toHaveBeenCalledWith('join-group', expect.anything());
+  });
+
   it('should pause audio when paused event is received', async () => {
     const listeners: Record<string, (...args: unknown[]) => void> = {};
     mockSocket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
@@ -80,7 +142,11 @@ describe('useSync hook', () => {
     });
 
     renderHook(() =>
-      useSync({ storeId: 'store-1', token: 'test-token', audioRef: { current: mockAudio as unknown as HTMLAudioElement } }),
+      useSync({
+        storeId: 'store-1',
+        token: 'test-token',
+        audioRef: { current: mockAudio as unknown as HTMLAudioElement },
+      }),
     );
 
     await act(async () => {
