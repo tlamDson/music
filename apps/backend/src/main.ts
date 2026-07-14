@@ -2,6 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { API_PREFIX } from '@cafe-music/shared';
+import { installBigIntJsonSupport } from './common/bigint-json';
+
+installBigIntJsonSupport();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

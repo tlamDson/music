@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { WsNowPlayingPayload, SyncGroupState } from '@cafe-music/shared';
+import { api } from '../lib/api-client';
 
 interface UseSyncOptions {
   storeId: string;
@@ -20,7 +21,7 @@ interface SyncState {
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:3001';
 
-export function useSync({ token, audioRef, clockOffset = 0 }: UseSyncOptions): SyncState {
+export function useSync({ storeId, token, audioRef, clockOffset = 0 }: UseSyncOptions): SyncState {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<WsNowPlayingPayload | null>(null);
@@ -64,7 +65,23 @@ export function useSync({ token, audioRef, clockOffset = 0 }: UseSyncOptions): S
 
     socketRef.current = socket;
 
-    socket.on('connect', () => setIsConnected(true));
+    // Join room của sync group sau mỗi lần connect (kể cả reconnect),
+    // nếu không join thì broadcast now-playing/paused/stopped không tới player
+    const joinGroup = async () => {
+      try {
+        const status = await api.get<{ syncGroupId: string | null }>(`/stores/${storeId}/status`);
+        if (status.syncGroupId) {
+          socket.emit('join-group', { groupId: status.syncGroupId });
+        }
+      } catch {
+        // Store chưa có group hoặc API lỗi — player vẫn connected, chờ lần reconnect sau
+      }
+    };
+
+    socket.on('connect', () => {
+      setIsConnected(true);
+      void joinGroup();
+    });
     socket.on('disconnect', () => setIsConnected(false));
 
     socket.on('now-playing', (payload: WsNowPlayingPayload) => {
@@ -89,7 +106,7 @@ export function useSync({ token, audioRef, clockOffset = 0 }: UseSyncOptions): S
     return () => {
       socket.disconnect();
     };
-  }, [token, handleNowPlaying, audioRef]);
+  }, [token, storeId, handleNowPlaying, audioRef]);
 
   return { isConnected, nowPlaying, groupState, isPlaying };
 }
