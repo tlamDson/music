@@ -58,9 +58,11 @@ prisma/generated/
 # MinIO / S3 local data
 .minio/
 
-# Claude Code — personal/machine-local, không chia sẻ team
+# AI tooling — chỉ dùng local, không đưa lên GitHub
+CLAUDE.md
 CLAUDE.local.md
-.claude/settings.local.json
+.claude/
+.cursor/
 
 # Python bytecode
 __pycache__/
