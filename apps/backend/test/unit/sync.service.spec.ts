@@ -6,12 +6,14 @@ import { SyncService } from '../../src/modules/sync/sync.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { RedisService } from '../../src/modules/sync/redis.service';
 import { SyncGateway } from '../../src/modules/sync/sync.gateway';
+import { S3Service } from '../../src/modules/tracks/s3.service';
 
 describe('SyncService', () => {
   let service: SyncService;
   let prisma: DeepMockProxy<PrismaClient>;
   let redis: jest.Mocked<RedisService>;
   let gateway: jest.Mocked<SyncGateway>;
+  let s3: jest.Mocked<S3Service>;
 
   const orgAdminUser = {
     sub: 'user-1',
@@ -67,6 +69,11 @@ describe('SyncService', () => {
       broadcastToGroup: jest.fn(),
       server: { to: jest.fn().mockReturnThis(), emit: jest.fn() },
     } as unknown as jest.Mocked<SyncGateway>;
+    const s3Mock = {
+      getPresignedUrl: jest
+        .fn()
+        .mockResolvedValue('https://s3/presigned/song.mp3'),
+    } as unknown as jest.Mocked<S3Service>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -74,6 +81,7 @@ describe('SyncService', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: RedisService, useValue: redisMock },
         { provide: SyncGateway, useValue: gatewayMock },
+        { provide: S3Service, useValue: s3Mock },
       ],
     }).compile();
 
@@ -81,6 +89,7 @@ describe('SyncService', () => {
     prisma = module.get(PrismaService);
     redis = module.get(RedisService);
     gateway = module.get(SyncGateway);
+    s3 = module.get(S3Service);
   });
 
   describe('play', () => {
@@ -106,6 +115,31 @@ describe('SyncService', () => {
         'group-1',
         'now-playing',
         expect.any(Object),
+      );
+    });
+
+    it('should include presigned trackUrl in now-playing broadcast so players can load audio', async () => {
+      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
+      prisma.syncGroup.update.mockResolvedValue({
+        ...mockGroup,
+        status: 'PLAYING',
+      } as any);
+
+      await service.play(
+        'group-1',
+        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
+        orgAdminUser,
+      );
+
+      expect(s3.getPresignedUrl).toHaveBeenCalledWith('org-1/tracks/song.mp3');
+      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
+        'group-1',
+        'now-playing',
+        expect.objectContaining({
+          trackId: 'track-1',
+          trackUrl: 'https://s3/presigned/song.mp3',
+        }),
       );
     });
 

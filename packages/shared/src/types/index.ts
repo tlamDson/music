@@ -117,7 +117,7 @@ export type WsEventName =
 export interface WsNowPlayingPayload {
   groupId: string;
   trackId: string;
-  trackUrl: string;
+  trackUrl: string | null;
   positionMs: number;
   serverTs: number;
   mode: SyncMode;

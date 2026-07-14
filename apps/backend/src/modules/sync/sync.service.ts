@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from './redis.service';
 import { SyncGateway } from './sync.gateway';
+import { S3Service } from '../tracks/s3.service';
 import {
   JwtPayload,
   PlayGroupDto,
@@ -15,6 +16,7 @@ export class SyncService {
     private prisma: PrismaService,
     private redis: RedisService,
     private gateway: SyncGateway,
+    private s3: S3Service,
   ) {}
 
   async play(groupId: string, dto: PlayGroupDto, user: JwtPayload) {
@@ -37,6 +39,11 @@ export class SyncService {
     const trackEntry = playlist.playlistTracks[dto.trackIndex ?? 0];
     if (!trackEntry)
       throw new NotFoundException('Track not found at given index');
+
+    // Presign URL để player load được audio trực tiếp từ S3/MinIO
+    const trackUrl = trackEntry.track.s3Key
+      ? await this.s3.getPresignedUrl(trackEntry.track.s3Key)
+      : null;
 
     const serverTs = Date.now();
     const state: SyncGroupState = {
@@ -67,6 +74,7 @@ export class SyncService {
     this.gateway.broadcastToGroup(groupId, 'now-playing', {
       groupId,
       trackId: trackEntry.trackId,
+      trackUrl,
       positionMs: 0,
       serverTs,
       mode: state.mode,
