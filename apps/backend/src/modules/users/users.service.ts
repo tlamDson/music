@@ -13,13 +13,13 @@ export const CreateUserSchema = z.object({
   password: z.string().min(8),
   name: z.string().min(1),
   role: z.enum(['ORG_ADMIN', 'STORE_ADMIN']),
-  storeId: z.string().uuid().optional(),
+  storeId: z.string().min(1).optional(),
 });
 
 export const UpdateUserSchema = z.object({
   name: z.string().min(1).optional(),
   role: z.enum(['ORG_ADMIN', 'STORE_ADMIN']).optional(),
-  storeId: z.string().uuid().nullable().optional(),
+  storeId: z.string().min(1).nullable().optional(),
 });
 
 export type CreateUserDto = z.infer<typeof CreateUserSchema>;

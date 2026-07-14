@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseUUIDPipe,
 } from '@nestjs/common';
 import { PlaylistsService } from './playlists.service';
 import { FoldersService } from './folders.service';
@@ -25,8 +24,8 @@ import {
 } from '@cafe-music/shared';
 import { z } from 'zod';
 
-const AddTrackSchema = z.object({ trackId: z.string().uuid() });
-const ReorderSchema = z.object({ trackIds: z.array(z.string().uuid()) });
+const AddTrackSchema = z.object({ trackId: z.string().min(1) });
+const ReorderSchema = z.object({ trackIds: z.array(z.string().min(1)) });
 const CreateFolderSchema = z.object({ name: z.string().min(1).max(100) });
 
 @Controller('playlists')
@@ -56,16 +55,13 @@ export class PlaylistsController {
   }
 
   @Get(':id')
-  findOne(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.playlistsService.findOne(id, user);
   }
 
   @Patch(':id')
   update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdatePlaylistSchema))
     dto: z.infer<typeof UpdatePlaylistSchema>,
     @CurrentUser() user: JwtPayload,
@@ -74,16 +70,13 @@ export class PlaylistsController {
   }
 
   @Delete(':id')
-  remove(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.playlistsService.remove(id, user);
   }
 
   @Post(':id/tracks')
   addTrack(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(AddTrackSchema)) body: { trackId: string },
     @CurrentUser() user: JwtPayload,
   ) {
@@ -92,7 +85,7 @@ export class PlaylistsController {
 
   @Patch(':id/tracks/reorder')
   reorderTracks(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(ReorderSchema)) body: { trackIds: string[] },
     @CurrentUser() user: JwtPayload,
   ) {
@@ -101,8 +94,8 @@ export class PlaylistsController {
 
   @Delete(':id/tracks/:trackId')
   removeTrack(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('trackId', ParseUUIDPipe) trackId: string,
+    @Param('id') id: string,
+    @Param('trackId') trackId: string,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.playlistsService.removeTrack(id, trackId, user);
@@ -126,10 +119,7 @@ export class PlaylistsController {
 
   @Delete('/folders/:id')
   @Roles('ORG_ADMIN')
-  removeFolder(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  removeFolder(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.foldersService.remove(id, user);
   }
 }

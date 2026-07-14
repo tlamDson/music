@@ -9,7 +9,6 @@ import {
   UseInterceptors,
   UploadedFile,
   Body,
-  ParseUUIDPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { TracksService } from './tracks.service';
@@ -51,19 +50,13 @@ export class TracksController {
   }
 
   @Get(':id/stream-url')
-  getStreamUrl(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  getStreamUrl(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tracksService.getStreamUrl(id, user);
   }
 
   @Delete(':id')
   @Roles('ORG_ADMIN')
-  remove(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tracksService.remove(id, user);
   }
 }

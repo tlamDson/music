@@ -7,7 +7,6 @@ import {
   Body,
   Param,
   UseGuards,
-  ParseUUIDPipe,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -19,8 +18,8 @@ import { JwtPayload } from '@cafe-music/shared';
 import { z } from 'zod';
 
 const CreateScheduleSchema = z.object({
-  syncGroupId: z.string().uuid(),
-  playlistId: z.string().uuid(),
+  syncGroupId: z.string().min(1),
+  playlistId: z.string().min(1),
   cronExpression: z.string().min(1),
   active: z.boolean().default(true),
 });
@@ -55,7 +54,7 @@ export class SchedulerController {
   }
 
   @Patch(':id/toggle')
-  toggle(@Param('id', ParseUUIDPipe) id: string) {
+  toggle(@Param('id') id: string) {
     return this.prisma.playlistSchedule.update({
       where: { id },
       data: { active: { set: undefined } },
@@ -63,7 +62,7 @@ export class SchedulerController {
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseUUIDPipe) id: string) {
+  remove(@Param('id') id: string) {
     return this.prisma.playlistSchedule.delete({ where: { id } });
   }
 }

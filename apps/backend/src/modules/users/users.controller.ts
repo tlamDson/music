@@ -6,7 +6,6 @@ import {
   Body,
   Param,
   UseGuards,
-  ParseUUIDPipe,
 } from '@nestjs/common';
 import {
   UsersService,
@@ -43,7 +42,7 @@ export class UsersController {
 
   @Patch(':id')
   update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateUserSchema))
     dto: z.infer<typeof UpdateUserSchema>,
     @CurrentUser() user: JwtPayload,

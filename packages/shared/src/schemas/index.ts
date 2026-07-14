@@ -31,7 +31,7 @@ export type CreateOrganizationDto = z.infer<typeof CreateOrganizationSchema>;
 
 export const CreateStoreSchema = z.object({
   name: z.string().min(2).max(100),
-  syncGroupId: z.string().uuid().optional(),
+  syncGroupId: z.string().min(1).optional(),
 });
 
 export const UpdateStoreSchema = CreateStoreSchema.partial();
@@ -43,9 +43,9 @@ export type UpdateStoreDto = z.infer<typeof UpdateStoreSchema>;
 
 export const CreatePlaylistSchema = z.object({
   name: z.string().min(1).max(100),
-  folderId: z.string().uuid().optional(),
+  folderId: z.string().min(1).optional(),
   scope: z.enum(['ORG', 'STORE']),
-  storeId: z.string().uuid().optional(),
+  storeId: z.string().min(1).optional(),
 });
 
 export const UpdatePlaylistSchema = CreatePlaylistSchema.partial();
@@ -58,7 +58,7 @@ export type UpdatePlaylistDto = z.infer<typeof UpdatePlaylistSchema>;
 export const CreateTrackMetaSchema = z.object({
   title: z.string().min(1).max(200),
   artist: z.string().max(200).optional(),
-  folderId: z.string().uuid().optional(),
+  folderId: z.string().min(1).optional(),
 });
 
 export type CreateTrackMetaDto = z.infer<typeof CreateTrackMetaSchema>;
@@ -66,7 +66,7 @@ export type CreateTrackMetaDto = z.infer<typeof CreateTrackMetaSchema>;
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
 export const PlayGroupSchema = z.object({
-  playlistId: z.string().uuid(),
+  playlistId: z.string().min(1),
   trackIndex: z.number().int().min(0).default(0),
   mode: z.enum(['TIGHT', 'LOOSE']).default('LOOSE'),
 });
@@ -76,8 +76,8 @@ export const SetSyncModeSchema = z.object({
 });
 
 export const OverrideSchema = z.object({
-  trackId: z.string().uuid().optional(),
-  playlistId: z.string().uuid().optional(),
+  trackId: z.string().min(1).optional(),
+  playlistId: z.string().min(1).optional(),
 });
 
 export type PlayGroupDto = z.infer<typeof PlayGroupSchema>;

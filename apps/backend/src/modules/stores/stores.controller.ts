@@ -6,7 +6,6 @@ import {
   Body,
   Param,
   UseGuards,
-  ParseUUIDPipe,
 } from '@nestjs/common';
 import { StoresService } from './stores.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -21,7 +20,7 @@ import {
 } from '@cafe-music/shared';
 import { z } from 'zod';
 
-const AssignGroupSchema = z.object({ syncGroupId: z.string().uuid() });
+const AssignGroupSchema = z.object({ syncGroupId: z.string().min(1) });
 
 @Controller('stores')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -34,10 +33,7 @@ export class StoresController {
   }
 
   @Get(':id')
-  findOne(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.storesService.findOne(id, user);
   }
 
@@ -54,7 +50,7 @@ export class StoresController {
   @Patch(':id')
   @Roles('ORG_ADMIN')
   update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateStoreSchema))
     dto: z.infer<typeof UpdateStoreSchema>,
     @CurrentUser() user: JwtPayload,
@@ -65,7 +61,7 @@ export class StoresController {
   @Post(':id/assign-group')
   @Roles('ORG_ADMIN')
   assignGroup(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(AssignGroupSchema))
     body: { syncGroupId: string },
     @CurrentUser() user: JwtPayload,
@@ -74,10 +70,7 @@ export class StoresController {
   }
 
   @Get(':id/status')
-  getStatus(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  getStatus(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.storesService.getStatus(id, user);
   }
 }
