@@ -12,13 +12,14 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": ["^build"]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": ["^build"]
     },
     "test:unit": {
       "cache": true,
+      "dependsOn": ["^build"],
       "inputs": ["src/**", "test/unit/**", "__tests__/unit/**"],
       "outputs": ["coverage/**", ".turbo/**"]
     },

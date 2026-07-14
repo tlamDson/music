@@ -30,6 +30,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma Client
+        run: pnpm --filter @cafe-music/backend prisma:generate
+
+      - name: Lint
+        run: pnpm turbo lint
+        env:
+          CI: true
+
       - name: Unit Tests - Backend + Frontend
         run: pnpm turbo test:unit
         env:
