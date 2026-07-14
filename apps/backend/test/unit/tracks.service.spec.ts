@@ -112,6 +112,31 @@ describe('TracksService', () => {
       expect(prisma.track.create).toHaveBeenCalled();
       expect(result).toMatchObject({ title: 'Test Song' });
     });
+
+    // M4A: mimetype khác nhau tùy trình duyệt/OS
+    it.each(['audio/mp4', 'audio/x-m4a', 'audio/m4a'])(
+      'should upload valid m4a file with mimetype %s',
+      async (mimetype) => {
+        const m4aFile = {
+          mimetype,
+          size: 5 * 1024 * 1024,
+          buffer: Buffer.from(''),
+          originalname: 'song.m4a',
+        } as Express.Multer.File;
+        prisma.track.create.mockResolvedValue(mockTrack as any);
+
+        const result = await service.create(
+          { title: 'M4A Song', artist: 'Test Artist' },
+          m4aFile,
+          mockJwtPayload,
+        );
+
+        expect(s3.uploadFile).toHaveBeenCalledWith(
+          expect.objectContaining({ contentType: mimetype }),
+        );
+        expect(result).toMatchObject({ title: 'Test Song' });
+      },
+    );
   });
 
   describe('getStreamUrl', () => {

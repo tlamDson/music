@@ -16,6 +16,10 @@ const ALLOWED_MIMETYPES = [
   'audio/flac',
   'audio/ogg',
   'audio/aac',
+  // M4A — mimetype khác nhau tùy trình duyệt/OS
+  'audio/mp4',
+  'audio/x-m4a',
+  'audio/m4a',
 ];
 
 @Injectable()
