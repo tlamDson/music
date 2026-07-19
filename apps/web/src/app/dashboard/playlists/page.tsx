@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { api } from '../../../lib/api-client';
 import type { ApiResponse, Playlist } from '@cafe-music/shared';
 
@@ -32,24 +33,37 @@ export default function PlaylistsPage() {
     setCreating(true);
     try {
       await api.post('/playlists', { name: newName, scope: 'ORG' });
+      toast.success(`Đã tạo playlist "${newName}" thành công`);
       setNewName('');
       fetchPlaylists();
+    } catch {
+      toast.error('Tạo playlist thất bại');
     } finally {
       setCreating(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    await api.delete(`/playlists/${id}`);
-    setPlaylists((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await api.delete(`/playlists/${id}`);
+      setPlaylists((prev) => prev.filter((p) => p.id !== id));
+      toast.success('Đã xóa playlist');
+    } catch {
+      toast.error('Xóa playlist thất bại');
+    }
   };
 
   const handlePlay = async (playlistId: string) => {
-    await api.post('/sync/groups/sync-group-main/play', {
-      playlistId,
-      trackIndex: 0,
-      mode: 'LOOSE',
-    });
+    try {
+      await api.post('/sync/groups/sync-group-main/play', {
+        playlistId,
+        trackIndex: 0,
+        mode: 'LOOSE',
+      });
+      toast.success('Đang phát playlist trên hệ thống');
+    } catch {
+      toast.error('Phát playlist thất bại — playlist có track nào chưa?');
+    }
   };
 
   return (
@@ -74,14 +88,22 @@ export default function PlaylistsPage() {
           onChange={(e) => setNewName(e.target.value)}
           placeholder="Playlist name (e.g. Ballad, V-Pop)..."
           className="flex-1 px-4 py-2 rounded-lg text-sm outline-none"
-          style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-foreground)', border: '1px solid var(--color-border)' }}
+          style={{
+            backgroundColor: 'var(--color-primary)',
+            color: 'var(--color-foreground)',
+            border: '1px solid var(--color-border)',
+          }}
           aria-label="Playlist name"
         />
         <button
           type="submit"
           disabled={creating}
           className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:opacity-90"
-          style={{ backgroundColor: 'var(--color-accent)', color: 'white', opacity: creating ? 0.7 : 1 }}
+          style={{
+            backgroundColor: 'var(--color-accent)',
+            color: 'white',
+            opacity: creating ? 0.7 : 1,
+          }}
         >
           {creating ? 'Creating...' : 'Create'}
         </button>
@@ -89,20 +111,29 @@ export default function PlaylistsPage() {
 
       {/* List */}
       {loading ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>Loading...</p>
+        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          Loading...
+        </p>
       ) : playlists.length === 0 ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>No playlists. Create one above.</p>
+        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          No playlists. Create one above.
+        </p>
       ) : (
         <div className="flex flex-col gap-3">
           {playlists.map((playlist) => (
             <div
               key={playlist.id}
               className="p-4 rounded-xl"
-              style={{ backgroundColor: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
+              style={{
+                backgroundColor: 'var(--color-muted)',
+                border: '1px solid var(--color-border)',
+              }}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium" style={{ color: 'var(--color-foreground)' }}>{playlist.name}</p>
+                  <p className="font-medium" style={{ color: 'var(--color-foreground)' }}>
+                    {playlist.name}
+                  </p>
                   <p className="text-xs mt-0.5" style={{ color: 'rgba(248,250,252,0.5)' }}>
                     {playlist.scope} · {playlist._count?.playlistTracks ?? 0} tracks
                   </p>
@@ -118,7 +149,11 @@ export default function PlaylistsPage() {
                   <a
                     href={`/dashboard/playlists/${playlist.id}`}
                     className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-all hover:opacity-80"
-                    style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-foreground)', border: '1px solid var(--color-border)' }}
+                    style={{
+                      backgroundColor: 'var(--color-primary)',
+                      color: 'var(--color-foreground)',
+                      border: '1px solid var(--color-border)',
+                    }}
                   >
                     Edit
                   </a>
@@ -128,8 +163,17 @@ export default function PlaylistsPage() {
                     style={{ color: 'var(--color-destructive)' }}
                     aria-label={`Delete ${playlist.name}`}
                   >
-                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
                     </svg>
                   </button>
                 </div>
