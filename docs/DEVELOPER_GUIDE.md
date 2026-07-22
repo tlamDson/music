@@ -87,6 +87,44 @@ cp apps/web/.env.example apps/web/.env.local
 
 Xem chi tiết từng biến trong [`apps/backend/.env.example`](../apps/backend/.env.example) và [`apps/web/.env.example`](../apps/web/.env.example).
 
+### GitHub MCP Server (cho Claude Code)
+
+Repo khai báo sẵn GitHub MCP server ở [`.mcp.json`](../.mcp.json), cho phép Claude Code thao tác issue / PR / code search trực tiếp. File chỉ chứa **tên biến môi trường**, không chứa token — mỗi người tự tạo token của mình.
+
+**1. Tạo Personal Access Token**
+
+Vào https://github.com/settings/tokens → **Generate new token**:
+
+| Loại token   | Quyền cần cấp                                                         |
+| ------------ | --------------------------------------------------------------------- |
+| Fine-grained | Repo `tlamDson/music` → Contents, Issues, Pull requests, Actions (RW) |
+| Classic      | Scope `repo`, `read:org`, `workflow`                                  |
+
+**2. Set biến môi trường `GITHUB_PAT`**
+
+```powershell
+# Windows (PowerShell)
+setx GITHUB_PAT "github_pat_xxxxxxxx"
+```
+
+```bash
+# macOS / Linux — thêm vào ~/.zshrc hoặc ~/.bashrc
+export GITHUB_PAT="github_pat_xxxxxxxx"
+```
+
+> `setx` không áp dụng cho cửa sổ đang mở — phải **đóng hẳn VSCode rồi mở lại** thì Claude Code mới đọc được biến mới.
+
+**3. Kiểm tra**
+
+```bash
+claude mcp list
+# → github: https://api.githubcopilot.com/mcp/ (HTTP) - ✔ Connected
+```
+
+> **Lưu ý:** server này xác thực bằng PAT chứ không phải OAuth — remote server của GitHub không hỗ trợ dynamic client registration nên flow OAuth tự động sẽ báo lỗi `Incompatible auth server`.
+>
+> **Không** dán token trực tiếp vào `.mcp.json`. Giữ nguyên dạng `${GITHUB_PAT}`.
+
 ### Run Development Servers
 
 ```bash
@@ -111,22 +149,22 @@ curl http://localhost:4000/api/v1/health
 
 ### Overview
 
-Mọi thay đổi code phải qua **Pull Request** — không push trực tiếp lên `main`.
+Mọi thay đổi code phải qua **Pull Request** — không commit hay push trực tiếp lên `develop` và `main`.
 
 ```
 develop  ←  feature/*  (PR + CI pass)
-main     ←  develop    (PR + CI pass, production-ready)
+main     ←  develop    (PR + CI pass, production-ready — chỉ chủ repo merge)
 ```
 
-| Nhánh       | Mục đích                                                        |
-| ----------- | --------------------------------------------------------------- |
-| `main`      | Production-ready. Chỉ merge từ `develop`. Có branch protection. |
-| `develop`   | Integration branch. Mọi feature PR merge vào đây.               |
-| `feature/*` | Làm việc hàng ngày. Tạo từ `develop`.                           |
-| `fix/*`     | Bug fix. Tạo từ `develop` (hoặc `main` nếu hotfix production).  |
-| `test/*`    | Thêm/sửa tests.                                                 |
-| `chore/*`   | CI, tooling, config.                                            |
-| `docs/*`    | Tài liệu.                                                       |
+| Nhánh       | Mục đích                                                                                                    |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| `main`      | Production-ready. Chỉ merge từ `develop`. Có branch protection. **Chủ repo quản lý — không ai khác merge.** |
+| `develop`   | Integration branch. Mọi feature PR merge vào đây.                                                           |
+| `feature/*` | Làm việc hàng ngày. Tạo từ `develop`.                                                                       |
+| `fix/*`     | Bug fix. Tạo từ `develop` (hoặc `main` nếu hotfix production).                                              |
+| `test/*`    | Thêm/sửa tests.                                                                                             |
+| `chore/*`   | CI, tooling, config.                                                                                        |
+| `docs/*`    | Tài liệu.                                                                                                   |
 
 ### Step by Step
 
@@ -279,7 +317,21 @@ Lint + Unit Tests
 5. Đợi CI **Lint + Unit Tests** pass
 6. Request review → merge
 
-> PR vào `main` chỉ dùng khi release (merge `develop` → `main`), không dùng cho feature hàng ngày.
+### Merge Policy
+
+| Target    | Ai được merge      | Điều kiện                                                                      |
+| --------- | ------------------ | ------------------------------------------------------------------------------ |
+| `develop` | Dev / AI assistant | CI `Lint + Unit Tests` **pass** + test local pass. CI đỏ hoặc đang chạy → đợi. |
+| `main`    | **Chỉ chủ repo**   | Release thủ công từ `develop`. Không ai khác merge hay push vào `main`.        |
+
+Verify CI trước khi merge:
+
+```bash
+gh pr checks <PR-number>          # tất cả check phải xanh
+gh pr merge <PR-number> --squash  # chỉ chạy sau khi xác nhận pass
+```
+
+> PR vào `main` chỉ dùng khi release (merge `develop` → `main`), không dùng cho feature hàng ngày — và do chủ repo tự thực hiện.
 
 ### PR Title Convention
 
