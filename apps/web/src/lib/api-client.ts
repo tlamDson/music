@@ -1,4 +1,6 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+import { resolveApiBaseUrl } from './env';
+
+const BASE_URL = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
 
 export class ApiError extends Error {
   constructor(
@@ -46,7 +48,11 @@ export const api = {
     }).then(async (res) => {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new ApiError(res.status, (data as { message?: string }).message ?? res.statusText, data);
+        throw new ApiError(
+          res.status,
+          (data as { message?: string }).message ?? res.statusText,
+          data,
+        );
       }
       return res.json() as Promise<T>;
     });
