@@ -52,3 +52,59 @@ jobs:
             apps/backend/coverage/
             apps/web/coverage/
           retention-days: 7
+
+  # Tách job riêng để không đổi tên check bắt buộc "Lint + Unit Tests"
+  quality:
+    name: Typecheck + Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # tsc cần type của @prisma/client nên phải generate trước
+      - name: Generate Prisma Client
+        run: pnpm --filter @cafe-music/backend prisma:generate
+
+      - name: Typecheck
+        run: pnpm turbo typecheck
+        env:
+          CI: true
+
+      - name: Build
+        run: pnpm turbo build
+        env:
+          CI: true
+
+  # Image này là thứ được deploy lên Railway — hỏng ở đây thì hỏng cả deploy
+  docker:
+    name: Backend Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

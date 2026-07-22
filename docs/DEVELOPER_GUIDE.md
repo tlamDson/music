@@ -332,12 +332,20 @@ pnpm --filter @cafe-music/web test:e2e
 
 ### When Does CI Run?
 
-| Event               | Workflow           | Job name               | Chạy? |
-| ------------------- | ------------------ | ---------------------- | ----- |
-| Push to `feature/*` | —                  | —                      | No    |
-| Open PR → `develop` | `CI - PR Check`    | `Lint + Unit Tests`    | Yes   |
-| Open PR → `main`    | `CI - PR Check`    | `Lint + Unit Tests`    | Yes   |
-| Push to `main`      | `CI - Main (Full)` | `Full CI + Unit Tests` | Yes   |
+| Event               | Workflow           | Job name                                                         | Chạy? |
+| ------------------- | ------------------ | ---------------------------------------------------------------- | ----- |
+| Push to `feature/*` | —                  | —                                                                | No    |
+| Open PR → `develop` | `CI - PR Check`    | `Lint + Unit Tests`, `Typecheck + Build`, `Backend Docker Build` | Yes   |
+| Open PR → `main`    | `CI - PR Check`    | `Lint + Unit Tests`, `Typecheck + Build`, `Backend Docker Build` | Yes   |
+| Push to `main`      | `CI - Main (Full)` | `Full CI + Unit Tests` (lint + typecheck + build + test)         | Yes   |
+
+Ba job của PR chạy song song:
+
+| Job                    | Kiểm tra gì                                                            |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `Lint + Unit Tests`    | ESLint + unit test backend/web — **check bắt buộc để merge**           |
+| `Typecheck + Build`    | `tsc --noEmit` và `turbo build` cả 3 package                           |
+| `Backend Docker Build` | Build image sẽ deploy lên Railway — hỏng ở đây nghĩa là deploy sẽ hỏng |
 
 ### Viewing Test Results
 
@@ -355,6 +363,8 @@ Khi setup branch protection cho `main`, chọn status check:
 
 ```
 Lint + Unit Tests
+Typecheck + Build
+Backend Docker Build
 ```
 
 ---
