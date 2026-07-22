@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { resolveSeedPassword } from '../src/database/seed-credentials';
 
 const prisma = new PrismaClient();
 
@@ -7,6 +8,9 @@ async function main() {
   console.log('Seeding database...');
 
   const SALT_ROUNDS = 10;
+  // Production sẽ throw ở đây: seed này là dữ liệu demo, prod dùng prisma:bootstrap.
+  const adminPassword = resolveSeedPassword('SEED_ADMIN_PASSWORD', process.env);
+  const storePassword = resolveSeedPassword('SEED_STORE_PASSWORD', process.env);
 
   const org = await prisma.organization.upsert({
     where: { slug: 'cafe-music-demo' },
@@ -24,7 +28,7 @@ async function main() {
     update: {},
     create: {
       email: 'admin@cafe.com',
-      passwordHash: await bcrypt.hash('Admin@123456', SALT_ROUNDS),
+      passwordHash: await bcrypt.hash(adminPassword, SALT_ROUNDS),
       name: 'Org Admin',
       role: 'ORG_ADMIN',
       organizationId: org.id,
@@ -67,7 +71,7 @@ async function main() {
       update: {},
       create: {
         email: s.email,
-        passwordHash: await bcrypt.hash('Store@123456', SALT_ROUNDS),
+        passwordHash: await bcrypt.hash(storePassword, SALT_ROUNDS),
         name: `Admin ${s.name}`,
         role: 'STORE_ADMIN',
         organizationId: org.id,
@@ -80,11 +84,11 @@ async function main() {
 
   console.log('Seed complete!');
   console.log('');
-  console.log('Login credentials:');
-  console.log('  ORG_ADMIN:   admin@cafe.com   / Admin@123456');
-  console.log('  STORE_ADMIN: store1@cafe.com  / Store@123456');
-  console.log('  STORE_ADMIN: store2@cafe.com  / Store@123456');
-  console.log('  STORE_ADMIN: store3@cafe.com  / Store@123456');
+  console.log('Login accounts (mật khẩu lấy từ SEED_*_PASSWORD):');
+  console.log('  ORG_ADMIN:   admin@cafe.com');
+  console.log(
+    '  STORE_ADMIN: store1@cafe.com / store2@cafe.com / store3@cafe.com',
+  );
 }
 
 main()
