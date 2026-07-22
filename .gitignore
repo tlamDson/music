@@ -4,12 +4,10 @@ node_modules/
 .pnp.js
 
 # Environment files - KHÔNG BAO GIỜ commit
+# Chặn mọi biến thể .env (kể cả .env.production, .env.staging), chỉ chừa .example
 .env
-.env.local
-.env.*.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # Build outputs
 dist/
