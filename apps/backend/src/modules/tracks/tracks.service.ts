@@ -7,20 +7,10 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { S3Service } from './s3.service';
 import { JwtPayload, CreateTrackMetaDto } from '@cafe-music/shared';
+import { MAX_FILE_SIZE, ALLOWED_MIMETYPES } from './upload.options';
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
-const ALLOWED_MIMETYPES = [
-  'audio/mpeg',
-  'audio/mp3',
-  'audio/wav',
-  'audio/flac',
-  'audio/ogg',
-  'audio/aac',
-  // M4A — mimetype khác nhau tùy trình duyệt/OS
-  'audio/mp4',
-  'audio/x-m4a',
-  'audio/m4a',
-];
+// Multer đã chặn sẵn theo cùng bộ hằng số này (upload.options.ts); service vẫn
+// kiểm tra lại để bảo vệ khi được gọi ngoài luồng HTTP upload.
 
 @Injectable()
 export class TracksService {

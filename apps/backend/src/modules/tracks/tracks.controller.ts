@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { TracksService } from './tracks.service';
+import { AUDIO_UPLOAD_OPTIONS } from './upload.options';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -30,7 +31,7 @@ export class TracksController {
 
   @Post()
   @Roles('ORG_ADMIN')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', AUDIO_UPLOAD_OPTIONS))
   create(
     @Body(new ZodValidationPipe(CreateTrackMetaSchema))
     dto: { title: string; artist?: string },

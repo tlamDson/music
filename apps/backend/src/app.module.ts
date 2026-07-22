@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { validateEnv } from './config/env.schema';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TracksModule } from './modules/tracks/tracks.module';
@@ -15,7 +17,7 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60000, limit: 100 }]),
     PrismaModule,
     AuthModule,
     TracksModule,
@@ -26,5 +28,11 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
     SchedulerModule,
   ],
   controllers: [AppController],
+  providers: [
+    // ThrottlerModule chỉ cấu hình mức giới hạn — không có guard này thì
+    // rate limit hoàn toàn không chạy.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+  ],
 })
 export class AppModule {}
