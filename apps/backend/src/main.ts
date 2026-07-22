@@ -1,5 +1,7 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { API_PREFIX } from '@cafe-music/shared';
 import { installBigIntJsonSupport } from './common/bigint-json';
@@ -7,7 +9,14 @@ import { installBigIntJsonSupport } from './common/bigint-json';
 installBigIntJsonSupport();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const logger = new Logger('Bootstrap');
+
+  app.use(helmet());
+
+  // Railway/Vercel đứng trước app: không tin proxy thì req.ip là IP của proxy
+  // và rate limit sẽ gộp chung mọi client thành một.
+  app.set('trust proxy', 1);
 
   app.setGlobalPrefix(API_PREFIX);
 
@@ -30,8 +39,9 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT || 4000;
-  await app.listen(port);
-  console.log(`Backend running on http://localhost:${port}${API_PREFIX}`);
+  // 0.0.0.0 để container/PaaS route được traffic vào (mặc định chỉ bind localhost).
+  await app.listen(port, '0.0.0.0');
+  logger.log(`Backend listening on port ${port} (prefix ${API_PREFIX})`);
 }
 
 void bootstrap();
