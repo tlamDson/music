@@ -125,6 +125,15 @@ claude mcp list
 >
 > **Không** dán token trực tiếp vào `.mcp.json`. Giữ nguyên dạng `${GITHUB_PAT}`.
 
+### Claude Code Settings — shared vs local
+
+| File                          | Track trong git? | Đặt gì vào đây                                                            |
+| ----------------------------- | ---------------- | ------------------------------------------------------------------------- |
+| `.claude/settings.json`       | Có               | Cấu hình dùng chung cả team, phải chạy được trên Windows/macOS/Linux      |
+| `.claude/settings.local.json` | Không (ignored)  | Cấu hình riêng máy bạn: hook phụ thuộc OS, permission cá nhân, MCP toggle |
+
+> Hook chỉ chạy trên một OS (ví dụ phát âm thanh bằng PowerShell) phải để trong `settings.local.json` — nếu đặt ở `settings.json` thì đồng đội dùng OS khác sẽ lỗi hook mỗi lần Claude chạy xong.
+
 ### Run Development Servers
 
 ```bash
