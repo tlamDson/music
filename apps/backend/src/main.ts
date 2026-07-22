@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { Logger as PinoLogger } from 'nestjs-pino';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { API_PREFIX } from '@cafe-music/shared';
@@ -9,8 +10,15 @@ import { installBigIntJsonSupport } from './common/bigint-json';
 installBigIntJsonSupport();
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  const logger = new Logger('Bootstrap');
+  // bufferLogs: giữ log lúc khởi động lại cho tới khi pino sẵn sàng nhận,
+  // nếu không những dòng đầu tiên sẽ ra định dạng khác phần còn lại.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
+
+  // Mọi log của Nest đi qua pino → một định dạng duy nhất, kèm request id
+  const logger = app.get(PinoLogger);
+  app.useLogger(logger);
 
   app.use(helmet());
 
