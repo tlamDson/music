@@ -58,10 +58,11 @@ prisma/generated/
 # MinIO / S3 local data
 .minio/
 
-# AI tooling — chỉ dùng local, không đưa lên GitHub
-CLAUDE.md
+# AI tooling
+# CLAUDE.md + .claude/ được track để cả team dùng chung rule, agent, skill.
+# Chỉ ignore phần cấu hình riêng từng máy:
 CLAUDE.local.md
-.claude/
+.claude/settings.local.json
 .cursor/
 
 # Python bytecode
