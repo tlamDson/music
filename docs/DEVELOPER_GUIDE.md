@@ -92,6 +92,34 @@ pnpm --filter @cafe-music/backend exec prisma migrate dev --name <mo-ta-ngan>
 
 Production (Railway) chạy `prisma migrate deploy` tự động lúc khởi động container — xem phần deploy.
 
+### Tài khoản đăng nhập
+
+Backend **không có endpoint đăng ký công khai** (`/auth` chỉ có `login` + `refresh`), và tạo user qua `POST /users` lại yêu cầu sẵn một `ORG_ADMIN`. Nên tài khoản đầu tiên luôn phải sinh từ script.
+
+**Local & staging — `prisma:seed`** (dữ liệu demo: 1 org, 1 org admin, 3 store + 3 store admin cùng một sync group):
+
+```bash
+pnpm --filter @cafe-music/backend prisma:seed
+```
+
+| Tài khoản                               | Role          | Mật khẩu                                        |
+| --------------------------------------- | ------------- | ----------------------------------------------- |
+| `admin@cafe.com`                        | `ORG_ADMIN`   | `SEED_ADMIN_PASSWORD` (mặc định `Admin@123456`) |
+| `store1@cafe.com`, `store2@`, `store3@` | `STORE_ADMIN` | `SEED_STORE_PASSWORD` (mặc định `Store@123456`) |
+
+Đặt `SEED_ADMIN_PASSWORD` / `SEED_STORE_PASSWORD` trong environment của staging để không dùng mật khẩu demo. Với `NODE_ENV=production`, seed **từ chối chạy** nếu thiếu hai biến này.
+
+**Production — `prisma:bootstrap`** (chỉ tạo 1 organization + 1 `ORG_ADMIN`, không có dữ liệu demo):
+
+```bash
+BOOTSTRAP_ADMIN_EMAIL=owner@example.com \
+BOOTSTRAP_ADMIN_PASSWORD='<mật khẩu mạnh >= 12 ký tự>' \
+BOOTSTRAP_ORG_NAME='Tên chuỗi quán' \
+pnpm --filter @cafe-music/backend prisma:bootstrap
+```
+
+Script idempotent — chạy lại không tạo trùng và **không đổi mật khẩu** tài khoản đã có. Sau khi bootstrap: đăng nhập bằng `ORG_ADMIN`, tạo store/user thật trên dashboard, rồi **xoá `BOOTSTRAP_ADMIN_EMAIL` và `BOOTSTRAP_ADMIN_PASSWORD` khỏi environment**.
+
 ### Environment Files
 
 Copy và điền giá trị local:
