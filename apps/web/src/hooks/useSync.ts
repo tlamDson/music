@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { WsNowPlayingPayload, SyncGroupState } from '@cafe-music/shared';
 import { api } from '../lib/api-client';
+import { resolveWsUrl } from '../lib/env';
 
 interface UseSyncOptions {
   storeId: string;
@@ -19,7 +20,7 @@ interface SyncState {
   isPlaying: boolean;
 }
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:3001';
+const WS_URL = resolveWsUrl(process.env.NEXT_PUBLIC_WS_URL);
 
 export function useSync({ storeId, token, audioRef, clockOffset = 0 }: UseSyncOptions): SyncState {
   const socketRef = useRef<Socket | null>(null);
