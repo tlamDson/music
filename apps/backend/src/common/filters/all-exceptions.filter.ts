@@ -35,21 +35,26 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     response.status(status).json({
+      ...this.buildBody(isHttpException ? exception : null),
       statusCode: status,
-      message: isHttpException
-        ? this.extractMessage(exception)
-        : 'Internal server error',
       path: request.url,
       timestamp: new Date().toISOString(),
     });
   }
 
-  private extractMessage(exception: HttpException): unknown {
+  /**
+   * Giữ nguyên payload dạng object của HttpException thay vì chỉ lấy `message`:
+   * readiness check của Terminus mang theo `info`/`error`/`details` cho biết
+   * **dependency nào** đang chết — bóp về một dòng message là mất sạch.
+   */
+  private buildBody(exception: HttpException | null): Record<string, unknown> {
+    if (!exception) return { message: 'Internal server error' };
+
     const payload = exception.getResponse();
-    if (typeof payload === 'string') return payload;
-    if (payload && typeof payload === 'object' && 'message' in payload) {
-      return payload.message;
+    if (typeof payload === 'string') return { message: payload };
+    if (payload && typeof payload === 'object') {
+      return { message: exception.message, ...payload };
     }
-    return exception.message;
+    return { message: exception.message };
   }
 }

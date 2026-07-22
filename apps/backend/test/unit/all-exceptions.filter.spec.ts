@@ -91,6 +91,34 @@ describe('AllExceptionsFilter', () => {
     );
   });
 
+  // Terminus trả kèm info/error/details cho biết dependency nào chết
+  it('preserves the structured payload of an HttpException', () => {
+    filter.catch(
+      new HttpException(
+        {
+          status: 'error',
+          error: { redis: { status: 'down', message: 'ECONNREFUSED' } },
+        },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      ),
+      host,
+    );
+
+    const body = sentBodies[0];
+    expect(body.error).toEqual({
+      redis: { status: 'down', message: 'ECONNREFUSED' },
+    });
+  });
+
+  it('still reports the right status code alongside a structured payload', () => {
+    filter.catch(
+      new HttpException({ status: 'error' }, HttpStatus.SERVICE_UNAVAILABLE),
+      host,
+    );
+
+    expect(sentBodies[0].statusCode).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+  });
+
   it('logs unexpected errors at error level', () => {
     const errorSpy = jest.spyOn(filter['logger'], 'error');
 

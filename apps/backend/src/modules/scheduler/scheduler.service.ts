@@ -63,7 +63,13 @@ export class SchedulerService {
         hourPart === '*' || parseInt(hourPart) === now.getHours();
 
       return matchMinute && matchHour;
-    } catch {
+    } catch (error) {
+      // Cron sai cú pháp khiến lịch không bao giờ chạy — im lặng thì không ai biết
+      this.logger.warn(
+        `Invalid cron expression "${expression}": ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
       return false;
     }
   }
