@@ -8,6 +8,16 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+/**
+ * Config đã validate trả về boolean, nhưng khi đọc env thô vẫn là string —
+ * chấp nhận cả hai, mặc định true (MinIO dev / R2).
+ */
+function resolveForcePathStyle(value: boolean | string | undefined): boolean {
+  if (value === undefined || value === '') return true;
+  if (typeof value === 'boolean') return value;
+  return value.toLowerCase() !== 'false';
+}
+
 export interface UploadParams {
   organizationId: string;
   key: string;
@@ -25,7 +35,10 @@ export class S3Service {
     this.client = new S3Client({
       region: config.get<string>('S3_REGION') ?? 'us-east-1',
       endpoint: config.get<string>('S3_ENDPOINT'),
-      forcePathStyle: true,
+      // MinIO/R2 cần path style, AWS S3 thật thì không — phải theo env.
+      forcePathStyle: resolveForcePathStyle(
+        config.get<boolean | string>('S3_FORCE_PATH_STYLE'),
+      ),
       credentials: {
         accessKeyId: config.get<string>('S3_ACCESS_KEY') ?? '',
         secretAccessKey: config.get<string>('S3_SECRET_KEY') ?? '',
