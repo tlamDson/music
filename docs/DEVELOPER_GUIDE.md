@@ -65,16 +65,32 @@ Services:
 | MinIO             | `http://localhost:9000` | S3-compatible storage |
 | MinIO Console     | `http://localhost:9001` | Quản lý bucket        |
 
-### Database Schema (dev)
+### Database Schema
 
-Dev dùng `prisma db push` để đồng bộ schema (chưa dùng migrations):
+Schema được quản lý bằng **Prisma migrations** (đã baseline ở `prisma/migrations/20260722000000_init`). Không dùng `prisma db push` nữa.
+
+**Setup database mới:**
 
 ```bash
-pnpm --filter @cafe-music/backend exec prisma db push
+pnpm --filter @cafe-music/backend exec prisma migrate deploy
 pnpm --filter @cafe-music/backend prisma:seed
 ```
 
-> Migrations sẽ được baseline (`prisma migrate dev`) trước release production đầu tiên. Không tự tạo migration lẻ khi chưa có baseline.
+**Đổi schema:** sửa `schema.prisma` rồi tạo migration mới — không sửa tay file migration đã commit:
+
+```bash
+pnpm --filter @cafe-music/backend exec prisma migrate dev --name <mo-ta-ngan>
+```
+
+> **Database dev tạo trước khi có baseline** (đã từng chạy `db push`) sẽ báo lỗi vì bảng đã tồn tại. Đánh dấu baseline là đã áp dụng, chạy đúng một lần:
+>
+> ```bash
+> pnpm --filter @cafe-music/backend exec prisma migrate resolve --applied 20260722000000_init
+> ```
+>
+> Cách khác cho DB dev bỏ đi được: drop database rồi `migrate deploy` lại từ đầu.
+
+Production (Railway) chạy `prisma migrate deploy` tự động lúc khởi động container — xem phần deploy.
 
 ### Environment Files
 
