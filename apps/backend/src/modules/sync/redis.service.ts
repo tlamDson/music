@@ -52,6 +52,11 @@ export class RedisService {
     await this.client.del(`store:${storeId}:override`);
   }
 
+  /** Dùng cho readiness probe — trả 'PONG' khi kết nối còn sống. */
+  async ping(): Promise<string> {
+    return this.client.ping();
+  }
+
   async quit(): Promise<void> {
     await this.client.quit();
   }

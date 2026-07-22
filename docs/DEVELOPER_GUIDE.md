@@ -522,11 +522,33 @@ Chi tiết: [`.cursor/rules/frontend-ui-ux-pro-max.mdc`](../.cursor/rules/fronte
 | Local       | `http://localhost:4000/api/v1` | `http://localhost:3000` |
 | Production  | TBD                            | TBD                     |
 
+### Health endpoints
+
+| Endpoint        | Kiểm tra                             | Dùng cho                                     |
+| --------------- | ------------------------------------ | -------------------------------------------- |
+| `/health`       | Chỉ process còn sống (không chạm DB) | **Healthcheck của Railway** (`railway.json`) |
+| `/health/ready` | Postgres (`SELECT 1`) + Redis (ping) | Chẩn đoán: dependency nào đang chết          |
+
+`/health/ready` trả **503** kèm chi tiết từng dependency khi có cái chết:
+
+```json
+{
+  "status": "error",
+  "error": { "redis": { "status": "down", "message": "Redis ping timed out after 3000ms" } },
+  "details": { "database": { "status": "up" }, "redis": { "status": "down", "...": "..." } }
+}
+```
+
+> Railway cố tình probe `/health` (liveness) chứ **không** phải `/health/ready`: nếu Postgres chập chờn mà probe fail, Railway sẽ restart container một cách vô ích và làm hỏng luôn phần đang chạy được. Cả hai check đều có ngưỡng timeout 3s — driver có thể _treo_ thay vì báo lỗi khi dependency chết (ioredis xếp hàng command lúc mất kết nối), mà probe treo thì chỉ nhận được timeout chứ không bao giờ có câu trả lời rõ ràng.
+
 **Ví dụ local:**
 
 ```bash
-# Health check
+# Liveness
 curl http://localhost:4000/api/v1/health
+
+# Readiness (DB + Redis)
+curl http://localhost:4000/api/v1/health/ready
 
 # Login (khi auth module sẵn sàng)
 curl -X POST http://localhost:4000/api/v1/auth/login \

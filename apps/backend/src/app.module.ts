@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { AppController } from './app.controller';
 import { validateEnv } from './config/env.schema';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { PrismaModule } from './prisma/prisma.module';
@@ -13,6 +12,7 @@ import { SyncModule } from './modules/sync/sync.module';
 import { StoresModule } from './modules/stores/stores.module';
 import { UsersModule } from './modules/users/users.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -26,8 +26,8 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
     StoresModule,
     UsersModule,
     SchedulerModule,
+    HealthModule,
   ],
-  controllers: [AppController],
   providers: [
     // ThrottlerModule chỉ cấu hình mức giới hạn — không có guard này thì
     // rate limit hoàn toàn không chạy.
