@@ -9,12 +9,10 @@ export class RedisService {
   private readonly GROUP_STATE_TTL = 86400; // 24h
 
   constructor(private config: ConfigService) {
-    this.client = new Redis({
-      host: config.get<string>('REDIS_HOST') ?? 'localhost',
-      port: config.get<number>('REDIS_PORT') ?? 6379,
-      password: config.get<string>('REDIS_PASSWORD') ?? undefined,
-      lazyConnect: true,
-    });
+    // Railway/managed Redis cấp một connection string duy nhất (redis:// hoặc
+    // rediss://), ioredis nhận trực tiếp URL nên không tách host/port/password.
+    const url = config.get<string>('REDIS_URL') ?? 'redis://localhost:6379';
+    this.client = new Redis(url, { lazyConnect: true });
   }
 
   async setGroupState(groupId: string, state: SyncGroupState): Promise<void> {
