@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { Logger } from '@nestjs/common';
+import { Logger, NotFoundException } from '@nestjs/common';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { PrismaClient } from '@prisma/client';
+import { JwtPayload } from '@cafe-music/shared';
 import { SchedulerService } from '../../src/modules/scheduler/scheduler.service';
 import { SyncService } from '../../src/modules/sync/sync.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -143,5 +144,154 @@ describe('SchedulerService', () => {
       expect.stringContaining('schedule-1'),
       expect.any(Error),
     );
+  });
+
+  // CRUD từng nằm thẳng trong controller: không kiểm tra org nên org khác
+  // toggle/xoá được lịch của nhau, và toggle ghi `active: { set: undefined }`
+  // nên không đổi gì cả.
+  describe('CRUD', () => {
+    const user: JwtPayload = {
+      sub: 'user-1',
+      email: 'admin@cafe.com',
+      role: 'ORG_ADMIN',
+      organizationId: 'org-1',
+      storeId: null,
+    };
+
+    const createDto = {
+      syncGroupId: 'group-1',
+      playlistId: 'playlist-1',
+      cronExpression: '30 10 * * *',
+      active: true,
+    };
+
+    it('lists only schedules of the caller organization', async () => {
+      prisma.playlistSchedule.findMany.mockResolvedValue([]);
+
+      await service.findAll(user);
+
+      expect(prisma.playlistSchedule.findMany).toHaveBeenCalledWith({
+        where: { syncGroup: { organizationId: 'org-1' } },
+        include: { syncGroup: true, playlist: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    });
+
+    it('creates a schedule when group and playlist belong to the organization', async () => {
+      prisma.syncGroup.findFirst.mockResolvedValue({ id: 'group-1' } as never);
+      prisma.playlist.findFirst.mockResolvedValue({
+        id: 'playlist-1',
+      } as never);
+      prisma.playlistSchedule.create.mockResolvedValue(
+        buildSchedule() as never,
+      );
+
+      await service.create(createDto, user);
+
+      expect(prisma.playlistSchedule.create).toHaveBeenCalledWith({
+        data: createDto,
+        include: { syncGroup: true, playlist: true },
+      });
+    });
+
+    it('refuses to create a schedule for a sync group outside the organization', async () => {
+      prisma.syncGroup.findFirst.mockResolvedValue(null);
+
+      await expect(service.create(createDto, user)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.playlistSchedule.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses to create a schedule for a playlist outside the organization', async () => {
+      prisma.syncGroup.findFirst.mockResolvedValue({ id: 'group-1' } as never);
+      prisma.playlist.findFirst.mockResolvedValue(null);
+
+      await expect(service.create(createDto, user)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.playlistSchedule.create).not.toHaveBeenCalled();
+    });
+
+    it('turns an active schedule off when toggling', async () => {
+      prisma.playlistSchedule.findFirst.mockResolvedValue(
+        buildSchedule({ active: true }) as never,
+      );
+      prisma.playlistSchedule.update.mockResolvedValue(
+        buildSchedule({ active: false }) as never,
+      );
+
+      await service.toggle('schedule-1', user);
+
+      expect(prisma.playlistSchedule.update).toHaveBeenCalledWith({
+        where: { id: 'schedule-1' },
+        data: { active: false },
+        include: { syncGroup: true, playlist: true },
+      });
+    });
+
+    it('turns a paused schedule back on when toggling', async () => {
+      prisma.playlistSchedule.findFirst.mockResolvedValue(
+        buildSchedule({ active: false }) as never,
+      );
+      prisma.playlistSchedule.update.mockResolvedValue(
+        buildSchedule({ active: true }) as never,
+      );
+
+      await service.toggle('schedule-1', user);
+
+      expect(prisma.playlistSchedule.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { active: true } }),
+      );
+    });
+
+    it('scopes the toggle lookup to the caller organization', async () => {
+      prisma.playlistSchedule.findFirst.mockResolvedValue(
+        buildSchedule() as never,
+      );
+      prisma.playlistSchedule.update.mockResolvedValue(
+        buildSchedule() as never,
+      );
+
+      await service.toggle('schedule-1', user);
+
+      expect(prisma.playlistSchedule.findFirst).toHaveBeenCalledWith({
+        where: { id: 'schedule-1', syncGroup: { organizationId: 'org-1' } },
+      });
+    });
+
+    it('refuses to toggle a schedule from another organization', async () => {
+      prisma.playlistSchedule.findFirst.mockResolvedValue(null);
+
+      await expect(service.toggle('schedule-1', user)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.playlistSchedule.update).not.toHaveBeenCalled();
+    });
+
+    it('deletes a schedule of the caller organization', async () => {
+      prisma.playlistSchedule.findFirst.mockResolvedValue(
+        buildSchedule() as never,
+      );
+      prisma.playlistSchedule.delete.mockResolvedValue(
+        buildSchedule() as never,
+      );
+
+      await expect(service.remove('schedule-1', user)).resolves.toEqual({
+        message: 'Schedule deleted',
+      });
+      expect(prisma.playlistSchedule.delete).toHaveBeenCalledWith({
+        where: { id: 'schedule-1' },
+      });
+    });
+
+    it('refuses to delete a schedule from another organization', async () => {
+      prisma.playlistSchedule.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove('schedule-1', user)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.playlistSchedule.delete).not.toHaveBeenCalled();
+    });
   });
 });
