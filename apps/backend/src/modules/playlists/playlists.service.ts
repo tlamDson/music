@@ -8,7 +8,7 @@ import {
   JwtPayload,
   CreatePlaylistDto,
   UpdatePlaylistDto,
-  PaginationDto,
+  PlaylistQueryDto,
 } from '@cafe-music/shared';
 
 @Injectable()
@@ -44,27 +44,49 @@ export class PlaylistsService {
     });
   }
 
-  async findAll(user: JwtPayload, pagination: PaginationDto) {
-    const where =
-      user.role === 'STORE_ADMIN'
-        ? {
-            organizationId: user.organizationId!,
-            OR: [{ scope: 'ORG' as const }, { storeId: user.storeId }],
-          }
-        : { organizationId: user.organizationId! };
+  async findAll(user: JwtPayload, query: PlaylistQueryDto) {
+    const where = {
+      organizationId: user.organizationId!,
+      // Store admin chỉ thấy playlist của chuỗi + playlist quán mình
+      ...(user.role === 'STORE_ADMIN'
+        ? { OR: [{ scope: 'ORG' as const }, { storeId: user.storeId }] }
+        : {}),
+      ...(query.scope ? { scope: query.scope } : {}),
+      ...(query.q
+        ? { name: { contains: query.q, mode: 'insensitive' as const } }
+        : {}),
+    };
 
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.playlist.findMany({
         where,
-        skip: (pagination.page - 1) * pagination.limit,
-        take: pagination.limit,
-        include: { _count: { select: { playlistTracks: true } } },
-        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+        include: {
+          _count: { select: { playlistTracks: true } },
+          // Chỉ để cộng tổng thời lượng cho card — không trả về client
+          playlistTracks: {
+            select: { track: { select: { durationMs: true } } },
+          },
+        },
+        orderBy:
+          query.sort === 'name' ? { name: 'asc' } : { createdAt: 'desc' },
       }),
       this.prisma.playlist.count({ where }),
     ]);
 
-    return { data, meta: { ...pagination, total } };
+    const data = rows.map(({ playlistTracks, ...playlist }) => ({
+      ...playlist,
+      totalDurationMs: playlistTracks.reduce(
+        (sum, entry) => sum + (entry.track?.durationMs ?? 0),
+        0,
+      ),
+    }));
+
+    return {
+      data,
+      meta: { page: query.page, limit: query.limit, total },
+    };
   }
 
   async findOne(id: string, user: JwtPayload) {

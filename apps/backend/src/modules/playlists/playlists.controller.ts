@@ -17,7 +17,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   CreatePlaylistSchema,
   UpdatePlaylistSchema,
-  PaginationSchema,
+  PlaylistQuerySchema,
   JwtPayload,
 } from '@cafe-music/shared';
 import { z } from 'zod';
@@ -41,8 +41,8 @@ export class PlaylistsController {
 
   @Get()
   findAll(
-    @Query(new ZodValidationPipe(PaginationSchema))
-    query: { page: number; limit: number },
+    @Query(new ZodValidationPipe(PlaylistQuerySchema))
+    query: z.infer<typeof PlaylistQuerySchema>,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.playlistsService.findAll(user, query);

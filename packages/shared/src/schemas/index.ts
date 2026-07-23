@@ -110,3 +110,14 @@ export const PaginationSchema = z.object({
 });
 
 export type PaginationDto = z.infer<typeof PaginationSchema>;
+
+// ─── Playlist query ───────────────────────────────────────────────────────────
+
+/** Chip lọc + ô tìm kiếm của trang duyệt playlist. */
+export const PlaylistQuerySchema = PaginationSchema.extend({
+  scope: z.enum(['ORG', 'STORE']).optional(),
+  q: z.string().trim().min(1).max(100).optional(),
+  sort: z.enum(['recent', 'name']).default('recent'),
+});
+
+export type PlaylistQueryDto = z.infer<typeof PlaylistQuerySchema>;
