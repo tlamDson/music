@@ -12,6 +12,16 @@ python .claude/skills/ui-ux-pro-max/scripts/search.py "<truy vấn>" --domain st
 python .claude/skills/ui-ux-pro-max/scripts/search.py "<truy vấn>" --stack react
 ```
 
+## Quy ước đã chốt cho UI hiện tại
+
+Layout lấy cảm hứng từ Spotify (sidebar thư viện, hàng card cuộn ngang, bảng track, thanh phát cố định) nhưng **màu/chữ vẫn theo `MASTER.md`** — không bê palette của Spotify vào.
+
+- Bìa nhạc: DB không có ảnh → dùng `components/media/CoverArt.tsx` (sinh từ id, màu lấy trong palette). Không để ô xám trống, cũng không bịa gradient tím/hồng.
+- Nút phát/xoá ẩn theo hover phải kèm `focus-visible:opacity-100` để dùng được bằng bàn phím.
+- Panel "Đang phát" ẩn dưới breakpoint `xl` để trang không tràn ngang.
+- Nhãn và `aria-label` viết tiếng Việt, thống nhất với phần còn lại của app.
+- Chưa có bảng `Artist` → **không** dựng card "Giới thiệu nghệ sĩ"/"Người tham gia" như ảnh tham chiếu; panel phải dùng cho trạng thái phát + hàng chờ.
+
 ## Checklist pre-delivery cho mọi UI
 
 - Không dùng emoji làm icon; dùng SVG (Heroicons/Lucide).
@@ -25,14 +35,14 @@ python .claude/skills/ui-ux-pro-max/scripts/search.py "<truy vấn>" --stack rea
 
 ## Skills có sẵn (`.claude/skills/`)
 
-| Skill | Dùng khi |
-|---|---|
-| `ui-ux-pro-max` | Style, màu, font, UX guideline, chart — nguồn bắt buộc cho mọi UI (xem trên) |
-| `design` | Brand identity, design tokens, logo, CIP, banner, icon, social photos, slides — skill tổng hợp |
-| `design-system` | Token architecture (primitive→semantic→component), component spec, slide generation |
-| `ui-styling` | shadcn/ui + Tailwind + canvas — dựng UI component/layout cụ thể |
-| `brand` | Brand voice, messaging framework, asset/brand consistency |
-| `banner-design` | Banner cho social/ads/web hero/print |
-| `slides` | HTML presentation với Chart.js, copywriting formula |
+| Skill           | Dùng khi                                                                                       |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| `ui-ux-pro-max` | Style, màu, font, UX guideline, chart — nguồn bắt buộc cho mọi UI (xem trên)                   |
+| `design`        | Brand identity, design tokens, logo, CIP, banner, icon, social photos, slides — skill tổng hợp |
+| `design-system` | Token architecture (primitive→semantic→component), component spec, slide generation            |
+| `ui-styling`    | shadcn/ui + Tailwind + canvas — dựng UI component/layout cụ thể                                |
+| `brand`         | Brand voice, messaging framework, asset/brand consistency                                      |
+| `banner-design` | Banner cho social/ads/web hero/print                                                           |
+| `slides`        | HTML presentation với Chart.js, copywriting formula                                            |
 
 Các skill này chỉ nên kích hoạt khi task thực sự liên quan (thiết kế/UI/brand) — không dùng cho backend logic thuần túy.
