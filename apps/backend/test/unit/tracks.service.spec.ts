@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { PrismaClient } from '@prisma/client';
 import { TracksService } from '../../src/modules/tracks/tracks.service';
@@ -179,6 +183,118 @@ describe('TracksService', () => {
         expect(result).toMatchObject({ title: 'Test Song' });
       },
     );
+  });
+
+  // Track dùng chung cả chuỗi thì quán này nghe được nhạc riêng của quán kia —
+  // track do store upload phải gắn storeId và chỉ quán đó thấy.
+  describe('store scope', () => {
+    const storeAdmin = {
+      sub: 'user-2',
+      email: 'store1@cafe.com',
+      role: 'STORE_ADMIN' as const,
+      organizationId: 'org-1',
+      storeId: 'store-1',
+    };
+
+    const validFile = {
+      mimetype: 'audio/mpeg',
+      size: 1024,
+      buffer: Buffer.from(''),
+      originalname: 'song.mp3',
+    } as Express.Multer.File;
+
+    it('tags tracks uploaded by a store admin with their store', async () => {
+      prisma.track.create.mockResolvedValue(mockTrack as any);
+
+      await service.create({ title: 'Quán 1 Song' }, validFile, storeAdmin);
+
+      expect(prisma.track.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ storeId: 'store-1' }),
+        }),
+      );
+    });
+
+    it('leaves org admin uploads shared across the chain', async () => {
+      prisma.track.create.mockResolvedValue(mockTrack as any);
+
+      await service.create({ title: 'Shared Song' }, validFile, mockJwtPayload);
+
+      expect(prisma.track.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ storeId: null }),
+        }),
+      );
+    });
+
+    it('shows a store admin org tracks plus their own store tracks', async () => {
+      prisma.track.findMany.mockResolvedValue([]);
+      prisma.track.count.mockResolvedValue(0);
+
+      await service.findAll(storeAdmin);
+
+      expect(prisma.track.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            organizationId: 'org-1',
+            OR: [{ storeId: null }, { storeId: 'store-1' }],
+          },
+        }),
+      );
+    });
+
+    it('shows an org admin every track in the organization', async () => {
+      prisma.track.findMany.mockResolvedValue([]);
+      prisma.track.count.mockResolvedValue(0);
+
+      await service.findAll(mockJwtPayload);
+
+      expect(prisma.track.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organizationId: 'org-1' } }),
+      );
+    });
+
+    it('refuses to let a store admin delete a shared org track', async () => {
+      prisma.track.findFirst.mockResolvedValue({
+        ...mockTrack,
+        storeId: null,
+      } as any);
+
+      await expect(
+        service.remove('track-1', storeAdmin),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.track.delete).not.toHaveBeenCalled();
+      expect(s3.deleteFile).not.toHaveBeenCalled();
+    });
+
+    it('lets a store admin delete their own store track', async () => {
+      prisma.track.findFirst.mockResolvedValue({
+        ...mockTrack,
+        storeId: 'store-1',
+      } as any);
+      prisma.track.delete.mockResolvedValue(mockTrack as any);
+
+      await expect(service.remove('track-1', storeAdmin)).resolves.toEqual({
+        message: 'Track deleted',
+      });
+      expect(prisma.track.delete).toHaveBeenCalledWith({
+        where: { id: 'track-1' },
+      });
+    });
+
+    it('scopes stream urls so a store cannot stream another store track', async () => {
+      prisma.track.findFirst.mockResolvedValue(mockTrack as any);
+
+      await service.getStreamUrl('track-1', storeAdmin);
+
+      expect(prisma.track.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'track-1',
+          organizationId: 'org-1',
+          OR: [{ storeId: null }, { storeId: 'store-1' }],
+        },
+      });
+    });
   });
 
   describe('getStreamUrl', () => {

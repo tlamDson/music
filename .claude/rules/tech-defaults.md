@@ -41,6 +41,16 @@ pnpm --filter @cafe-music/backend exec prisma migrate dev --name <mo-ta>  # đ�
 
 DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate resolve --applied 20260722000000_init`.
 
+## Phạm vi dữ liệu theo vai trò
+
+| Bảng       | Cột phạm vi                   | Ý nghĩa                                                                                                                        |
+| ---------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `Track`    | `organizationId` + `storeId?` | `storeId = null` → kho chung của chuỗi; có giá trị → nhạc riêng của quán đó. `STORE_ADMIN` upload thì track tự gắn quán của họ |
+| `Playlist` | `organizationId` + `scope`    | `scope = ORG` chỉ `ORG_ADMIN` sửa/xoá; `scope = STORE` gắn `storeId`                                                           |
+| Sync       | `syncGroup.organizationId`    | Lịch phát (`PlaylistSchedule`) không có org riêng — luôn lọc qua sync group                                                    |
+
+`STORE_ADMIN` **được** upload và xoá track của quán mình, **không** xoá được track chung (`TracksService.scopeFor` + check trong `remove`). `SyncService.assertStoreAccess` chặn store admin thao tác quán khác.
+
 ## Tài khoản (không có endpoint đăng ký công khai)
 
 | Lệnh               | Dùng cho        | Ghi chú                                                                                                                                           |

@@ -122,6 +122,21 @@ export class PlaylistsService {
 
     if (!playlist) throw new NotFoundException('Playlist not found');
 
+    // Track riêng của quán khác không được kéo vào playlist — nếu không thì
+    // scope kho nhạc ở TracksService bị vòng qua bằng đúng một request.
+    const track = await this.prisma.track.findFirst({
+      where:
+        user.role === 'STORE_ADMIN'
+          ? {
+              id: trackId,
+              organizationId: user.organizationId!,
+              OR: [{ storeId: null }, { storeId: user.storeId }],
+            }
+          : { id: trackId, organizationId: user.organizationId! },
+    });
+
+    if (!track) throw new NotFoundException('Track not found');
+
     const count = await this.prisma.playlistTrack.count({
       where: { playlistId },
     });

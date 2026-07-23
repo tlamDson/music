@@ -29,8 +29,10 @@ import {
 export class TracksController {
   constructor(private tracksService: TracksService) {}
 
+  // Store admin upload được, nhưng track sẽ gắn storeId của quán họ (xem
+  // TracksService.scopeFor) nên quán khác không thấy.
   @Post()
-  @Roles('ORG_ADMIN')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
   @UseInterceptors(FileInterceptor('file', AUDIO_UPLOAD_OPTIONS))
   create(
     @Body(new ZodValidationPipe(CreateTrackMetaSchema))
@@ -56,7 +58,7 @@ export class TracksController {
   }
 
   @Delete(':id')
-  @Roles('ORG_ADMIN')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
   remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tracksService.remove(id, user);
   }
