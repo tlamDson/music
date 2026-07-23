@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
+import { useSyncGroups } from '../../hooks/useSyncGroups';
 import type { ApiResponse, Playlist } from '@cafe-music/shared';
 
 export default function DashboardPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
+  const { defaultGroupId } = useSyncGroups();
 
   useEffect(() => {
     api
@@ -17,14 +20,19 @@ export default function DashboardPage() {
   }, []);
 
   const handlePlay = async (playlistId: string) => {
+    if (!defaultGroupId) {
+      toast.error('Chưa có sync group nào — tạo nhóm ở trang Sync Control trước');
+      return;
+    }
     try {
-      await api.post('/sync/groups/sync-group-main/play', {
+      await api.post(`/sync/groups/${defaultGroupId}/play`, {
         playlistId,
         trackIndex: 0,
         mode: 'LOOSE',
       });
-    } catch (err) {
-      console.error('Failed to play:', err);
+      toast.success('Đang phát playlist trên hệ thống');
+    } catch {
+      toast.error('Phát playlist thất bại — playlist có track nào chưa?');
     }
   };
 
@@ -65,7 +73,10 @@ export default function DashboardPage() {
               <div
                 key={playlist.id}
                 className="flex items-center justify-between p-4 rounded-xl"
-                style={{ backgroundColor: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
+                style={{
+                  backgroundColor: 'var(--color-muted)',
+                  border: '1px solid var(--color-border)',
+                }}
               >
                 <div>
                   <p className="font-medium" style={{ color: 'var(--color-foreground)' }}>

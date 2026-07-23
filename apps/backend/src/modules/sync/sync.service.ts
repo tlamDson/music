@@ -11,6 +11,7 @@ import {
   JwtPayload,
   PlayGroupDto,
   OverrideDto,
+  CreateSyncGroupDto,
   SyncGroupState,
 } from '@cafe-music/shared';
 
@@ -22,6 +23,30 @@ export class SyncService {
     private gateway: SyncGateway,
     private s3: S3Service,
   ) {}
+
+  /**
+   * Không có endpoint liệt kê group thì web buộc phải hardcode id
+   * ('sync-group-main') — hỏng ngay khi chuỗi có nhóm thứ hai.
+   */
+  async listGroups(user: JwtPayload) {
+    const groups = await this.prisma.syncGroup.findMany({
+      where: { organizationId: user.organizationId! },
+      include: { _count: { select: { stores: true } } },
+      orderBy: { name: 'asc' },
+    });
+
+    return { data: groups };
+  }
+
+  async createGroup(dto: CreateSyncGroupDto, user: JwtPayload) {
+    return this.prisma.syncGroup.create({
+      data: {
+        name: dto.name,
+        mode: dto.mode ?? 'LOOSE',
+        organizationId: user.organizationId!,
+      },
+    });
+  }
 
   async play(groupId: string, dto: PlayGroupDto, user: JwtPayload) {
     const group = await this.prisma.syncGroup.findFirst({
