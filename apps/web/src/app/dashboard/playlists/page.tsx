@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../../lib/api-client';
+import { useSyncGroups } from '../../../hooks/useSyncGroups';
 import type { ApiResponse, Playlist } from '@cafe-music/shared';
 
 interface PlaylistWithCount extends Playlist {
@@ -14,6 +15,7 @@ export default function PlaylistsPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  const { defaultGroupId } = useSyncGroups();
 
   const fetchPlaylists = () => {
     api
@@ -54,8 +56,12 @@ export default function PlaylistsPage() {
   };
 
   const handlePlay = async (playlistId: string) => {
+    if (!defaultGroupId) {
+      toast.error('Chưa có sync group nào — tạo nhóm ở trang Sync Control trước');
+      return;
+    }
     try {
-      await api.post('/sync/groups/sync-group-main/play', {
+      await api.post(`/sync/groups/${defaultGroupId}/play`, {
         playlistId,
         trackIndex: 0,
         mode: 'LOOSE',

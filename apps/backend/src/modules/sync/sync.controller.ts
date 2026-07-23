@@ -8,6 +8,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   PlayGroupSchema,
   OverrideSchema,
+  CreateSyncGroupSchema,
   JwtPayload,
 } from '@cafe-music/shared';
 import { z } from 'zod';
@@ -16,6 +17,21 @@ import { z } from 'zod';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SyncController {
   constructor(private syncService: SyncService) {}
+
+  @Get('groups')
+  listGroups(@CurrentUser() user: JwtPayload) {
+    return this.syncService.listGroups(user);
+  }
+
+  @Post('groups')
+  @Roles('ORG_ADMIN')
+  createGroup(
+    @Body(new ZodValidationPipe(CreateSyncGroupSchema))
+    dto: z.infer<typeof CreateSyncGroupSchema>,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.syncService.createGroup(dto, user);
+  }
 
   @Post('groups/:id/play')
   @Roles('ORG_ADMIN')

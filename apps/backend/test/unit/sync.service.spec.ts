@@ -156,6 +156,50 @@ describe('SyncService', () => {
     });
   });
 
+  // Web từng hardcode groupId 'sync-group-main' vì không có endpoint nào liệt
+  // kê sync group.
+  describe('groups', () => {
+    it('lists sync groups of the caller organization with store counts', async () => {
+      prisma.syncGroup.findMany.mockResolvedValue([mockGroup] as any);
+
+      const result = await service.listGroups(orgAdminUser);
+
+      expect(prisma.syncGroup.findMany).toHaveBeenCalledWith({
+        where: { organizationId: 'org-1' },
+        include: { _count: { select: { stores: true } } },
+        orderBy: { name: 'asc' },
+      });
+      expect(result).toEqual({ data: [mockGroup] });
+    });
+
+    it('creates a sync group inside the caller organization', async () => {
+      prisma.syncGroup.create.mockResolvedValue(mockGroup as any);
+
+      await service.createGroup(
+        { name: 'Quán trung tâm', mode: 'TIGHT' },
+        orgAdminUser,
+      );
+
+      expect(prisma.syncGroup.create).toHaveBeenCalledWith({
+        data: {
+          name: 'Quán trung tâm',
+          mode: 'TIGHT',
+          organizationId: 'org-1',
+        },
+      });
+    });
+
+    it('defaults new groups to LOOSE mode', async () => {
+      prisma.syncGroup.create.mockResolvedValue(mockGroup as any);
+
+      await service.createGroup({ name: 'Nhóm mặc định' }, orgAdminUser);
+
+      expect(prisma.syncGroup.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ mode: 'LOOSE' }),
+      });
+    });
+  });
+
   describe('override', () => {
     it('should set store override in Redis and disconnect store from sync group', async () => {
       prisma.store.findFirst.mockResolvedValue({

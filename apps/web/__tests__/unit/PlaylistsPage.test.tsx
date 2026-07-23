@@ -41,6 +41,45 @@ describe('PlaylistsPage', () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
   });
 
+  // Groupd id từng bị hardcode 'sync-group-main' — sai ngay khi chuỗi có nhóm khác
+  it('should play a playlist on the sync group returned by the API', async () => {
+    mockApi.get.mockImplementation((path: string) => {
+      if (path === '/sync/groups')
+        return Promise.resolve({
+          data: [{ id: 'group-42', name: 'Nhóm chính', mode: 'LOOSE', status: 'STOPPED' }],
+        });
+      return Promise.resolve({
+        data: [{ id: 'playlist-1', name: 'V-Pop', scope: 'ORG', _count: { playlistTracks: 3 } }],
+      });
+    });
+    mockApi.post.mockResolvedValue({});
+
+    render(<PlaylistsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /play all/i }));
+
+    await waitFor(() =>
+      expect(mockApi.post).toHaveBeenCalledWith(
+        '/sync/groups/group-42/play',
+        expect.objectContaining({ playlistId: 'playlist-1' }),
+      ),
+    );
+  });
+
+  it('should warn instead of playing when no sync group exists', async () => {
+    mockApi.get.mockImplementation((path: string) => {
+      if (path === '/sync/groups') return Promise.resolve({ data: [] });
+      return Promise.resolve({
+        data: [{ id: 'playlist-1', name: 'V-Pop', scope: 'ORG', _count: { playlistTracks: 3 } }],
+      });
+    });
+
+    render(<PlaylistsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /play all/i }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(mockApi.post).not.toHaveBeenCalled();
+  });
+
   it('should show error toast when create fails', async () => {
     mockApi.post.mockRejectedValue(new Error('boom'));
 

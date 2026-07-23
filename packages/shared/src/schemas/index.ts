@@ -75,6 +75,11 @@ export const SetSyncModeSchema = z.object({
   mode: z.enum(['TIGHT', 'LOOSE']),
 });
 
+export const CreateSyncGroupSchema = z.object({
+  name: z.string().min(2).max(100),
+  mode: z.enum(['TIGHT', 'LOOSE']).optional(),
+});
+
 export const OverrideSchema = z.object({
   trackId: z.string().min(1).optional(),
   playlistId: z.string().min(1).optional(),
@@ -82,6 +87,7 @@ export const OverrideSchema = z.object({
 
 export type PlayGroupDto = z.infer<typeof PlayGroupSchema>;
 export type SetSyncModeDto = z.infer<typeof SetSyncModeSchema>;
+export type CreateSyncGroupDto = z.infer<typeof CreateSyncGroupSchema>;
 export type OverrideDto = z.infer<typeof OverrideSchema>;
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
