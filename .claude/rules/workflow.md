@@ -4,7 +4,7 @@
 
 1. **Mọi thay đổi đều phải qua PR.** Không bao giờ commit thẳng vào `develop` hay `main`. Có gì cần commit → tạo nhánh mới → commit → push → mở PR vào `develop`.
 2. **`main` do chủ repo quản lý.** Claude/dev **không được** merge vào `main` dưới bất kỳ hình thức nào (kể cả khi CI xanh). PR `develop → main` chỉ chủ repo tự thực hiện khi release.
-3. **Chỉ merge PR vào `develop` khi CI + toàn bộ test pass.** Bắt buộc xác nhận job `Lint + Unit Tests` đã xanh trước khi merge. CI đỏ hoặc đang chạy → không merge, đợi hoặc fix.
+3. **Chỉ merge PR vào `develop` khi CI + toàn bộ test pass.** Bắt buộc xác nhận **cả 3 job** đã xanh: `Lint + Unit Tests`, `Typecheck + Build`, `Backend Docker Build`. CI đỏ hoặc đang chạy → không merge, đợi hoặc fix.
 4. **Cập nhật `CLAUDE.md` và `.claude/rules/*` khi task làm thay đổi convention/tooling**, để lần sau còn áp dụng đúng.
 
 ## Git Flow
@@ -21,7 +21,7 @@ git checkout -b <type>/<short-kebab-case-description>
 
 ## Commit Messages
 
-Imperative mood, hoàn thành câu *"If applied, this commit will… [message]"*. Một dòng, không dùng prefix `feat:`/`fix:` (prefix đó chỉ dành cho PR title).
+Imperative mood, hoàn thành câu _"If applied, this commit will… [message]"_. Một dòng, không dùng prefix `feat:`/`fix:` (prefix đó chỉ dành cho PR title).
 
 Verb chuẩn: `add`, `fix`, `update`, `remove`, `refactor`, `test`, `docs`, `chore`.
 
@@ -43,24 +43,26 @@ PR description dùng template:
 
 ```markdown
 ## Summary
+
 - <thay đổi chính>
 - <lý do / impact>
 
 ## Test plan
+
 - [ ] Unit tests added/updated (TDD: RED → GREEN)
 - [ ] `pnpm turbo test:unit` pass locally
 - [ ] No `.env` or secrets committed
 - [ ] UI follows design-system/cafe-music/MASTER.md (if frontend)
 ```
 
-Trước khi đề xuất merge, tự verify: nhánh tạo từ `develop` mới nhất, commit message đúng convention, có test cho logic mới, không hardcode secrets, PR target đúng branch. CI check bắt buộc: `Lint + Unit Tests`.
+Trước khi đề xuất merge, tự verify: nhánh tạo từ `develop` mới nhất, commit message đúng convention, có test cho logic mới, không hardcode secrets, PR target đúng branch. CI check bắt buộc: `Lint + Unit Tests`, `Typecheck + Build`, `Backend Docker Build`.
 
 ### Merge policy
 
-| Target | Ai merge | Điều kiện |
-|---|---|---|
-| `develop` | Claude/dev được phép | CI `Lint + Unit Tests` **pass** + toàn bộ test local pass. CI đỏ/đang chạy → đợi, không merge. |
-| `main` | **Chỉ chủ repo** | Claude không merge, không push, không tự mở PR release trừ khi được yêu cầu rõ ràng. |
+| Target    | Ai merge             | Điều kiện                                                                            |
+| --------- | -------------------- | ------------------------------------------------------------------------------------ |
+| `develop` | Claude/dev được phép | **Cả 3 CI job pass** + toàn bộ test local pass. CI đỏ/đang chạy → đợi, không merge.  |
+| `main`    | **Chỉ chủ repo**     | Claude không merge, không push, không tự mở PR release trừ khi được yêu cầu rõ ràng. |
 
 Kiểm tra CI trước khi merge:
 
@@ -68,6 +70,8 @@ Kiểm tra CI trước khi merge:
 gh pr checks <PR-number>          # xem trạng thái từng check
 gh pr merge <PR-number> --squash  # chỉ chạy khi tất cả check xanh
 ```
+
+> `gh` có thể chưa được auth trên máy. Khi đó dùng GitHub MCP server (`pull_request_read` với method `get_check_runs`) hoặc gọi thẳng REST API bằng `$GITHUB_PAT`.
 
 ## TDD (Red → Green → Refactor) — bắt buộc cho mọi feature/fix
 
