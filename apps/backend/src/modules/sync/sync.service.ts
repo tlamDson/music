@@ -1,7 +1,9 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from './redis.service';
@@ -16,13 +18,137 @@ import {
 } from '@cafe-music/shared';
 
 @Injectable()
-export class SyncService {
+export class SyncService implements OnModuleInit {
+  private readonly logger = new Logger(SyncService.name);
+
+  /**
+   * Hẹn giờ chuyển bài của từng nhóm. Nằm trong bộ nhớ nên chỉ đúng khi chạy
+   * một instance backend (Railway hiện tại); scale nhiều instance thì phải
+   * chuyển sang khoá phân tán trên Redis, nếu không mỗi instance sẽ tự chuyển
+   * bài một lần.
+   */
+  private readonly advanceTimers = new Map<string, NodeJS.Timeout>();
+
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
     private gateway: SyncGateway,
     private s3: S3Service,
   ) {}
+
+  /** Timer mất khi process restart — dựng lại theo thời lượng còn lại. */
+  async onModuleInit() {
+    const groups = await this.prisma.syncGroup.findMany({
+      where: { status: 'PLAYING' },
+    });
+
+    for (const group of groups) {
+      const state = await this.redis.getGroupState(group.id);
+      if (!state?.isPlaying || !state.trackId || !state.startedAtServerTs) {
+        continue;
+      }
+
+      const track = await this.prisma.track.findFirst({
+        where: { id: state.trackId },
+      });
+      if (!track?.durationMs) continue;
+
+      const elapsedMs =
+        Date.now() - state.startedAtServerTs + (state.positionMs ?? 0);
+      const remainingMs = track.durationMs - elapsedMs;
+
+      if (remainingMs > 0) {
+        this.scheduleAdvance(group.id, remainingMs);
+      } else {
+        void this.advance(group.id);
+      }
+    }
+  }
+
+  private clearAdvance(groupId: string) {
+    const timer = this.advanceTimers.get(groupId);
+    if (!timer) return;
+
+    clearTimeout(timer);
+    this.advanceTimers.delete(groupId);
+  }
+
+  private scheduleAdvance(groupId: string, delayMs: number) {
+    this.clearAdvance(groupId);
+    if (delayMs <= 0) return;
+
+    this.advanceTimers.set(
+      groupId,
+      setTimeout(() => {
+        void this.advance(groupId).catch((err: unknown) =>
+          this.logger.error(
+            `Auto-next failed for group ${groupId}`,
+            err instanceof Error ? err.stack : String(err),
+          ),
+        );
+      }, delayMs),
+    );
+  }
+
+  /** Hết bài: sang bài kế, hoặc dừng hẳn nếu đã là bài cuối playlist. */
+  private async advance(groupId: string) {
+    const state = await this.redis.getGroupState(groupId);
+    if (!state?.playlistId || !state.isPlaying) return;
+
+    const group = await this.prisma.syncGroup.findFirst({
+      where: { id: groupId },
+    });
+    if (!group) return;
+
+    const playlist = await this.prisma.playlist.findFirst({
+      where: { id: state.playlistId },
+      include: { playlistTracks: { orderBy: { position: 'asc' } } },
+    });
+    if (!playlist) return;
+
+    const nextIndex = state.trackIndex + 1;
+    if (nextIndex >= playlist.playlistTracks.length) {
+      await this.stopGroup(groupId);
+      return;
+    }
+
+    // Chạy nền, không có request nào phía sau → dựng payload hệ thống theo org
+    // của chính nhóm (giống SchedulerService).
+    await this.play(
+      groupId,
+      { playlistId: state.playlistId, trackIndex: nextIndex, mode: state.mode },
+      {
+        sub: 'system',
+        email: 'system@cafe-music',
+        role: 'ORG_ADMIN',
+        organizationId: group.organizationId,
+        storeId: null,
+      },
+    );
+  }
+
+  private async stopGroup(groupId: string) {
+    this.clearAdvance(groupId);
+
+    const state = await this.redis.getGroupState(groupId);
+    if (state) {
+      await this.redis.setGroupState(groupId, {
+        ...state,
+        isPlaying: false,
+        status: 'STOPPED',
+      });
+    }
+
+    await this.prisma.syncGroup.update({
+      where: { id: groupId },
+      data: { status: 'STOPPED' },
+    });
+
+    this.gateway.broadcastToGroup(groupId, 'stopped', {
+      groupId,
+      serverTs: Date.now(),
+    });
+  }
 
   /**
    * Không có endpoint liệt kê group thì web buộc phải hardcode id
@@ -109,6 +235,17 @@ export class SyncService {
       mode: state.mode,
     });
 
+    // Track upload trước khi web đo thời lượng có durationMs = 0 → không biết
+    // bao giờ hết bài, đành để nhóm dừng ở đó thay vì đoán bừa.
+    if (trackEntry.track.durationMs > 0) {
+      this.scheduleAdvance(groupId, trackEntry.track.durationMs);
+    } else {
+      this.clearAdvance(groupId);
+      this.logger.warn(
+        `Track ${trackEntry.trackId} has no duration — auto-next disabled for group ${groupId}`,
+      );
+    }
+
     return state;
   }
 
@@ -117,6 +254,9 @@ export class SyncService {
       where: { id: groupId, organizationId: user.organizationId! },
     });
     if (!group) throw new NotFoundException('Sync group not found');
+
+    // Không huỷ thì timer vẫn nổ và nhóm tự phát tiếp dù đang tạm dừng
+    this.clearAdvance(groupId);
 
     const state = await this.redis.getGroupState(groupId);
     if (state) {
