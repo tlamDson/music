@@ -1,0 +1,207 @@
+import { screen, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import PlaylistDetail from '../../src/components/playlist/PlaylistDetail';
+import { renderWithPlayer } from '../utils/renderWithPlayer';
+import { api } from '../../src/lib/api-client';
+import { toast } from 'sonner';
+
+jest.mock('../../src/lib/api-client', () => ({
+  api: { get: jest.fn(), post: jest.fn(), patch: jest.fn(), delete: jest.fn() },
+}));
+
+jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
+
+const mockApi = api as jest.Mocked<typeof api>;
+
+const track = (id: string, title: string, durationMs: number, artist: string | null = null) => ({
+  id,
+  title,
+  artist,
+  durationMs,
+  source: 'SELF_HOSTED',
+  s3Key: `${id}.mp3`,
+  externalProvider: null,
+  externalId: null,
+  organizationId: 'org-1',
+  createdAt: '',
+});
+
+const playlistDetail = {
+  id: 'playlist-1',
+  name: 'Nhạc Lofi Chill Việt Nam',
+  scope: 'ORG',
+  storeId: null,
+  playlistTracks: [
+    {
+      id: 'pt-1',
+      playlistId: 'playlist-1',
+      trackId: 'track-1',
+      position: 0,
+      track: track('track-1', 'Hẹn Em Ở Lần Yêu Thứ 2', 366_000, 'Nguyenn'),
+    },
+    {
+      id: 'pt-2',
+      playlistId: 'playlist-1',
+      trackId: 'track-2',
+      position: 1,
+      track: track('track-2', 'Rồi Sẽ Đến Nơi', 215_000, 'JUUN D'),
+    },
+  ],
+};
+
+describe('PlaylistDetail', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockApi.get.mockImplementation((path: string) => {
+      if (path === '/playlists/playlist-1') return Promise.resolve(playlistDetail);
+      if (path.startsWith('/sync/groups')) {
+        return Promise.resolve({
+          data: [{ id: 'group-1', name: 'Nhóm chính', mode: 'LOOSE', status: 'STOPPED' }],
+        });
+      }
+      if (path.startsWith('/tracks')) {
+        return Promise.resolve({
+          data: [
+            track('track-1', 'Hẹn Em Ở Lần Yêu Thứ 2', 366_000, 'Nguyenn'),
+            track('track-3', 'Gonna be you', 258_000, 'Linh Ka'),
+          ],
+        });
+      }
+      return Promise.resolve({ data: [] });
+    });
+  });
+
+  const renderDetail = (role: 'ORG_ADMIN' | 'STORE_ADMIN' = 'ORG_ADMIN') =>
+    renderWithPlayer(
+      <PlaylistDetail
+        playlistId="playlist-1"
+        role={role}
+        storeId={role === 'STORE_ADMIN' ? 'store-1' : null}
+        backHref="/dashboard/playlists"
+      />,
+    );
+
+  it('shows the playlist header with scope, track count and total length', async () => {
+    renderDetail();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Nhạc Lofi Chill Việt Nam' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/danh sách phát của chuỗi/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 bài · 10 phút/i)).toBeInTheDocument();
+  });
+
+  it('lists tracks with position, artist and duration', async () => {
+    renderDetail();
+
+    const row = await screen.findByRole('row', { name: /hẹn em ở lần yêu thứ 2/i });
+    expect(row).toHaveTextContent('1');
+    expect(row).toHaveTextContent('Nguyenn');
+    expect(row).toHaveTextContent('6:06');
+  });
+
+  it('plays the whole playlist from the header button', async () => {
+    mockApi.post.mockResolvedValue({});
+    renderDetail();
+
+    await userEvent.click(await screen.findByRole('button', { name: /phát playlist/i }));
+
+    await waitFor(() =>
+      expect(mockApi.post).toHaveBeenCalledWith('/sync/groups/group-1/play', {
+        playlistId: 'playlist-1',
+        trackIndex: 0,
+        mode: 'LOOSE',
+      }),
+    );
+  });
+
+  it('starts from the clicked track', async () => {
+    mockApi.post.mockResolvedValue({});
+    renderDetail();
+
+    await userEvent.click(await screen.findByRole('button', { name: /phát rồi sẽ đến nơi/i }));
+
+    await waitFor(() =>
+      expect(mockApi.post).toHaveBeenCalledWith(
+        '/sync/groups/group-1/play',
+        expect.objectContaining({ trackIndex: 1 }),
+      ),
+    );
+  });
+
+  // Quán phát playlist là tách khỏi nhóm sync, không điều khiển cả chuỗi
+  it('plays locally when a store opens the playlist', async () => {
+    mockApi.post.mockResolvedValue({});
+    renderDetail('STORE_ADMIN');
+
+    await userEvent.click(await screen.findByRole('button', { name: /phát playlist/i }));
+
+    await waitFor(() =>
+      expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/play', {
+        playlistId: 'playlist-1',
+        trackIndex: 0,
+        returnToGroupOnFinish: true,
+      }),
+    );
+  });
+
+  it('adds a track from the add-song dialog', async () => {
+    mockApi.post.mockResolvedValue({ id: 'pt-3' });
+    renderDetail();
+
+    await userEvent.click(await screen.findByRole('button', { name: /thêm bài hát/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /thêm gonna be you/i }));
+
+    await waitFor(() =>
+      expect(mockApi.post).toHaveBeenCalledWith('/playlists/playlist-1/tracks', {
+        trackId: 'track-3',
+      }),
+    );
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('still accepts a track dropped onto the list', async () => {
+    mockApi.post.mockResolvedValue({ id: 'pt-3' });
+    renderDetail();
+
+    const dropZone = await screen.findByLabelText(/danh sách bài hát/i);
+    fireEvent.drop(dropZone, {
+      dataTransfer: { getData: (key: string) => (key === 'trackId' ? 'track-3' : '') },
+    });
+
+    await waitFor(() =>
+      expect(mockApi.post).toHaveBeenCalledWith('/playlists/playlist-1/tracks', {
+        trackId: 'track-3',
+      }),
+    );
+  });
+
+  it('removes a track from the playlist', async () => {
+    mockApi.delete.mockResolvedValue({ message: 'ok' });
+    renderDetail();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /xóa hẹn em ở lần yêu thứ 2/i }),
+    );
+
+    await waitFor(() =>
+      expect(mockApi.delete).toHaveBeenCalledWith('/playlists/playlist-1/tracks/track-1'),
+    );
+  });
+
+  it('saves the new order after a drag', async () => {
+    mockApi.patch.mockResolvedValue(playlistDetail);
+    renderDetail();
+
+    const rows = await screen.findAllByRole('row');
+    // Kéo bài thứ hai lên đầu danh sách
+    fireEvent.dragStart(rows[2]);
+    fireEvent.drop(rows[1]);
+
+    await waitFor(() =>
+      expect(mockApi.patch).toHaveBeenCalledWith('/playlists/playlist-1/tracks/reorder', {
+        trackIds: ['track-2', 'track-1'],
+      }),
+    );
+  });
+});
