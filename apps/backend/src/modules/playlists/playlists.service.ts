@@ -159,12 +159,16 @@ export class PlaylistsService {
 
     if (!track) throw new NotFoundException('Track not found');
 
-    const count = await this.prisma.playlistTrack.count({
+    // Xoá một bài giữa playlist để lại lỗ hổng vị trí, nên đếm số bài rồi lấy
+    // làm position sẽ trùng bài cuối và vi phạm unique (playlistId, position).
+    const last = await this.prisma.playlistTrack.findFirst({
       where: { playlistId },
+      orderBy: { position: 'desc' },
+      select: { position: true },
     });
 
     return this.prisma.playlistTrack.create({
-      data: { playlistId, trackId, position: count },
+      data: { playlistId, trackId, position: (last?.position ?? -1) + 1 },
     });
   }
 
@@ -179,14 +183,23 @@ export class PlaylistsService {
 
     if (!playlist) throw new NotFoundException('Playlist not found');
 
-    await this.prisma.$transaction(
-      orderedTrackIds.map((trackId, position) =>
+    // Unique (playlistId, position) được kiểm ngay từng câu lệnh, không hoãn tới
+    // cuối transaction: ghi thẳng vị trí mới thì bài đầu nhận 0 trong khi bài cũ
+    // vẫn giữ 0 → nổ. Dời tạm sang vị trí âm rồi mới ghi vị trí thật.
+    await this.prisma.$transaction([
+      ...orderedTrackIds.map((trackId, index) =>
         this.prisma.playlistTrack.updateMany({
           where: { playlistId, trackId },
-          data: { position },
+          data: { position: -(index + 1) },
         }),
       ),
-    );
+      ...orderedTrackIds.map((trackId, index) =>
+        this.prisma.playlistTrack.updateMany({
+          where: { playlistId, trackId },
+          data: { position: index },
+        }),
+      ),
+    ]);
 
     return this.findOne(playlistId, user);
   }
