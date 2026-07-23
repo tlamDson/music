@@ -414,12 +414,19 @@ export class SyncService implements OnModuleInit {
 
     const nextIndex = playback.trackIndex + 1;
     if (nextIndex >= playback.trackIds.length) {
+      // Hết hàng chờ riêng: mặc định quán quay lại dòng sync của admin, bắt
+      // đúng bài đang phát chứ không phát lại từ đầu.
+      if (playback.returnToGroupOnFinish) {
+        const { state } = await this.rejoin(storeId, user);
+        return { finished: true, rejoined: true, playback: null, state };
+      }
+
       await this.redis.clearStorePlayback(storeId);
       this.gateway.broadcastToStore(storeId, 'store-stopped', {
         storeId,
         serverTs: Date.now(),
       });
-      return { finished: true, playback: null };
+      return { finished: true, rejoined: false, playback: null };
     }
 
     const trackId = playback.trackIds[nextIndex];
@@ -433,7 +440,7 @@ export class SyncService implements OnModuleInit {
       trackId,
     });
 
-    return { finished: false, playback: next };
+    return { finished: false, rejoined: false, playback: next };
   }
 
   async getStorePlayback(storeId: string, user: JwtPayload) {
@@ -523,6 +530,8 @@ export class SyncService implements OnModuleInit {
     const store = await this.assertStoreAccess(storeId, user);
 
     await this.redis.clearStoreOverride(storeId);
+    // Hàng chờ riêng còn sót lại sẽ khiến quán tiếp tục phát nhạc của mình
+    await this.redis.clearStorePlayback(storeId);
 
     await this.prisma.storeOverride.upsert({
       where: { storeId },
@@ -530,12 +539,33 @@ export class SyncService implements OnModuleInit {
       create: { storeId, isOverridden: false },
     });
 
-    if (store.syncGroupId) {
-      const state = await this.redis.getGroupState(store.syncGroupId);
+    if (!store.syncGroupId) return { rejoined: true, state: null };
+
+    const state = await this.redis.getGroupState(store.syncGroupId);
+    if (!state?.isPlaying || !state.trackId || !state.startedAtServerTs) {
+      // Nhóm đang dừng thì không có gì để bắt kịp — im lặng là đúng
       return { rejoined: true, state };
     }
 
-    return { rejoined: true, state: null };
+    // Bắt kịp giữa bài: bù đúng khoảng đã trôi kể từ lúc nhóm bắt đầu phát,
+    // nếu không quán vừa quay lại sẽ phát lại bài từ đầu và lệch cả nhóm.
+    const track = await this.prisma.track.findFirst({
+      where: { id: state.trackId },
+    });
+    const trackUrl = track?.s3Key
+      ? await this.s3.getPresignedUrl(track.s3Key)
+      : null;
+
+    this.gateway.broadcastToStore(storeId, 'now-playing', {
+      groupId: store.syncGroupId,
+      trackId: state.trackId,
+      trackUrl,
+      positionMs: state.positionMs + (Date.now() - state.startedAtServerTs),
+      serverTs: Date.now(),
+      mode: state.mode,
+    });
+
+    return { rejoined: true, state };
   }
 
   async getGroupState(groupId: string, user: JwtPayload) {

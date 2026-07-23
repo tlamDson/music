@@ -673,6 +673,132 @@ describe('SyncService', () => {
     });
   });
 
+  // "Phát xong từng đây bài thì quay lại playlist ban đầu": hết hàng chờ riêng
+  // là quán tự về dòng sync của admin, đúng bài đang phát và đúng giây.
+  describe('auto rejoin after the local queue ends', () => {
+    const groupPlaying = {
+      groupId: 'group-1',
+      playlistId: 'playlist-9',
+      trackId: 'track-9',
+      trackIndex: 0,
+      positionMs: 0,
+      startedAtServerTs: Date.now() - 45_000,
+      isPlaying: true,
+      mode: 'LOOSE' as const,
+      status: 'PLAYING' as const,
+    };
+
+    const lastTrackQueue = {
+      storeId: 'store-1',
+      playlistId: 'playlist-1',
+      trackIds: ['track-1', 'track-2'],
+      trackIndex: 1,
+      positionMs: 0,
+      startedAtServerTs: Date.now(),
+      isPlaying: true,
+      returnToGroupOnFinish: true,
+    };
+
+    beforeEach(() => {
+      prisma.store.findFirst.mockResolvedValue({
+        id: 'store-1',
+        organizationId: 'org-1',
+        syncGroupId: 'group-1',
+      } as any);
+      prisma.track.findFirst.mockResolvedValue({
+        id: 'track-9',
+        s3Key: 'group-track.mp3',
+      } as any);
+    });
+
+    it('drops the override when the last local track finishes', async () => {
+      redis.getStorePlayback.mockResolvedValue(lastTrackQueue);
+      redis.getGroupState.mockResolvedValue(groupPlaying);
+
+      await service.nextStore('store-1', storeAdminUser);
+
+      expect(redis.clearStoreOverride).toHaveBeenCalledWith('store-1');
+      expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-1');
+    });
+
+    it('resumes the group track at the position it is already at', async () => {
+      redis.getStorePlayback.mockResolvedValue(lastTrackQueue);
+      redis.getGroupState.mockResolvedValue(groupPlaying);
+
+      await service.nextStore('store-1', storeAdminUser);
+
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'now-playing',
+        expect.objectContaining({
+          trackId: 'track-9',
+          trackUrl: 'https://s3/presigned/song.mp3',
+          positionMs: expect.any(Number),
+        }),
+      );
+
+      const call = gateway.broadcastToStore.mock.calls.find(
+        ([, event]) => event === 'now-playing',
+      );
+      const payload = call?.[2] as { positionMs: number };
+      expect(payload.positionMs).toBeGreaterThanOrEqual(45_000);
+    });
+
+    it('stays detached when the store asked not to return', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        ...lastTrackQueue,
+        returnToGroupOnFinish: false,
+      });
+
+      await service.nextStore('store-1', storeAdminUser);
+
+      expect(redis.clearStoreOverride).not.toHaveBeenCalled();
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-stopped',
+        expect.any(Object),
+      );
+    });
+
+    it('stays silent when the group itself is stopped', async () => {
+      redis.getStorePlayback.mockResolvedValue(lastTrackQueue);
+      redis.getGroupState.mockResolvedValue({
+        ...groupPlaying,
+        isPlaying: false,
+        status: 'STOPPED',
+      });
+
+      await service.nextStore('store-1', storeAdminUser);
+
+      expect(redis.clearStoreOverride).toHaveBeenCalledWith('store-1');
+      expect(gateway.broadcastToStore).not.toHaveBeenCalledWith(
+        'store-1',
+        'now-playing',
+        expect.anything(),
+      );
+    });
+
+    it('catches up mid-track when rejoining by hand', async () => {
+      redis.getGroupState.mockResolvedValue(groupPlaying);
+
+      await service.rejoin('store-1', storeAdminUser);
+
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'now-playing',
+        expect.objectContaining({ trackId: 'track-9' }),
+      );
+    });
+
+    it('clears any leftover local queue when rejoining by hand', async () => {
+      redis.getGroupState.mockResolvedValue(groupPlaying);
+
+      await service.rejoin('store-1', storeAdminUser);
+
+      expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-1');
+    });
+  });
+
   describe('rejoin', () => {
     it('should clear store override and return current group state', async () => {
       redis.getGroupState.mockResolvedValue({
