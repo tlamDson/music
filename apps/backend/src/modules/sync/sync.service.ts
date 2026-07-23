@@ -166,6 +166,51 @@ export class SyncService implements OnModuleInit {
     return { data: groups };
   }
 
+  /**
+   * Một chỗ để admin nhìn ra quán nào đang nghe theo chuỗi, quán nào tách ra
+   * phát nhạc riêng và còn mấy bài nữa thì quay lại.
+   */
+  async overview(user: JwtPayload) {
+    const stores = await this.prisma.store.findMany({
+      where: { organizationId: user.organizationId! },
+      include: { storeOverride: true, syncGroup: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const data = await Promise.all(
+      stores.map(async (store) => {
+        const playback = await this.redis.getStorePlayback(store.id);
+        const groupState = store.syncGroupId
+          ? await this.redis.getGroupState(store.syncGroupId)
+          : null;
+
+        // Hàng chờ riêng trong Redis là nguồn tin cậy nhất; cờ trong DB chỉ là
+        // bản lưu để sống sót qua restart.
+        const isOverridden =
+          Boolean(playback) || Boolean(store.storeOverride?.isOverridden);
+
+        return {
+          storeId: store.id,
+          name: store.name,
+          syncGroupId: store.syncGroupId,
+          syncGroupName: store.syncGroup?.name ?? null,
+          isOverridden,
+          trackId: playback
+            ? (playback.trackIds[playback.trackIndex] ?? null)
+            : (groupState?.trackId ?? null),
+          isPlaying: playback
+            ? playback.isPlaying
+            : (groupState?.isPlaying ?? false),
+          queueRemaining: playback
+            ? playback.trackIds.length - playback.trackIndex - 1
+            : null,
+        };
+      }),
+    );
+
+    return { data };
+  }
+
   async createGroup(dto: CreateSyncGroupDto, user: JwtPayload) {
     return this.prisma.syncGroup.create({
       data: {

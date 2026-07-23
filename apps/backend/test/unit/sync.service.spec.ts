@@ -598,6 +598,91 @@ describe('SyncService', () => {
     });
   });
 
+  // Admin cần nhìn một chỗ biết quán nào đang nghe theo chuỗi, quán nào tách ra
+  describe('overview', () => {
+    const stores = [
+      {
+        id: 'store-1',
+        name: 'Quán Nguyễn Huệ',
+        organizationId: 'org-1',
+        syncGroupId: 'group-1',
+        syncGroup: { id: 'group-1', name: 'Nhóm chính' },
+        storeOverride: null,
+      },
+      {
+        id: 'store-2',
+        name: 'Quán Lê Lợi',
+        organizationId: 'org-1',
+        syncGroupId: 'group-1',
+        syncGroup: { id: 'group-1', name: 'Nhóm chính' },
+        storeOverride: { isOverridden: true },
+      },
+    ];
+
+    it('lists stores of the caller organization only', async () => {
+      prisma.store.findMany.mockResolvedValue(stores as any);
+
+      await service.overview(orgAdminUser);
+
+      expect(prisma.store.findMany).toHaveBeenCalledWith({
+        where: { organizationId: 'org-1' },
+        include: { storeOverride: true, syncGroup: true },
+        orderBy: { name: 'asc' },
+      });
+    });
+
+    it('reports the group track for a store following the chain', async () => {
+      prisma.store.findMany.mockResolvedValue([stores[0]] as any);
+      redis.getStorePlayback.mockResolvedValue(null);
+      redis.getGroupState.mockResolvedValue({
+        groupId: 'group-1',
+        playlistId: 'playlist-1',
+        trackId: 'track-9',
+        trackIndex: 0,
+        positionMs: 0,
+        startedAtServerTs: Date.now(),
+        isPlaying: true,
+        mode: 'LOOSE',
+        status: 'PLAYING',
+      });
+
+      const result = await service.overview(orgAdminUser);
+
+      expect(result.data[0]).toMatchObject({
+        storeId: 'store-1',
+        name: 'Quán Nguyễn Huệ',
+        syncGroupName: 'Nhóm chính',
+        isOverridden: false,
+        trackId: 'track-9',
+        isPlaying: true,
+        queueRemaining: null,
+      });
+    });
+
+    it('reports the local queue for a store playing on its own', async () => {
+      prisma.store.findMany.mockResolvedValue([stores[1]] as any);
+      redis.getStorePlayback.mockResolvedValue({
+        storeId: 'store-2',
+        playlistId: 'playlist-2',
+        trackIds: ['track-1', 'track-2', 'track-3'],
+        trackIndex: 1,
+        positionMs: 0,
+        startedAtServerTs: Date.now(),
+        isPlaying: true,
+        returnToGroupOnFinish: true,
+      });
+
+      const result = await service.overview(orgAdminUser);
+
+      expect(result.data[0]).toMatchObject({
+        storeId: 'store-2',
+        isOverridden: true,
+        trackId: 'track-2',
+        queueRemaining: 1,
+      });
+    });
+  });
+
   describe('override', () => {
     it('should set store override in Redis and disconnect store from sync group', async () => {
       prisma.store.findFirst.mockResolvedValue({

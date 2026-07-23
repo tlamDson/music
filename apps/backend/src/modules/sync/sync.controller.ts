@@ -24,6 +24,12 @@ export class SyncController {
     return this.syncService.listGroups(user);
   }
 
+  @Get('overview')
+  @Roles('ORG_ADMIN')
+  overview(@CurrentUser() user: JwtPayload) {
+    return this.syncService.overview(user);
+  }
+
   @Post('groups')
   @Roles('ORG_ADMIN')
   createGroup(
