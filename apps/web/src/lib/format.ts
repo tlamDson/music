@@ -13,6 +13,19 @@ export function formatPosition(ms: number | null | undefined): string {
   return toClock(Math.max(ms ?? 0, 0));
 }
 
+/**
+ * Tổng thời lượng playlist cho card: "khoảng 7 giờ" / "45 phút" — người dùng chỉ
+ * cần độ dài áng chừng, không cần từng giây.
+ */
+export function formatTotalDuration(ms: number | null | undefined): string {
+  if (!ms || ms <= 0) return '0 phút';
+
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 60) return `${minutes} phút`;
+
+  return `khoảng ${Math.round(minutes / 60)} giờ`;
+}
+
 function toClock(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);

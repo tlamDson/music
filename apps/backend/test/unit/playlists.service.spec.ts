@@ -97,6 +97,87 @@ describe('PlaylistsService', () => {
     });
   });
 
+  // Trang duyệt playlist cần lọc theo chip (chuỗi/quán), ô tìm kiếm và tổng
+  // thời lượng để hiện "98 bài hát, khoảng 7 giờ" như trên card.
+  describe('findAll filters', () => {
+    // Zod đã điền sẵn `sort` trước khi tới service (default 'recent')
+    const pagination = { page: 1, limit: 20, sort: 'recent' as const };
+
+    beforeEach(() => {
+      prisma.playlist.findMany.mockResolvedValue([]);
+      prisma.playlist.count.mockResolvedValue(0);
+    });
+
+    it('filters by scope when a chip is selected', async () => {
+      await service.findAll(orgAdminUser, { ...pagination, scope: 'STORE' });
+
+      expect(prisma.playlist.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ scope: 'STORE' }),
+        }),
+      );
+    });
+
+    it('searches playlists by name, ignoring case', async () => {
+      await service.findAll(orgAdminUser, { ...pagination, q: 'lofi' });
+
+      expect(prisma.playlist.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            name: { contains: 'lofi', mode: 'insensitive' },
+          }),
+        }),
+      );
+    });
+
+    it('sorts by name when asked, newest first otherwise', async () => {
+      await service.findAll(orgAdminUser, { ...pagination, sort: 'name' });
+      expect(prisma.playlist.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { name: 'asc' } }),
+      );
+
+      await service.findAll(orgAdminUser, pagination);
+      expect(prisma.playlist.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
+      );
+    });
+
+    it('keeps a store admin from seeing playlists of other stores', async () => {
+      await service.findAll(storeAdminUser, pagination);
+
+      expect(prisma.playlist.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [{ scope: 'ORG' }, { storeId: 'store-1' }],
+          }),
+        }),
+      );
+    });
+
+    it('reports the total duration of each playlist', async () => {
+      prisma.playlist.findMany.mockResolvedValue([
+        {
+          ...mockPlaylist,
+          _count: { playlistTracks: 2 },
+          playlistTracks: [
+            { track: { durationMs: 180_000 } },
+            { track: { durationMs: 245_000 } },
+          ],
+        },
+      ] as any);
+      prisma.playlist.count.mockResolvedValue(1);
+
+      const result = await service.findAll(orgAdminUser, pagination);
+
+      expect(result.data[0]).toMatchObject({
+        id: 'playlist-1',
+        totalDurationMs: 425_000,
+      });
+      // Danh sách track chỉ dùng để cộng thời lượng, không cần trả về client
+      expect(result.data[0]).not.toHaveProperty('playlistTracks');
+    });
+  });
+
   describe('addTrack', () => {
     it('should add a track to a playlist and auto-assign position', async () => {
       prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
