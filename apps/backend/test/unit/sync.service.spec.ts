@@ -200,6 +200,159 @@ describe('SyncService', () => {
     });
   });
 
+  // Trước đây play() phát đúng một bài rồi im: hết bài là nhóm đứng hình, store
+  // rejoin giữa chừng không có gì để nghe.
+  describe('auto-next', () => {
+    const twoTrackPlaylist = {
+      id: 'playlist-1',
+      name: 'Test',
+      playlistTracks: [
+        {
+          trackId: 'track-1',
+          position: 0,
+          track: { id: 'track-1', s3Key: 'k1', durationMs: 180_000 },
+        },
+        {
+          trackId: 'track-2',
+          position: 1,
+          track: { id: 'track-2', s3Key: 'k2', durationMs: 200_000 },
+        },
+      ],
+    };
+
+    const playingState = (trackIndex: number) => ({
+      groupId: 'group-1',
+      playlistId: 'playlist-1',
+      trackId: `track-${trackIndex + 1}`,
+      trackIndex,
+      positionMs: 0,
+      startedAtServerTs: Date.now(),
+      isPlaying: true,
+      mode: 'LOOSE' as const,
+      status: 'PLAYING' as const,
+    });
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
+      prisma.playlist.findFirst.mockResolvedValue(twoTrackPlaylist as any);
+      prisma.syncGroup.update.mockResolvedValue(mockGroup as any);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('plays the next track once the current one ends', async () => {
+      redis.getGroupState.mockResolvedValue(playingState(0));
+
+      await service.play(
+        'group-1',
+        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
+        orgAdminUser,
+      );
+      gateway.broadcastToGroup.mockClear();
+
+      await jest.advanceTimersByTimeAsync(180_000);
+
+      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
+        'group-1',
+        'now-playing',
+        expect.objectContaining({ trackId: 'track-2' }),
+      );
+    });
+
+    it('stops the group after the last track instead of looping', async () => {
+      redis.getGroupState.mockResolvedValue(playingState(1));
+
+      await service.play(
+        'group-1',
+        { playlistId: 'playlist-1', trackIndex: 1, mode: 'LOOSE' },
+        orgAdminUser,
+      );
+      gateway.broadcastToGroup.mockClear();
+
+      await jest.advanceTimersByTimeAsync(200_000);
+
+      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
+        'group-1',
+        'stopped',
+        expect.any(Object),
+      );
+      expect(gateway.broadcastToGroup).not.toHaveBeenCalledWith(
+        'group-1',
+        'now-playing',
+        expect.anything(),
+      );
+    });
+
+    it('cancels the pending advance when the group is paused', async () => {
+      redis.getGroupState.mockResolvedValue(playingState(0));
+
+      await service.play(
+        'group-1',
+        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
+        orgAdminUser,
+      );
+      await service.pause('group-1', orgAdminUser);
+      gateway.broadcastToGroup.mockClear();
+
+      await jest.advanceTimersByTimeAsync(180_000);
+
+      expect(gateway.broadcastToGroup).not.toHaveBeenCalled();
+    });
+
+    it('does not schedule anything for tracks with unknown duration', async () => {
+      prisma.playlist.findFirst.mockResolvedValue({
+        ...twoTrackPlaylist,
+        playlistTracks: [
+          {
+            trackId: 'track-1',
+            position: 0,
+            track: { id: 'track-1', s3Key: 'k1', durationMs: 0 },
+          },
+        ],
+      } as any);
+      redis.getGroupState.mockResolvedValue(playingState(0));
+
+      await service.play(
+        'group-1',
+        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
+        orgAdminUser,
+      );
+      gateway.broadcastToGroup.mockClear();
+
+      await jest.advanceTimersByTimeAsync(600_000);
+
+      expect(gateway.broadcastToGroup).not.toHaveBeenCalled();
+    });
+
+    // Timer nằm trong bộ nhớ nên restart backend là mất — phải dựng lại theo
+    // thời lượng còn lại, nếu không nhạc đứng im sau mỗi lần deploy.
+    it('reschedules playing groups after a restart', async () => {
+      prisma.syncGroup.findMany.mockResolvedValue([mockGroup] as any);
+      redis.getGroupState.mockResolvedValue({
+        ...playingState(0),
+        startedAtServerTs: Date.now() - 60_000,
+      });
+      prisma.track.findFirst.mockResolvedValue({
+        id: 'track-1',
+        durationMs: 180_000,
+      } as any);
+
+      await service.onModuleInit();
+      gateway.broadcastToGroup.mockClear();
+
+      await jest.advanceTimersByTimeAsync(120_000);
+
+      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
+        'group-1',
+        'now-playing',
+        expect.objectContaining({ trackId: 'track-2' }),
+      );
+    });
+  });
+
   describe('override', () => {
     it('should set store override in Redis and disconnect store from sync group', async () => {
       prisma.store.findFirst.mockResolvedValue({
