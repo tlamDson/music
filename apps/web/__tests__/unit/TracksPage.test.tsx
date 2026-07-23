@@ -23,10 +23,25 @@ const mockAudio = {
   pause: jest.fn(),
   src: '',
   currentTime: 0,
+  // jsdom không decode audio thật: giả lập metadata để trang đo được thời lượng
+  duration: 245,
+  addEventListener: jest.fn((event: string, handler: () => void) => {
+    if (event === 'loadedmetadata') handler();
+  }),
+  removeEventListener: jest.fn(),
 };
 Object.defineProperty(global, 'Audio', {
   writable: true,
   value: jest.fn(() => mockAudio),
+});
+
+Object.defineProperty(global.URL, 'createObjectURL', {
+  writable: true,
+  value: jest.fn(() => 'blob:mock'),
+});
+Object.defineProperty(global.URL, 'revokeObjectURL', {
+  writable: true,
+  value: jest.fn(),
 });
 
 const tracks = [
@@ -34,7 +49,7 @@ const tracks = [
     id: 'track-1',
     title: 'Song One',
     artist: 'Artist A',
-    durationMs: 0,
+    durationMs: 245000,
     source: 'SELF_HOSTED',
     s3Key: 'k1',
     externalProvider: null,
@@ -69,6 +84,26 @@ describe('TracksPage', () => {
       expect(mockApi.postMultipart).toHaveBeenCalledWith('/tracks', expect.any(FormData)),
     );
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
+  });
+
+  it('should send the measured duration along with the upload', async () => {
+    mockApi.postMultipart.mockResolvedValue({ id: 'track-2', title: 'new-song' });
+
+    render(<TracksPage />);
+    const input = await screen.findByLabelText(/select audio file/i);
+    fireEvent.change(input, {
+      target: { files: [new File(['x'], 'new-song.mp3', { type: 'audio/mpeg' })] },
+    });
+
+    await waitFor(() => expect(mockApi.postMultipart).toHaveBeenCalled());
+    const formData = mockApi.postMultipart.mock.calls[0][1] as FormData;
+    expect(formData.get('durationMs')).toBe('245000');
+  });
+
+  it('should render the track duration', async () => {
+    render(<TracksPage />);
+
+    expect(await screen.findByText('4:05')).toBeInTheDocument();
   });
 
   it('should show error toast when upload fails', async () => {

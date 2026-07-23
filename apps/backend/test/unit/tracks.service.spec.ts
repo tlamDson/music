@@ -113,6 +113,48 @@ describe('TracksService', () => {
       expect(result).toMatchObject({ title: 'Test Song' });
     });
 
+    // durationMs từng bị ghi cứng 0 nên không hiện được thời lượng bài hát và
+    // backend không biết bao giờ hết bài để tự chuyển.
+    it('should persist the duration reported by the uploader', async () => {
+      const validFile = {
+        mimetype: 'audio/mpeg',
+        size: 1024,
+        buffer: Buffer.from(''),
+        originalname: 'song.mp3',
+      } as Express.Multer.File;
+      prisma.track.create.mockResolvedValue(mockTrack as any);
+
+      await service.create(
+        { title: 'Test Song', durationMs: 245_000 },
+        validFile,
+        mockJwtPayload,
+      );
+
+      expect(prisma.track.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ durationMs: 245_000 }),
+        }),
+      );
+    });
+
+    it('should fall back to zero duration when the uploader sends none', async () => {
+      const validFile = {
+        mimetype: 'audio/mpeg',
+        size: 1024,
+        buffer: Buffer.from(''),
+        originalname: 'song.mp3',
+      } as Express.Multer.File;
+      prisma.track.create.mockResolvedValue(mockTrack as any);
+
+      await service.create({ title: 'Test Song' }, validFile, mockJwtPayload);
+
+      expect(prisma.track.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ durationMs: 0 }),
+        }),
+      );
+    });
+
     // M4A: mimetype khác nhau tùy trình duyệt/OS
     it.each(['audio/mp4', 'audio/x-m4a', 'audio/m4a'])(
       'should upload valid m4a file with mimetype %s',

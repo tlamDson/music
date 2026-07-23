@@ -59,6 +59,10 @@ export const CreateTrackMetaSchema = z.object({
   title: z.string().min(1).max(200),
   artist: z.string().max(200).optional(),
   folderId: z.string().min(1).optional(),
+  // Trình duyệt đo bằng HTMLAudioElement trước khi upload (multipart nên là
+  // chuỗi → coerce). Thiếu thì service để 0 và UI hiện "--:--" thay vì chặn
+  // upload — optional chứ không default để client cũ vẫn upload được.
+  durationMs: z.coerce.number().int().min(0).max(86_400_000).optional(),
 });
 
 export type CreateTrackMetaDto = z.infer<typeof CreateTrackMetaSchema>;
