@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { PrismaClient } from '@prisma/client';
 import { SyncService } from '../../src/modules/sync/sync.service';
@@ -158,12 +158,76 @@ describe('SyncService', () => {
 
   describe('override', () => {
     it('should set store override in Redis and disconnect store from sync group', async () => {
+      prisma.store.findFirst.mockResolvedValue({
+        id: 'store-1',
+        organizationId: 'org-1',
+        syncGroupId: 'group-1',
+      } as any);
+
       await service.override('store-1', { trackId: 'track-2' }, storeAdminUser);
 
       expect(redis.setStoreOverride).toHaveBeenCalledWith(
         'store-1',
         expect.objectContaining({ isOverridden: true }),
       );
+    });
+  });
+
+  // Role guard chỉ chứng minh "là store admin", chưa nói gì về việc đó là store
+  // admin của quán NÀO — thiếu check này thì quán A điều khiển được quán B.
+  describe('store access control', () => {
+    const otherStoreAdmin = {
+      ...storeAdminUser,
+      sub: 'user-3',
+      storeId: 'store-2',
+    };
+
+    beforeEach(() => {
+      prisma.store.findFirst.mockResolvedValue({
+        id: 'store-1',
+        organizationId: 'org-1',
+        syncGroupId: 'group-1',
+      } as any);
+    });
+
+    it('refuses override from a store admin of another store', async () => {
+      await expect(
+        service.override('store-1', {}, otherStoreAdmin),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(redis.setStoreOverride).not.toHaveBeenCalled();
+      expect(prisma.storeOverride.upsert).not.toHaveBeenCalled();
+    });
+
+    it('refuses rejoin from a store admin of another store', async () => {
+      await expect(
+        service.rejoin('store-1', otherStoreAdmin),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(redis.clearStoreOverride).not.toHaveBeenCalled();
+    });
+
+    it('allows an org admin to override any store in their organization', async () => {
+      await expect(
+        service.override('store-1', {}, orgAdminUser),
+      ).resolves.toEqual(expect.objectContaining({ isOverridden: true }));
+    });
+
+    it('scopes the store lookup to the caller organization', async () => {
+      await service.override('store-1', {}, orgAdminUser);
+
+      expect(prisma.store.findFirst).toHaveBeenCalledWith({
+        where: { id: 'store-1', organizationId: 'org-1' },
+      });
+    });
+
+    it('hides stores from other organizations behind a 404', async () => {
+      prisma.store.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.override('store-9', {}, orgAdminUser),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(redis.setStoreOverride).not.toHaveBeenCalled();
     });
   });
 

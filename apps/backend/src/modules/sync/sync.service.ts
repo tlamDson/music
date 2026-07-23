@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from './redis.service';
 import { SyncGateway } from './sync.gateway';
@@ -135,7 +139,29 @@ export class SyncService {
     );
   }
 
-  async override(storeId: string, dto: OverrideDto, _user: JwtPayload) {
+  /**
+   * RolesGuard chỉ chứng minh "người gọi là STORE_ADMIN", không nói gì về việc
+   * đó là store admin của quán nào — thiếu bước này thì quán A điều khiển được
+   * quán B. Store ngoài org trả 404 để không lộ sự tồn tại.
+   */
+  private async assertStoreAccess(storeId: string, user: JwtPayload) {
+    const store = await this.prisma.store.findFirst({
+      where: { id: storeId, organizationId: user.organizationId! },
+    });
+    if (!store) throw new NotFoundException('Store not found');
+
+    if (user.role === 'STORE_ADMIN' && user.storeId !== storeId) {
+      throw new ForbiddenException(
+        'Store admins can only control their own store',
+      );
+    }
+
+    return store;
+  }
+
+  async override(storeId: string, dto: OverrideDto, user: JwtPayload) {
+    await this.assertStoreAccess(storeId, user);
+
     const overrideData = {
       storeId,
       isOverridden: true,
@@ -167,10 +193,7 @@ export class SyncService {
   }
 
   async rejoin(storeId: string, user: JwtPayload) {
-    const store = await this.prisma.store.findFirst({
-      where: { id: storeId, organizationId: user.organizationId! },
-    });
-    if (!store) throw new NotFoundException('Store not found');
+    const store = await this.assertStoreAccess(storeId, user);
 
     await this.redis.clearStoreOverride(storeId);
 
