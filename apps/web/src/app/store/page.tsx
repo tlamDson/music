@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '../../../hooks/useAuth';
-import { useSync } from '../../../hooks/useSync';
-import { useClockOffset } from '../../../hooks/useClockOffset';
-import { api } from '../../../lib/api-client';
+import { useAuth } from '../../hooks/useAuth';
+import { useSync } from '../../hooks/useSync';
+import { useClockOffset } from '../../hooks/useClockOffset';
+import { api } from '../../lib/api-client';
 import type { ApiResponse, Playlist } from '@cafe-music/shared';
 
 interface StoreStatus {
@@ -95,7 +95,7 @@ export default function MyStorePage() {
           className="text-2xl font-bold"
           style={{ fontFamily: 'Fira Code, monospace', color: 'var(--color-foreground)' }}
         >
-          My Store
+          Quán của tôi
         </h1>
         <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
           {status?.name ?? 'Loading...'}

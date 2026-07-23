@@ -1,0 +1,71 @@
+import { render, screen, waitFor } from '@testing-library/react';
+import AppShell from '../../src/components/layout/AppShell';
+import { dashboardNavItems, storeNavItems } from '../../src/lib/nav';
+import { api } from '../../src/lib/api-client';
+
+jest.mock('../../src/lib/api-client', () => ({
+  api: { get: jest.fn(), post: jest.fn() },
+}));
+
+jest.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard/playlists',
+}));
+
+const mockApi = api as jest.Mocked<typeof api>;
+
+const playlists = [
+  { id: 'playlist-1', name: 'Nhạc Lofi Chill Việt Nam', scope: 'ORG' },
+  { id: 'playlist-2', name: 'Nhạc quán Nguyễn Huệ', scope: 'STORE' },
+];
+
+describe('AppShell', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockApi.get.mockResolvedValue({ data: playlists });
+  });
+
+  const renderShell = (role: 'ORG_ADMIN' | 'STORE_ADMIN') =>
+    render(
+      <AppShell
+        navItems={role === 'STORE_ADMIN' ? storeNavItems() : dashboardNavItems(role)}
+        user={{ email: 'admin@cafe.com', role }}
+      >
+        <p>nội dung trang</p>
+      </AppShell>,
+    );
+
+  it('renders the chain-wide sections for an org admin', () => {
+    renderShell('ORG_ADMIN');
+
+    expect(screen.getByRole('link', { name: 'Sync Control' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Người dùng' })).toBeInTheDocument();
+  });
+
+  it('never offers sync control to a store console', () => {
+    renderShell('STORE_ADMIN');
+
+    expect(screen.queryByRole('link', { name: 'Sync Control' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Người dùng' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Playlists' })).toBeInTheDocument();
+  });
+
+  it('marks the section matching the current path', () => {
+    renderShell('ORG_ADMIN');
+
+    expect(screen.getByRole('link', { name: 'Playlists' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('lists the playlist library in the sidebar', async () => {
+    renderShell('ORG_ADMIN');
+
+    expect(await screen.findByText('Nhạc Lofi Chill Việt Nam')).toBeInTheDocument();
+    expect(screen.getByText('Playlist của quán')).toBeInTheDocument();
+  });
+
+  it('renders the page content', async () => {
+    renderShell('ORG_ADMIN');
+
+    expect(screen.getByText('nội dung trang')).toBeInTheDocument();
+    await waitFor(() => expect(mockApi.get).toHaveBeenCalledWith('/playlists'));
+  });
+});

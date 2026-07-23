@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { WsNowPlayingPayload, SyncGroupState } from '@cafe-music/shared';
+import type {
+  WsNowPlayingPayload,
+  WsStoreNowPlayingPayload,
+  SyncGroupState,
+} from '@cafe-music/shared';
 import { api } from '../lib/api-client';
 import { resolveWsUrl } from '../lib/env';
 
@@ -18,6 +22,8 @@ interface SyncState {
   nowPlaying: WsNowPlayingPayload | null;
   groupState: Partial<SyncGroupState> | null;
   isPlaying: boolean;
+  /** Hàng chờ riêng khi quán tách khỏi nhóm sync; null = đang theo nhóm. */
+  storeQueue: WsStoreNowPlayingPayload['queue'] | null;
 }
 
 const WS_URL = resolveWsUrl(process.env.NEXT_PUBLIC_WS_URL);
@@ -28,6 +34,7 @@ export function useSync({ storeId, token, audioRef, clockOffset = 0 }: UseSyncOp
   const [nowPlaying, setNowPlaying] = useState<WsNowPlayingPayload | null>(null);
   const [groupState] = useState<Partial<SyncGroupState> | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [storeQueue, setStoreQueue] = useState<WsStoreNowPlayingPayload['queue'] | null>(null);
 
   const handleNowPlaying = useCallback(
     async (payload: WsNowPlayingPayload) => {
@@ -66,9 +73,12 @@ export function useSync({ storeId, token, audioRef, clockOffset = 0 }: UseSyncOp
 
     socketRef.current = socket;
 
-    // Join room của sync group sau mỗi lần connect (kể cả reconnect),
-    // nếu không join thì broadcast now-playing/paused/stopped không tới player
-    const joinGroup = async () => {
+    // Join cả hai kênh sau mỗi lần connect (kể cả reconnect):
+    // - room của sync group: nhạc chung cả chuỗi
+    // - room của chính quán: nhạc riêng khi quán tách ra phát playlist của mình
+    const joinRooms = async () => {
+      socket.emit('join-store', { storeId });
+
       try {
         const status = await api.get<{ syncGroupId: string | null }>(`/stores/${storeId}/status`);
         if (status.syncGroupId) {
@@ -81,12 +91,36 @@ export function useSync({ storeId, token, audioRef, clockOffset = 0 }: UseSyncOp
 
     socket.on('connect', () => {
       setIsConnected(true);
-      void joinGroup();
+      void joinRooms();
     });
     socket.on('disconnect', () => setIsConnected(false));
 
     socket.on('now-playing', (payload: WsNowPlayingPayload) => {
       void handleNowPlaying(payload);
+    });
+
+    // Nhạc riêng của quán: cùng cách xử lý, chỉ khác là đến từ room `store:<id>`
+    socket.on('store-now-playing', (payload: WsStoreNowPlayingPayload) => {
+      void handleNowPlaying({
+        groupId: '',
+        trackId: payload.trackId,
+        trackUrl: payload.trackUrl,
+        positionMs: payload.positionMs,
+        serverTs: payload.serverTs,
+        mode: 'LOOSE',
+      });
+      setStoreQueue(payload.queue);
+    });
+
+    socket.on('store-paused', () => {
+      audioRef.current?.pause();
+      setIsPlaying(false);
+    });
+
+    socket.on('store-stopped', () => {
+      audioRef.current?.pause();
+      setIsPlaying(false);
+      setStoreQueue(null);
     });
 
     socket.on('paused', () => {
@@ -109,5 +143,5 @@ export function useSync({ storeId, token, audioRef, clockOffset = 0 }: UseSyncOp
     };
   }, [token, storeId, handleNowPlaying, audioRef]);
 
-  return { isConnected, nowPlaying, groupState, isPlaying };
+  return { isConnected, nowPlaying, groupState, isPlaying, storeQueue };
 }
