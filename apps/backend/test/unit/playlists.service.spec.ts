@@ -182,7 +182,8 @@ describe('PlaylistsService', () => {
     it('should add a track to a playlist and auto-assign position', async () => {
       prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
       prisma.track.findFirst.mockResolvedValue({ id: 'track-1' } as any);
-      prisma.playlistTrack.count.mockResolvedValue(2);
+      // Playlist đang có 2 bài ở vị trí 0 và 1 → bài mới vào vị trí 2
+      prisma.playlistTrack.findFirst.mockResolvedValue({ position: 1 } as any);
       prisma.playlistTrack.create.mockResolvedValue({
         id: 'pt-1',
         playlistId: 'playlist-1',
@@ -237,6 +238,84 @@ describe('PlaylistsService', () => {
       await expect(
         service.addTrack('nonexistent', 'track-1', orgAdminUser),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    // Xoá một bài giữa playlist để lại lỗ hổng vị trí: đếm số bài rồi lấy làm
+    // position sẽ trùng với bài cuối → 500 unique constraint (playlistId, position)
+    it('should append after the highest position, not the track count', async () => {
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
+      prisma.track.findFirst.mockResolvedValue({ id: 'track-3' } as any);
+      prisma.playlistTrack.findFirst.mockResolvedValue({ position: 4 } as any);
+      prisma.playlistTrack.create.mockResolvedValue({ id: 'pt-9' } as any);
+
+      await service.addTrack('playlist-1', 'track-3', orgAdminUser);
+
+      expect(prisma.playlistTrack.create).toHaveBeenCalledWith({
+        data: { playlistId: 'playlist-1', trackId: 'track-3', position: 5 },
+      });
+    });
+
+    it('should start at position 0 on an empty playlist', async () => {
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
+      prisma.track.findFirst.mockResolvedValue({ id: 'track-1' } as any);
+      prisma.playlistTrack.findFirst.mockResolvedValue(null);
+      prisma.playlistTrack.create.mockResolvedValue({ id: 'pt-1' } as any);
+
+      await service.addTrack('playlist-1', 'track-1', orgAdminUser);
+
+      expect(prisma.playlistTrack.create).toHaveBeenCalledWith({
+        data: { playlistId: 'playlist-1', trackId: 'track-1', position: 0 },
+      });
+    });
+  });
+
+  describe('reorderTracks', () => {
+    // Ghi thẳng vị trí mới thì bài đầu tiên nhận position 0 trong khi bài cũ
+    // vẫn giữ 0 → unique constraint nổ ngay giữa transaction.
+    it('should park positions out of the way before writing the new order', async () => {
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
+      prisma.$transaction.mockResolvedValue([] as any);
+
+      await service.reorderTracks(
+        'playlist-1',
+        ['track-2', 'track-1'],
+        orgAdminUser,
+      );
+
+      const calls = prisma.playlistTrack.updateMany.mock.calls.map(
+        ([args]) => args,
+      );
+
+      expect(calls).toHaveLength(4);
+      expect(calls.slice(0, 2)).toEqual([
+        {
+          where: { playlistId: 'playlist-1', trackId: 'track-2' },
+          data: { position: -1 },
+        },
+        {
+          where: { playlistId: 'playlist-1', trackId: 'track-1' },
+          data: { position: -2 },
+        },
+      ]);
+      expect(calls.slice(2)).toEqual([
+        {
+          where: { playlistId: 'playlist-1', trackId: 'track-2' },
+          data: { position: 0 },
+        },
+        {
+          where: { playlistId: 'playlist-1', trackId: 'track-1' },
+          data: { position: 1 },
+        },
+      ]);
+    });
+
+    it('should refuse to reorder a playlist from another organization', async () => {
+      prisma.playlist.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.reorderTracks('playlist-9', ['track-1'], orgAdminUser),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
 });
