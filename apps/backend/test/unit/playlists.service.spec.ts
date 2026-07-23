@@ -100,6 +100,7 @@ describe('PlaylistsService', () => {
   describe('addTrack', () => {
     it('should add a track to a playlist and auto-assign position', async () => {
       prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
+      prisma.track.findFirst.mockResolvedValue({ id: 'track-1' } as any);
       prisma.playlistTrack.count.mockResolvedValue(2);
       prisma.playlistTrack.create.mockResolvedValue({
         id: 'pt-1',
@@ -120,6 +121,33 @@ describe('PlaylistsService', () => {
         }),
       );
       expect(result).toMatchObject({ position: 2 });
+    });
+
+    // Không check track thì store admin vòng qua scope kho nhạc bằng đúng một
+    // request: thêm nhạc riêng của quán khác vào playlist rồi phát.
+    it('should refuse tracks outside the caller store scope', async () => {
+      const storeAdminUser = {
+        sub: 'user-2',
+        email: 'store1@cafe.com',
+        role: 'STORE_ADMIN' as const,
+        organizationId: 'org-1',
+        storeId: 'store-1',
+      };
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
+      prisma.track.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.addTrack('playlist-1', 'track-9', storeAdminUser),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(prisma.track.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'track-9',
+          organizationId: 'org-1',
+          OR: [{ storeId: null }, { storeId: 'store-1' }],
+        },
+      });
+      expect(prisma.playlistTrack.create).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when playlist does not belong to org', async () => {

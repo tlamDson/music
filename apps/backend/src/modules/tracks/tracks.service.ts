@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
@@ -18,6 +19,20 @@ export class TracksService {
     private prisma: PrismaService,
     private s3: S3Service,
   ) {}
+
+  /**
+   * Track có `storeId = null` là kho chung của chuỗi, ai trong org cũng dùng
+   * được; track có storeId là nhạc riêng của quán đó. Store admin chỉ thấy hai
+   * nhóm này, không thấy nhạc riêng của quán khác.
+   */
+  private scopeFor(user: JwtPayload) {
+    return user.role === 'STORE_ADMIN'
+      ? {
+          organizationId: user.organizationId!,
+          OR: [{ storeId: null }, { storeId: user.storeId }],
+        }
+      : { organizationId: user.organizationId! };
+  }
 
   async create(
     dto: CreateTrackMetaDto,
@@ -51,13 +66,14 @@ export class TracksService {
         source: 'SELF_HOSTED',
         s3Key: key,
         organizationId: user.organizationId!,
+        storeId: user.role === 'STORE_ADMIN' ? user.storeId : null,
       },
     });
   }
 
   async getStreamUrl(trackId: string, user: JwtPayload) {
     const track = await this.prisma.track.findFirst({
-      where: { id: trackId, organizationId: user.organizationId! },
+      where: { id: trackId, ...this.scopeFor(user) },
     });
 
     if (!track) throw new NotFoundException('Track not found');
@@ -68,16 +84,16 @@ export class TracksService {
   }
 
   async findAll(user: JwtPayload, page = 1, limit = 20) {
+    const where = this.scopeFor(user);
+
     const [data, total] = await Promise.all([
       this.prisma.track.findMany({
-        where: { organizationId: user.organizationId! },
+        where,
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.track.count({
-        where: { organizationId: user.organizationId! },
-      }),
+      this.prisma.track.count({ where }),
     ]);
 
     return { data, meta: { page, limit, total } };
@@ -85,10 +101,18 @@ export class TracksService {
 
   async remove(trackId: string, user: JwtPayload) {
     const track = await this.prisma.track.findFirst({
-      where: { id: trackId, organizationId: user.organizationId! },
+      where: { id: trackId, ...this.scopeFor(user) },
     });
 
     if (!track) throw new NotFoundException('Track not found');
+
+    // Store admin thấy được track chung của chuỗi nhưng không được xoá nó —
+    // xoá là mất nhạc của mọi quán.
+    if (user.role === 'STORE_ADMIN' && track.storeId !== user.storeId) {
+      throw new ForbiddenException(
+        'Store admins can only delete tracks of their own store',
+      );
+    }
 
     if (track.s3Key) {
       await this.s3.deleteFile(track.s3Key);
