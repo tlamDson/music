@@ -66,11 +66,7 @@ export default function StoresPage() {
       </div>
 
       {/* Create store */}
-      <form
-        onSubmit={(e) => void handleCreate(e)}
-        className="flex gap-3"
-        aria-label="Create store"
-      >
+      <form onSubmit={(e) => void handleCreate(e)} className="flex gap-3" aria-label="Create store">
         <input
           type="text"
           value={newStoreName}
@@ -88,7 +84,11 @@ export default function StoresPage() {
           type="submit"
           disabled={creating}
           className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:opacity-90"
-          style={{ backgroundColor: 'var(--color-accent)', color: 'white', opacity: creating ? 0.7 : 1 }}
+          style={{
+            backgroundColor: 'var(--color-accent)',
+            color: 'white',
+            opacity: creating ? 0.7 : 1,
+          }}
         >
           {creating ? 'Creating...' : 'Add Store'}
         </button>
@@ -96,16 +96,23 @@ export default function StoresPage() {
 
       {/* Stores list */}
       {loading ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>Loading stores...</p>
+        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          Loading stores...
+        </p>
       ) : stores.length === 0 ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>No stores yet.</p>
+        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          No stores yet.
+        </p>
       ) : (
         <div className="grid gap-3">
           {stores.map((store) => (
             <div
               key={store.id}
               className="p-4 rounded-xl flex items-center justify-between"
-              style={{ backgroundColor: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
+              style={{
+                backgroundColor: 'var(--color-muted)',
+                border: '1px solid var(--color-border)',
+              }}
             >
               <div className="flex items-center gap-3">
                 <div
@@ -114,8 +121,8 @@ export default function StoresPage() {
                     backgroundColor: store.storeOverride?.isOverridden
                       ? 'var(--color-destructive)'
                       : store.syncGroupId
-                      ? 'var(--color-accent)'
-                      : 'rgba(248,250,252,0.2)',
+                        ? 'var(--color-accent)'
+                        : 'rgba(248,250,252,0.2)',
                   }}
                 />
                 <div>
@@ -126,8 +133,8 @@ export default function StoresPage() {
                     {store.storeOverride?.isOverridden
                       ? 'Overriding'
                       : store.syncGroupId
-                      ? 'In sync group'
-                      : 'No group assigned'}
+                        ? 'In sync group'
+                        : 'No group assigned'}
                   </p>
                 </div>
               </div>
@@ -146,10 +153,28 @@ export default function StoresPage() {
                   href={`/player/${store.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-all duration-150 hover:opacity-80"
-                  style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-foreground)', border: '1px solid var(--color-border)' }}
+                  className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-all duration-150 hover:brightness-110"
+                  style={{
+                    backgroundColor: 'var(--color-primary)',
+                    color: 'var(--color-foreground)',
+                    border: '1px solid var(--color-border)',
+                  }}
                 >
-                  Open Player
+                  Mở màn hình quán
+                </a>
+                {/* Bản chỉ hiển thị để treo TV trong quán */}
+                <a
+                  href={`/player/${store.id}?kiosk=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-all duration-150 hover:brightness-110"
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: 'var(--color-secondary)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  Màn chiếu
                 </a>
               </div>
             </div>
