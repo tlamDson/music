@@ -93,4 +93,11 @@ pnpm --filter web test:e2e   # Playwright
 
 Backend mock Prisma bằng `jest-mock-extended` (`mockDeep<PrismaClient>()`) — không dùng real DB trong unit test. Frontend mock API bằng MSW, không mock module trực tiếp nếu MSW đủ dùng.
 
+Quy ước bổ sung rút ra khi làm store console:
+
+- **Trang web nào có nút phát đều phải render trong `PlayerProvider`** — dùng helper `apps/web/__tests__/utils/renderWithPlayer.tsx` thay cho `render()`, đúng như layout gốc.
+- **Lỗi routing của Nest không bắt được bằng unit test gọi thẳng method controller.** Dựng app thật + `supertest` trong `test/unit/` (xem `folders.controller.spec.ts`) — vẫn mock hết provider nên không cần DB.
+- Spec dựng app Nest ngốn RAM: `apps/backend/jest.config.ts` đã set `maxWorkers: '50%'` + `workerIdleMemoryLimit` để worker không "ran out of memory" khi turbo chạy song song backend + web.
+- Test timer (auto-next, hẹn giờ chuyển bài): `jest.useFakeTimers()` + `await jest.advanceTimersByTimeAsync(ms)`; nhớ `jest.useRealTimers()` trong `afterEach`.
+
 Coverage >= 80% cho file mới. Test độc lập (reset state trong `beforeEach`/`afterEach`), assertion cụ thể theo hành vi. Không skip test bằng `test.skip` mà không giải thích lý do. Không commit code mới thiếu test.
