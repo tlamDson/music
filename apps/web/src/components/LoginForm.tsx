@@ -3,6 +3,8 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../hooks/useAuth';
+import { homePathFor } from '../lib/nav';
+import type { UserRole } from '@cafe-music/shared';
 
 export default function LoginForm() {
   const router = useRouter();
@@ -18,11 +20,7 @@ export default function LoginForm() {
     setLoading(true);
     try {
       const user = await login({ email, password });
-      if (user?.role === 'STORE_ADMIN' && user.storeId) {
-        router.push(`/player/${user.storeId}`);
-      } else {
-        router.push('/dashboard');
-      }
+      router.push(user ? homePathFor(user.role as UserRole) : '/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

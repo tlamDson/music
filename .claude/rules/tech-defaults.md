@@ -4,11 +4,11 @@ Nền tảng phát nhạc đồng bộ cho chuỗi quán cafe. Monorepo TypeScri
 
 ## Kiến trúc
 
-| App/Package | Path              | Stack                                           | Vai trò                                                                                                    |
-| ----------- | ----------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Backend     | `apps/backend`    | NestJS 11, Prisma 6, Redis (ioredis), Socket.IO | API `/api/v1` (port 4000), modules: auth, organizations, stores, users, tracks, playlists, sync, scheduler |
-| Web         | `apps/web`        | Next.js App Router                              | `dashboard/*` (quản trị), `player/[storeId]` (trang phát nhạc) — port 3000                                 |
-| Shared      | `packages/shared` | Zod schemas, types, constants                   | Dùng chung backend/web                                                                                     |
+| App/Package | Path              | Stack                                           | Vai trò                                                                                                                           |
+| ----------- | ----------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Backend     | `apps/backend`    | NestJS 11, Prisma 6, Redis (ioredis), Socket.IO | API `/api/v1` (port 4000), modules: auth, organizations, stores, users, tracks, playlists, sync, scheduler                        |
+| Web         | `apps/web`        | Next.js App Router                              | `dashboard/*` (console chuỗi — ORG_ADMIN), `store/*` (console quán — STORE_ADMIN), `player/[storeId]` (màn phát nhạc) — port 3000 |
+| Shared      | `packages/shared` | Zod schemas, types, constants                   | Dùng chung backend/web                                                                                                            |
 
 Chi tiết setup/local dev đầy đủ: `docs/DEVELOPER_GUIDE.md`.
 

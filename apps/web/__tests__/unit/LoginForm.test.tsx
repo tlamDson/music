@@ -17,6 +17,29 @@ describe('LoginForm', () => {
     jest.clearAllMocks();
   });
 
+  // Store admin có console riêng, không dùng chung dashboard của chuỗi
+  it('should send a store admin to the store console after login', async () => {
+    mockLogin.mockResolvedValue({ role: 'STORE_ADMIN', storeId: 'store-1' });
+    render(<LoginForm />);
+
+    await userEvent.type(screen.getByLabelText(/email/i), 'store1@cafe.com');
+    await userEvent.type(screen.getByLabelText(/password/i), 'Store@123456');
+    fireEvent.submit(screen.getByRole('form'));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/store'));
+  });
+
+  it('should send an org admin to the chain dashboard after login', async () => {
+    mockLogin.mockResolvedValue({ role: 'ORG_ADMIN', storeId: null });
+    render(<LoginForm />);
+
+    await userEvent.type(screen.getByLabelText(/email/i), 'admin@cafe.com');
+    await userEvent.type(screen.getByLabelText(/password/i), 'Admin@123456');
+    fireEvent.submit(screen.getByRole('form'));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/dashboard'));
+  });
+
   it('should render email and password fields', () => {
     render(<LoginForm />);
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();

@@ -4,24 +4,18 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
 import AppShell from '../../components/layout/AppShell';
-import { dashboardNavItems } from '../../lib/nav';
-import type { UserRole } from '@cafe-music/shared';
+import { storeNavItems } from '../../lib/nav';
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Console của quán: cùng khung với `/dashboard` nhưng nav không có Sync
+ * Control, Quán hay Người dùng — quán chỉ lo nhạc của mình.
+ */
+export default function StoreLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, loading, logout } = useAuth();
 
   useEffect(() => {
-    if (loading) return;
-
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-
-    // Store admin có console riêng — vào thẳng /dashboard thì đẩy về đó thay vì
-    // để họ nhìn thấy phần quản trị của cả chuỗi.
-    if (user.role === 'STORE_ADMIN') router.push('/store');
+    if (!loading && !user) router.push('/login');
   }, [user, loading, router]);
 
   if (loading) {
@@ -39,11 +33,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  if (!user || user.role === 'STORE_ADMIN') return null;
+  if (!user) return null;
 
   return (
     <AppShell
-      navItems={dashboardNavItems(user.role as UserRole)}
+      navItems={storeNavItems()}
       user={{ email: user.email, role: user.role }}
       onLogout={() => {
         logout();
