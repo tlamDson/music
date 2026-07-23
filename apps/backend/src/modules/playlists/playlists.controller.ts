@@ -10,10 +10,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { PlaylistsService } from './playlists.service';
-import { FoldersService } from './folders.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
@@ -26,15 +24,11 @@ import { z } from 'zod';
 
 const AddTrackSchema = z.object({ trackId: z.string().min(1) });
 const ReorderSchema = z.object({ trackIds: z.array(z.string().min(1)) });
-const CreateFolderSchema = z.object({ name: z.string().min(1).max(100) });
 
 @Controller('playlists')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PlaylistsController {
-  constructor(
-    private playlistsService: PlaylistsService,
-    private foldersService: FoldersService,
-  ) {}
+  constructor(private playlistsService: PlaylistsService) {}
 
   @Post()
   create(
@@ -99,27 +93,5 @@ export class PlaylistsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.playlistsService.removeTrack(id, trackId, user);
-  }
-
-  // ── Folders ────────────────────────────────────────────────────────────
-
-  @Post('/folders')
-  @Roles('ORG_ADMIN')
-  createFolder(
-    @Body(new ZodValidationPipe(CreateFolderSchema)) body: { name: string },
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.foldersService.create(body.name, user);
-  }
-
-  @Get('/folders')
-  getFolders(@CurrentUser() user: JwtPayload) {
-    return this.foldersService.findAll(user);
-  }
-
-  @Delete('/folders/:id')
-  @Roles('ORG_ADMIN')
-  removeFolder(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.foldersService.remove(id, user);
   }
 }
