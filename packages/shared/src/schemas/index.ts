@@ -89,10 +89,18 @@ export const OverrideSchema = z.object({
   playlistId: z.string().min(1).optional(),
 });
 
+export const StorePlaySchema = z.object({
+  playlistId: z.string().min(1),
+  trackIndex: z.number().int().min(0).default(0),
+  // Mặc định phát xong hàng chờ là quay lại dòng sync của admin
+  returnToGroupOnFinish: z.boolean().default(true),
+});
+
 export type PlayGroupDto = z.infer<typeof PlayGroupSchema>;
 export type SetSyncModeDto = z.infer<typeof SetSyncModeSchema>;
 export type CreateSyncGroupDto = z.infer<typeof CreateSyncGroupSchema>;
 export type OverrideDto = z.infer<typeof OverrideSchema>;
+export type StorePlayDto = z.infer<typeof StorePlaySchema>;
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 

@@ -103,8 +103,53 @@ export class SyncGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { event: 'left', data: { groupId: data.groupId } };
   }
 
+  /**
+   * Kênh riêng của một quán: dùng khi quán tách khỏi nhóm sync để phát nhạc
+   * của mình. Store admin chỉ nghe được quán của chính họ.
+   */
+  @SubscribeMessage('join-store')
+  async handleJoinStore(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { storeId: string },
+  ) {
+    const user = (client.data as { user?: JwtPayload }).user;
+    if (!user?.organizationId) {
+      return { event: 'error', data: { message: 'Unauthorized' } };
+    }
+
+    const store = await this.prisma.store.findFirst({
+      where: { id: data.storeId, organizationId: user.organizationId },
+    });
+
+    if (
+      !store ||
+      (user.role === 'STORE_ADMIN' && user.storeId !== data.storeId)
+    ) {
+      this.logger.warn(
+        `User ${user.sub} denied join for store ${data.storeId}`,
+      );
+      return { event: 'error', data: { message: 'Store not found' } };
+    }
+
+    void client.join(`store:${data.storeId}`);
+    return { event: 'joined', data: { storeId: data.storeId } };
+  }
+
+  @SubscribeMessage('leave-store')
+  handleLeaveStore(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { storeId: string },
+  ) {
+    void client.leave(`store:${data.storeId}`);
+    return { event: 'left', data: { storeId: data.storeId } };
+  }
+
   broadcastToGroup(groupId: string, event: string, payload: unknown) {
     this.server.to(`sync-group:${groupId}`).emit(event, payload);
+  }
+
+  broadcastToStore(storeId: string, event: string, payload: unknown) {
+    this.server.to(`store:${storeId}`).emit(event, payload);
   }
 
   @SubscribeMessage('clock-sync')

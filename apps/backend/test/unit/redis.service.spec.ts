@@ -89,4 +89,62 @@ describe('RedisService', () => {
 
     await expect(service.getGroupState('group-1')).resolves.toBeNull();
   });
+
+  // Hàng chờ khi quán phát nhạc riêng — tách hẳn khỏi state của sync group
+  describe('store playback', () => {
+    const playback = {
+      storeId: 'store-1',
+      playlistId: 'playlist-1',
+      trackIds: ['track-1', 'track-2'],
+      trackIndex: 0,
+      positionMs: 0,
+      startedAtServerTs: 1_700_000_000_000,
+      isPlaying: true,
+      returnToGroupOnFinish: true,
+    };
+
+    it('caches playback under a key of its own', async () => {
+      const service = buildService({ REDIS_URL: 'redis://localhost:6379' });
+      const client = (service as unknown as { client: { setex: jest.Mock } })
+        .client;
+
+      await service.setStorePlayback('store-1', playback);
+
+      expect(client.setex).toHaveBeenCalledWith(
+        'store:store-1:playback',
+        86400,
+        JSON.stringify(playback),
+      );
+    });
+
+    it('reads cached playback back', async () => {
+      const service = buildService({ REDIS_URL: 'redis://localhost:6379' });
+      const client = (service as unknown as { client: { get: jest.Mock } })
+        .client;
+      client.get.mockResolvedValue(JSON.stringify(playback));
+
+      await expect(service.getStorePlayback('store-1')).resolves.toEqual(
+        playback,
+      );
+    });
+
+    it('returns null when the store is not playing on its own', async () => {
+      const service = buildService({ REDIS_URL: 'redis://localhost:6379' });
+      const client = (service as unknown as { client: { get: jest.Mock } })
+        .client;
+      client.get.mockResolvedValue(null);
+
+      await expect(service.getStorePlayback('store-1')).resolves.toBeNull();
+    });
+
+    it('clears playback', async () => {
+      const service = buildService({ REDIS_URL: 'redis://localhost:6379' });
+      const client = (service as unknown as { client: { del: jest.Mock } })
+        .client;
+
+      await service.clearStorePlayback('store-1');
+
+      expect(client.del).toHaveBeenCalledWith('store:store-1:playback');
+    });
+  });
 });

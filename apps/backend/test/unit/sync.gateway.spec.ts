@@ -164,6 +164,94 @@ describe('SyncGateway', () => {
     });
   });
 
+  // Nhạc riêng của một quán không thể đi qua room của sync group — cần kênh
+  // riêng cho từng store.
+  describe('handleJoinStore', () => {
+    const storeAdmin = {
+      sub: 'user-2',
+      email: 'store1@cafe.com',
+      role: 'STORE_ADMIN' as const,
+      organizationId: 'org-1',
+      storeId: 'store-1',
+    };
+
+    it('joins the store room for the org admin of that organization', async () => {
+      prisma.store.findFirst.mockResolvedValue({
+        id: 'store-1',
+        organizationId: 'org-1',
+      } as never);
+      const client = buildClient();
+      client.data = { user };
+
+      const result = await gateway.handleJoinStore(client, {
+        storeId: 'store-1',
+      });
+
+      expect(client.join).toHaveBeenCalledWith('store:store-1');
+      expect(result).toEqual({ event: 'joined', data: { storeId: 'store-1' } });
+    });
+
+    it('joins the store room for the admin of that store', async () => {
+      prisma.store.findFirst.mockResolvedValue({
+        id: 'store-1',
+        organizationId: 'org-1',
+      } as never);
+      const client = buildClient();
+      client.data = { user: storeAdmin };
+
+      await gateway.handleJoinStore(client, { storeId: 'store-1' });
+
+      expect(client.join).toHaveBeenCalledWith('store:store-1');
+    });
+
+    it('refuses a store admin listening to another store', async () => {
+      prisma.store.findFirst.mockResolvedValue({
+        id: 'store-2',
+        organizationId: 'org-1',
+      } as never);
+      const client = buildClient();
+      client.data = { user: storeAdmin };
+
+      const result = await gateway.handleJoinStore(client, {
+        storeId: 'store-2',
+      });
+
+      expect(client.join).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        event: 'error',
+        data: { message: 'Store not found' },
+      });
+    });
+
+    it('refuses a store from another organization', async () => {
+      prisma.store.findFirst.mockResolvedValue(null);
+      const client = buildClient();
+      client.data = { user };
+
+      const result = await gateway.handleJoinStore(client, {
+        storeId: 'store-9',
+      });
+
+      expect(client.join).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        event: 'error',
+        data: { message: 'Store not found' },
+      });
+    });
+  });
+
+  describe('broadcastToStore', () => {
+    it('emits into the room of that store only', () => {
+      const emit = jest.fn();
+      gateway.server = { to: jest.fn().mockReturnValue({ emit }) } as never;
+
+      gateway.broadcastToStore('store-1', 'store-now-playing', { a: 1 });
+
+      expect(gateway.server.to).toHaveBeenCalledWith('store:store-1');
+      expect(emit).toHaveBeenCalledWith('store-now-playing', { a: 1 });
+    });
+  });
+
   describe('handleLeaveGroup', () => {
     it('leaves the requested room', () => {
       const client = buildClient();
@@ -172,6 +260,17 @@ describe('SyncGateway', () => {
 
       expect(client.leave).toHaveBeenCalledWith('sync-group:group-1');
       expect(result).toEqual({ event: 'left', data: { groupId: 'group-1' } });
+    });
+  });
+
+  describe('handleLeaveStore', () => {
+    it('leaves the store room', () => {
+      const client = buildClient();
+
+      const result = gateway.handleLeaveStore(client, { storeId: 'store-1' });
+
+      expect(client.leave).toHaveBeenCalledWith('store:store-1');
+      expect(result).toEqual({ event: 'left', data: { storeId: 'store-1' } });
     });
   });
 });

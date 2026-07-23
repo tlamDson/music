@@ -64,9 +64,13 @@ describe('SyncService', () => {
       setStoreOverride: jest.fn().mockResolvedValue(undefined),
       getStoreOverride: jest.fn().mockResolvedValue(null),
       clearStoreOverride: jest.fn().mockResolvedValue(undefined),
+      setStorePlayback: jest.fn().mockResolvedValue(undefined),
+      getStorePlayback: jest.fn().mockResolvedValue(null),
+      clearStorePlayback: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<RedisService>;
     const gatewayMock = {
       broadcastToGroup: jest.fn(),
+      broadcastToStore: jest.fn(),
       server: { to: jest.fn().mockReturnThis(), emit: jest.fn() },
     } as unknown as jest.Mocked<SyncGateway>;
     const s3Mock = {
@@ -350,6 +354,247 @@ describe('SyncService', () => {
         'now-playing',
         expect.objectContaining({ trackId: 'track-2' }),
       );
+    });
+  });
+
+  // Trước đây override() chỉ set cờ: không presign URL, không broadcast gì cả
+  // nên quán bấm phát xong là im lặng hoàn toàn.
+  describe('store local playback', () => {
+    const storePlaylist = {
+      id: 'playlist-1',
+      name: 'Nhạc quán',
+      playlistTracks: [
+        {
+          trackId: 'track-1',
+          position: 0,
+          track: { id: 'track-1', s3Key: 'k1', durationMs: 180_000 },
+        },
+        {
+          trackId: 'track-2',
+          position: 1,
+          track: { id: 'track-2', s3Key: 'k2', durationMs: 200_000 },
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      prisma.store.findFirst.mockResolvedValue({
+        id: 'store-1',
+        organizationId: 'org-1',
+        syncGroupId: 'group-1',
+      } as any);
+      prisma.playlist.findFirst.mockResolvedValue(storePlaylist as any);
+    });
+
+    it('broadcasts the track into the room of that store only', async () => {
+      await service.playStore(
+        'store-1',
+        {
+          playlistId: 'playlist-1',
+          trackIndex: 0,
+          returnToGroupOnFinish: true,
+        },
+        storeAdminUser,
+      );
+
+      expect(s3.getPresignedUrl).toHaveBeenCalledWith('k1');
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({
+          storeId: 'store-1',
+          trackId: 'track-1',
+          trackUrl: 'https://s3/presigned/song.mp3',
+        }),
+      );
+      expect(gateway.broadcastToGroup).not.toHaveBeenCalled();
+    });
+
+    it('marks the store as overridden so group broadcasts stop applying', async () => {
+      await service.playStore(
+        'store-1',
+        {
+          playlistId: 'playlist-1',
+          trackIndex: 0,
+          returnToGroupOnFinish: true,
+        },
+        storeAdminUser,
+      );
+
+      expect(redis.setStoreOverride).toHaveBeenCalledWith(
+        'store-1',
+        expect.objectContaining({
+          isOverridden: true,
+          overridePlaylistId: 'playlist-1',
+        }),
+      );
+    });
+
+    it('stores the queue so a refresh can pick it back up', async () => {
+      await service.playStore(
+        'store-1',
+        {
+          playlistId: 'playlist-1',
+          trackIndex: 0,
+          returnToGroupOnFinish: true,
+        },
+        storeAdminUser,
+      );
+
+      expect(redis.setStorePlayback).toHaveBeenCalledWith(
+        'store-1',
+        expect.objectContaining({
+          storeId: 'store-1',
+          playlistId: 'playlist-1',
+          trackIds: ['track-1', 'track-2'],
+          trackIndex: 0,
+          isPlaying: true,
+          returnToGroupOnFinish: true,
+        }),
+      );
+    });
+
+    it('reports how many tracks are left before returning to the group', async () => {
+      await service.playStore(
+        'store-1',
+        {
+          playlistId: 'playlist-1',
+          trackIndex: 0,
+          returnToGroupOnFinish: true,
+        },
+        storeAdminUser,
+      );
+
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({
+          queue: { index: 0, total: 2, remaining: 1 },
+        }),
+      );
+    });
+
+    it('refuses a store admin playing on another store', async () => {
+      await expect(
+        service.playStore(
+          'store-1',
+          {
+            playlistId: 'playlist-1',
+            trackIndex: 0,
+            returnToGroupOnFinish: true,
+          },
+          { ...storeAdminUser, storeId: 'store-2' },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(gateway.broadcastToStore).not.toHaveBeenCalled();
+    });
+
+    it('pauses local playback and keeps the position', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        storeId: 'store-1',
+        playlistId: 'playlist-1',
+        trackIds: ['track-1', 'track-2'],
+        trackIndex: 0,
+        positionMs: 0,
+        startedAtServerTs: Date.now() - 30_000,
+        isPlaying: true,
+        returnToGroupOnFinish: true,
+      });
+
+      await service.pauseStore('store-1', storeAdminUser);
+
+      expect(redis.setStorePlayback).toHaveBeenCalledWith(
+        'store-1',
+        expect.objectContaining({ isPlaying: false }),
+      );
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-paused',
+        expect.objectContaining({ storeId: 'store-1' }),
+      );
+    });
+
+    it('resumes from the stored position instead of restarting the track', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        storeId: 'store-1',
+        playlistId: 'playlist-1',
+        trackIds: ['track-1', 'track-2'],
+        trackIndex: 0,
+        positionMs: 42_000,
+        startedAtServerTs: Date.now() - 42_000,
+        isPlaying: false,
+        returnToGroupOnFinish: true,
+      });
+
+      await service.resumeStore('store-1', storeAdminUser);
+
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({ trackId: 'track-1', positionMs: 42_000 }),
+      );
+    });
+
+    it('plays the next track in the local queue', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        storeId: 'store-1',
+        playlistId: 'playlist-1',
+        trackIds: ['track-1', 'track-2'],
+        trackIndex: 0,
+        positionMs: 0,
+        startedAtServerTs: Date.now(),
+        isPlaying: true,
+        returnToGroupOnFinish: true,
+      });
+
+      await service.nextStore('store-1', storeAdminUser);
+
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({ trackId: 'track-2' }),
+      );
+    });
+
+    it('clears the queue once the last track finishes', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        storeId: 'store-1',
+        playlistId: 'playlist-1',
+        trackIds: ['track-1', 'track-2'],
+        trackIndex: 1,
+        positionMs: 0,
+        startedAtServerTs: Date.now(),
+        isPlaying: true,
+        returnToGroupOnFinish: true,
+      });
+
+      await service.nextStore('store-1', storeAdminUser);
+
+      expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-1');
+      expect(gateway.broadcastToStore).not.toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.anything(),
+      );
+    });
+
+    it('returns the current local playback state', async () => {
+      const playback = {
+        storeId: 'store-1',
+        playlistId: 'playlist-1',
+        trackIds: ['track-1'],
+        trackIndex: 0,
+        positionMs: 0,
+        startedAtServerTs: Date.now(),
+        isPlaying: true,
+        returnToGroupOnFinish: true,
+      };
+      redis.getStorePlayback.mockResolvedValue(playback);
+
+      await expect(
+        service.getStorePlayback('store-1', storeAdminUser),
+      ).resolves.toEqual(playback);
     });
   });
 
