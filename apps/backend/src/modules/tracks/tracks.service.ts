@@ -47,7 +47,7 @@ export class TracksService {
       data: {
         title: dto.title,
         artist: dto.artist ?? null,
-        durationMs: 0,
+        durationMs: dto.durationMs ?? 0,
         source: 'SELF_HOSTED',
         s3Key: key,
         organizationId: user.organizationId!,

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../../lib/api-client';
+import { formatDuration, measureAudioDuration } from '../../../lib/format';
 import TrackPlayButton from '../../../components/TrackPlayButton';
 import type { ApiResponse, Track } from '@cafe-music/shared';
 
@@ -28,9 +29,11 @@ export default function TracksPage() {
   const uploadFile = async (file: File) => {
     setUploading(true);
     try {
+      const durationMs = await measureAudioDuration(file);
       const formData = new FormData();
       formData.append('file', file);
       formData.append('title', file.name.replace(/\.[^.]+$/, ''));
+      formData.append('durationMs', String(durationMs));
       await api.postMultipart('/tracks', formData);
       fetchTracks();
       toast.success(`Đã upload "${file.name}" thành công`);
@@ -177,6 +180,12 @@ export default function TracksPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  <span
+                    className="text-xs tabular-nums mr-2"
+                    style={{ color: 'rgba(248,250,252,0.5)' }}
+                  >
+                    {formatDuration(track.durationMs)}
+                  </span>
                   <TrackPlayButton trackId={track.id} title={track.title} />
                   <button
                     onClick={() => void handleDelete(track.id)}
