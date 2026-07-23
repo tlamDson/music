@@ -8,6 +8,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   PlayGroupSchema,
   OverrideSchema,
+  StorePlaySchema,
   CreateSyncGroupSchema,
   JwtPayload,
 } from '@cafe-music/shared';
@@ -59,6 +60,42 @@ export class SyncController {
   @Get('groups/:id/state')
   getState(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.syncService.getGroupState(id, user);
+  }
+
+  // Phát nhạc riêng của quán — quán tự tách khỏi nhóm sync khi bấm phát
+  @Post('stores/:id/play')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
+  playStore(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(StorePlaySchema))
+    dto: z.infer<typeof StorePlaySchema>,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.syncService.playStore(id, dto, user);
+  }
+
+  @Post('stores/:id/pause')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
+  pauseStore(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.syncService.pauseStore(id, user);
+  }
+
+  @Post('stores/:id/resume')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
+  resumeStore(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.syncService.resumeStore(id, user);
+  }
+
+  @Post('stores/:id/next')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
+  nextStore(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.syncService.nextStore(id, user);
+  }
+
+  @Get('stores/:id/playback')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
+  storePlayback(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.syncService.getStorePlayback(id, user);
   }
 
   @Post('stores/:id/override')

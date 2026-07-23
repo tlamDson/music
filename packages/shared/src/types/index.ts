@@ -64,6 +64,21 @@ export interface StoreOverride {
   overriddenAt: string | null;
 }
 
+/**
+ * Hàng chờ khi một quán tách khỏi nhóm sync để phát nhạc riêng.
+ * `returnToGroupOnFinish` = hết hàng chờ thì tự quay lại dòng sync của admin.
+ */
+export interface StorePlaybackState {
+  storeId: string;
+  playlistId: string;
+  trackIds: string[];
+  trackIndex: number;
+  positionMs: number;
+  startedAtServerTs: number;
+  isPlaying: boolean;
+  returnToGroupOnFinish: boolean;
+}
+
 // ─── Playlist / Track ─────────────────────────────────────────────────────────
 
 export type PlaylistScope = 'ORG' | 'STORE';
@@ -109,6 +124,9 @@ export type WsEventName =
   | 'now-playing'
   | 'paused'
   | 'stopped'
+  | 'store-now-playing'
+  | 'store-paused'
+  | 'store-stopped'
   | 'override'
   | 'rejoin'
   | 'clock-sync'
@@ -121,6 +139,15 @@ export interface WsNowPlayingPayload {
   positionMs: number;
   serverTs: number;
   mode: SyncMode;
+}
+
+export interface WsStoreNowPlayingPayload {
+  storeId: string;
+  trackId: string;
+  trackUrl: string | null;
+  positionMs: number;
+  serverTs: number;
+  queue: { index: number; total: number; remaining: number };
 }
 
 export interface WsClockSyncPayload {

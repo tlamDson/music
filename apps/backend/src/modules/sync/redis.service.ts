@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
-import { SyncGroupState, StoreOverride } from '@cafe-music/shared';
+import {
+  SyncGroupState,
+  StoreOverride,
+  StorePlaybackState,
+} from '@cafe-music/shared';
 
 @Injectable()
 export class RedisService {
@@ -50,6 +54,30 @@ export class RedisService {
 
   async clearStoreOverride(storeId: string): Promise<void> {
     await this.client.del(`store:${storeId}:override`);
+  }
+
+  // ── Hàng chờ phát riêng của quán ─────────────────────────────────────────
+  // Tách khỏi state của sync group: quán tách ra phát playlist của mình thì
+  // vị trí bài, hàng chờ và cờ "phát xong quay lại nhóm" đều là của riêng quán.
+
+  async setStorePlayback(
+    storeId: string,
+    playback: StorePlaybackState,
+  ): Promise<void> {
+    await this.client.setex(
+      `store:${storeId}:playback`,
+      this.GROUP_STATE_TTL,
+      JSON.stringify(playback),
+    );
+  }
+
+  async getStorePlayback(storeId: string): Promise<StorePlaybackState | null> {
+    const data = await this.client.get(`store:${storeId}:playback`);
+    return data ? (JSON.parse(data) as StorePlaybackState) : null;
+  }
+
+  async clearStorePlayback(storeId: string): Promise<void> {
+    await this.client.del(`store:${storeId}:playback`);
   }
 
   /** Dùng cho readiness probe — trả 'PONG' khi kết nối còn sống. */

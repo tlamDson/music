@@ -13,8 +13,10 @@ import {
   JwtPayload,
   PlayGroupDto,
   OverrideDto,
+  StorePlayDto,
   CreateSyncGroupDto,
   SyncGroupState,
+  StorePlaybackState,
 } from '@cafe-music/shared';
 
 @Injectable()
@@ -322,6 +324,166 @@ export class SyncService implements OnModuleInit {
     }
 
     return store;
+  }
+
+  // ── Phát nhạc riêng của quán ─────────────────────────────────────────────
+  // Quán tách khỏi nhóm sync (override) và phát playlist của mình. Nhạc đi qua
+  // room `store:<id>` chứ không qua room của nhóm, nên không ảnh hưởng quán khác.
+
+  async playStore(storeId: string, dto: StorePlayDto, user: JwtPayload) {
+    await this.assertStoreAccess(storeId, user);
+
+    const playlist = await this.prisma.playlist.findFirst({
+      where: { id: dto.playlistId, organizationId: user.organizationId! },
+      include: {
+        playlistTracks: {
+          orderBy: { position: 'asc' },
+          include: { track: true },
+        },
+      },
+    });
+    if (!playlist) throw new NotFoundException('Playlist not found');
+    if (playlist.playlistTracks.length === 0) {
+      throw new NotFoundException('Playlist has no tracks');
+    }
+
+    const trackIds = playlist.playlistTracks.map((pt) => pt.trackId);
+    const trackIndex = dto.trackIndex ?? 0;
+    const entry = playlist.playlistTracks[trackIndex];
+    if (!entry) throw new NotFoundException('Track not found at given index');
+
+    // Tách khỏi nhóm trước khi phát, nếu không broadcast của admin vẫn ghi đè
+    await this.override(storeId, { playlistId: dto.playlistId }, user);
+
+    return this.startStoreTrack({
+      storeId,
+      playlistId: dto.playlistId,
+      trackIds,
+      trackIndex,
+      positionMs: 0,
+      returnToGroupOnFinish: dto.returnToGroupOnFinish ?? true,
+      s3Key: entry.track.s3Key,
+      trackId: entry.trackId,
+    });
+  }
+
+  async pauseStore(storeId: string, user: JwtPayload) {
+    await this.assertStoreAccess(storeId, user);
+
+    const playback = await this.redis.getStorePlayback(storeId);
+    if (!playback) throw new NotFoundException('Store is not playing locally');
+
+    const positionMs = playback.isPlaying
+      ? playback.positionMs + (Date.now() - playback.startedAtServerTs)
+      : playback.positionMs;
+
+    const paused = { ...playback, isPlaying: false, positionMs };
+    await this.redis.setStorePlayback(storeId, paused);
+
+    this.gateway.broadcastToStore(storeId, 'store-paused', {
+      storeId,
+      serverTs: Date.now(),
+    });
+
+    return paused;
+  }
+
+  async resumeStore(storeId: string, user: JwtPayload) {
+    await this.assertStoreAccess(storeId, user);
+
+    const playback = await this.redis.getStorePlayback(storeId);
+    if (!playback) throw new NotFoundException('Store is not playing locally');
+
+    const track = await this.prisma.track.findFirst({
+      where: { id: playback.trackIds[playback.trackIndex] },
+    });
+
+    return this.startStoreTrack({
+      ...playback,
+      s3Key: track?.s3Key ?? null,
+      trackId: playback.trackIds[playback.trackIndex],
+    });
+  }
+
+  /** Hết bài trong hàng chờ riêng → bài kế, hết hàng chờ thì dọn state. */
+  async nextStore(storeId: string, user: JwtPayload) {
+    await this.assertStoreAccess(storeId, user);
+
+    const playback = await this.redis.getStorePlayback(storeId);
+    if (!playback) throw new NotFoundException('Store is not playing locally');
+
+    const nextIndex = playback.trackIndex + 1;
+    if (nextIndex >= playback.trackIds.length) {
+      await this.redis.clearStorePlayback(storeId);
+      this.gateway.broadcastToStore(storeId, 'store-stopped', {
+        storeId,
+        serverTs: Date.now(),
+      });
+      return { finished: true, playback: null };
+    }
+
+    const trackId = playback.trackIds[nextIndex];
+    const track = await this.prisma.track.findFirst({ where: { id: trackId } });
+
+    const next = await this.startStoreTrack({
+      ...playback,
+      trackIndex: nextIndex,
+      positionMs: 0,
+      s3Key: track?.s3Key ?? null,
+      trackId,
+    });
+
+    return { finished: false, playback: next };
+  }
+
+  async getStorePlayback(storeId: string, user: JwtPayload) {
+    await this.assertStoreAccess(storeId, user);
+    return this.redis.getStorePlayback(storeId);
+  }
+
+  /** Lưu state + presign + broadcast — dùng chung cho play/resume/next. */
+  private async startStoreTrack(params: {
+    storeId: string;
+    playlistId: string;
+    trackIds: string[];
+    trackIndex: number;
+    positionMs: number;
+    returnToGroupOnFinish: boolean;
+    s3Key: string | null;
+    trackId: string;
+  }): Promise<StorePlaybackState> {
+    const serverTs = Date.now();
+    const playback: StorePlaybackState = {
+      storeId: params.storeId,
+      playlistId: params.playlistId,
+      trackIds: params.trackIds,
+      trackIndex: params.trackIndex,
+      positionMs: params.positionMs,
+      startedAtServerTs: serverTs,
+      isPlaying: true,
+      returnToGroupOnFinish: params.returnToGroupOnFinish,
+    };
+
+    await this.redis.setStorePlayback(params.storeId, playback);
+
+    const trackUrl = params.s3Key
+      ? await this.s3.getPresignedUrl(params.s3Key)
+      : null;
+
+    this.gateway.broadcastToStore(params.storeId, 'store-now-playing', {
+      storeId: params.storeId,
+      trackId: params.trackId,
+      trackUrl,
+      positionMs: params.positionMs,
+      serverTs,
+      queue: {
+        index: params.trackIndex,
+        total: params.trackIds.length,
+        remaining: params.trackIds.length - params.trackIndex - 1,
+      },
+    });
+
+    return playback;
   }
 
   async override(storeId: string, dto: OverrideDto, user: JwtPayload) {
