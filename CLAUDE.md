@@ -12,11 +12,15 @@ Các rule chi tiết dưới đây áp dụng luôn, không chỉ khi được h
 
 - **Mọi thay đổi đi qua PR** — không commit thẳng vào `develop`/`main`. Tạo nhánh → commit → push → mở PR vào `develop`.
 - **`main` do chủ repo quản lý** — Claude không merge, không push vào `main`.
-- **Chỉ merge vào `develop` khi CI + test pass hết** — verify job `Lint + Unit Tests` xanh (`gh pr checks`) trước khi merge.
+- **Chỉ merge vào `develop` khi CI + test pass hết** — phải xanh **cả 3 job**: `Lint + Unit Tests`, `Typecheck + Build`, `Backend Docker Build`.
 - **Cập nhật `CLAUDE.md` + `.claude/rules/*`** khi task làm thay đổi convention, tooling hay quy trình.
 
 Chi tiết merge policy: [.claude/rules/workflow.md](.claude/rules/workflow.md).
 
+## Trạng thái dự án
+
+Đang chuẩn bị release production đầu tiên (`v0.1.0`). **Phase 0 (code readiness) đã xong** — xem [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) để biết đã làm gì, còn nợ gì và bước tiếp theo. Đọc file đó trước khi bắt tay vào việc liên quan deploy/staging/release.
+
 ## MCP Servers
 
-Project dùng GitHub MCP server (khai báo ở [.mcp.json](.mcp.json)) để thao tác issue/PR/code search trực tiếp. Cần set biến môi trường `GITHUB_PAT` trên máy — xem [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) mục *GitHub MCP Server*.
+Project dùng GitHub MCP server (khai báo ở [.mcp.json](.mcp.json)) để thao tác issue/PR/code search trực tiếp. Cần set biến môi trường `GITHUB_PAT` trên máy — xem [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) mục _GitHub MCP Server_.
