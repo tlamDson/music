@@ -1,56 +1,43 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../lib/api-client';
-
-// Audio dùng chung toàn trang — chỉ một preview phát tại một thời điểm
-let sharedAudio: HTMLAudioElement | null = null;
-let stopActive: (() => void) | null = null;
+import { usePlayer } from './player/PlayerProvider';
 
 interface TrackPlayButtonProps {
   trackId: string;
   title: string;
+  artist?: string | null;
+  durationMs?: number;
 }
 
-export default function TrackPlayButton({ trackId, title }: TrackPlayButtonProps) {
-  const [playing, setPlaying] = useState(false);
+/**
+ * Nghe thử một track trong dashboard. Audio dùng chung của PlayerProvider nên
+ * bấm nghe thử sẽ thay thế bài đang phát thay vì chồng tiếng lên nhau.
+ */
+export default function TrackPlayButton({
+  trackId,
+  title,
+  artist,
+  durationMs,
+}: TrackPlayButtonProps) {
+  const { current, isPlaying, playTrack, toggle } = usePlayer();
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    return () => {
-      // Unmount khi đang phát → dừng để không phát mồ côi
-      if (stopActive && playing) {
-        sharedAudio?.pause();
-        stopActive = null;
-      }
-    };
-  }, [playing]);
+  const isCurrent = current?.id === trackId;
+  const playing = isCurrent && isPlaying;
 
-  const stop = () => {
-    sharedAudio?.pause();
-    setPlaying(false);
-    stopActive = null;
-  };
-
-  const play = async () => {
-    if (playing) {
-      stop();
+  const handleClick = async () => {
+    if (isCurrent) {
+      toggle();
       return;
     }
+
     setLoading(true);
     try {
       const { url } = await api.get<{ url: string }>(`/tracks/${trackId}/stream-url`);
-      stopActive?.(); // dừng track khác đang preview
-      if (!sharedAudio) sharedAudio = new Audio();
-      sharedAudio.src = url;
-      sharedAudio.onended = () => {
-        setPlaying(false);
-        stopActive = null;
-      };
-      await sharedAudio.play();
-      setPlaying(true);
-      stopActive = () => setPlaying(false);
+      playTrack({ id: trackId, title, artist, url, durationMs }, { mode: 'preview' });
     } catch {
       toast.error(`Không phát được "${title}"`);
     } finally {
@@ -60,7 +47,7 @@ export default function TrackPlayButton({ trackId, title }: TrackPlayButtonProps
 
   return (
     <button
-      onClick={() => void play()}
+      onClick={() => void handleClick()}
       disabled={loading}
       className="p-2 rounded cursor-pointer transition-all duration-150 hover:opacity-80 focus-visible:outline-none"
       style={{ color: 'var(--color-accent)', opacity: loading ? 0.5 : 1 }}

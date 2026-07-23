@@ -1,5 +1,6 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import PlaylistEditorPage from '../../src/app/dashboard/playlists/[id]/page';
+import { renderWithPlayer } from '../utils/renderWithPlayer';
 import { api } from '../../src/lib/api-client';
 import { toast } from 'sonner';
 
@@ -64,7 +65,7 @@ describe('PlaylistEditorPage', () => {
   });
 
   it('should render playlist name, its tracks, and the track library', async () => {
-    render(<PlaylistEditorPage />);
+    renderWithPlayer(<PlaylistEditorPage />);
 
     await waitFor(() => expect(screen.getByText('Morning Chill')).toBeInTheDocument());
     expect(await screen.findByText('Song Two')).toBeInTheDocument();
@@ -74,7 +75,7 @@ describe('PlaylistEditorPage', () => {
   it('should add a library track to the playlist and toast success', async () => {
     mockApi.post.mockResolvedValue({ id: 'pt-2' });
 
-    render(<PlaylistEditorPage />);
+    renderWithPlayer(<PlaylistEditorPage />);
     const addBtn = await screen.findByRole('button', { name: /add song two/i });
     fireEvent.click(addBtn);
 
@@ -89,7 +90,7 @@ describe('PlaylistEditorPage', () => {
   it('should add a track when dropped from the library onto the playlist', async () => {
     mockApi.post.mockResolvedValue({ id: 'pt-2' });
 
-    render(<PlaylistEditorPage />);
+    renderWithPlayer(<PlaylistEditorPage />);
     const dropZone = await screen.findByLabelText(/playlist tracks/i);
 
     fireEvent.drop(dropZone, {
@@ -106,7 +107,7 @@ describe('PlaylistEditorPage', () => {
   it('should remove a track from the playlist', async () => {
     mockApi.delete.mockResolvedValue({ message: 'ok' });
 
-    render(<PlaylistEditorPage />);
+    renderWithPlayer(<PlaylistEditorPage />);
     const removeBtn = await screen.findByRole('button', { name: /remove song one/i });
     fireEvent.click(removeBtn);
 
