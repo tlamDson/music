@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
+import { PlayerProvider } from '../components/player/PlayerProvider';
+import PlayerBar from '../components/player/PlayerBar';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -18,7 +20,11 @@ export default function RootLayout({
         className="min-h-full flex flex-col"
         style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-foreground)' }}
       >
-        {children}
+        <PlayerProvider>
+          {children}
+          {/* Thanh phát chỉ tự hiện khi có nhạc — trang đăng nhập vẫn sạch */}
+          <PlayerBar />
+        </PlayerProvider>
         <Toaster
           position="bottom-right"
           theme="dark"

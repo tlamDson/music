@@ -2,7 +2,19 @@
 export function formatDuration(ms: number | null | undefined): string {
   if (!ms || ms <= 0) return '--:--';
 
-  const totalSeconds = Math.round(ms / 1000);
+  return toClock(ms);
+}
+
+/**
+ * mm:ss cho vị trí đang phát. Khác `formatDuration` ở chỗ 0 là mốc hợp lệ
+ * ("0:00" — vừa bắt đầu bài), không phải dữ liệu thiếu.
+ */
+export function formatPosition(ms: number | null | undefined): string {
+  return toClock(Math.max(ms ?? 0, 0));
+}
+
+function toClock(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
 

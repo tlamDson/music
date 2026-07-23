@@ -1,5 +1,6 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import TracksPage from '../../src/app/dashboard/tracks/page';
+import { renderWithPlayer } from '../utils/renderWithPlayer';
 import { api } from '../../src/lib/api-client';
 import { toast } from 'sonner';
 
@@ -73,7 +74,7 @@ describe('TracksPage', () => {
   it('should show success toast after uploading a file', async () => {
     mockApi.postMultipart.mockResolvedValue({ id: 'track-2', title: 'new-song' });
 
-    render(<TracksPage />);
+    renderWithPlayer(<TracksPage />);
     await waitFor(() => expect(screen.getByText('Song One')).toBeInTheDocument());
 
     const input = screen.getByLabelText(/select audio file/i);
@@ -89,7 +90,7 @@ describe('TracksPage', () => {
   it('should send the measured duration along with the upload', async () => {
     mockApi.postMultipart.mockResolvedValue({ id: 'track-2', title: 'new-song' });
 
-    render(<TracksPage />);
+    renderWithPlayer(<TracksPage />);
     const input = await screen.findByLabelText(/select audio file/i);
     fireEvent.change(input, {
       target: { files: [new File(['x'], 'new-song.mp3', { type: 'audio/mpeg' })] },
@@ -101,7 +102,7 @@ describe('TracksPage', () => {
   });
 
   it('should render the track duration', async () => {
-    render(<TracksPage />);
+    renderWithPlayer(<TracksPage />);
 
     expect(await screen.findByText('4:05')).toBeInTheDocument();
   });
@@ -109,7 +110,7 @@ describe('TracksPage', () => {
   it('should show error toast when upload fails', async () => {
     mockApi.postMultipart.mockRejectedValue(new Error('boom'));
 
-    render(<TracksPage />);
+    renderWithPlayer(<TracksPage />);
     const input = await screen.findByLabelText(/select audio file/i);
     fireEvent.change(input, {
       target: { files: [new File(['x'], 'bad.mp3', { type: 'audio/mpeg' })] },
@@ -119,7 +120,7 @@ describe('TracksPage', () => {
   });
 
   it('should render a play button for each track and stream it on click', async () => {
-    render(<TracksPage />);
+    renderWithPlayer(<TracksPage />);
     const playBtn = await screen.findByRole('button', { name: /play song one/i });
 
     fireEvent.click(playBtn);
