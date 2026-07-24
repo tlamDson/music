@@ -17,7 +17,27 @@ import {
   CreateSyncGroupDto,
   SyncGroupState,
   StorePlaybackState,
+  NowPlayingSnapshot,
+  WsTrackMeta,
 } from '@cafe-music/shared';
+
+/** Chỉ phần client cần để dựng thanh phát — không đẩy cả bản ghi Track ra WS. */
+type TrackRow = {
+  id: string;
+  title: string;
+  artist: string | null;
+  durationMs: number;
+  s3Key: string | null;
+};
+
+function toTrackMeta(track: TrackRow): WsTrackMeta {
+  return {
+    id: track.id,
+    title: track.title,
+    artist: track.artist,
+    durationMs: track.durationMs,
+  };
+}
 
 @Injectable()
 export class SyncService implements OnModuleInit {
@@ -276,6 +296,7 @@ export class SyncService implements OnModuleInit {
     this.gateway.broadcastToGroup(groupId, 'now-playing', {
       groupId,
       trackId: trackEntry.trackId,
+      track: toTrackMeta(trackEntry.track),
       trackUrl,
       positionMs: 0,
       serverTs,
@@ -407,8 +428,7 @@ export class SyncService implements OnModuleInit {
       trackIndex,
       positionMs: 0,
       returnToGroupOnFinish: dto.returnToGroupOnFinish ?? true,
-      s3Key: entry.track.s3Key,
-      trackId: entry.trackId,
+      track: entry.track,
     });
   }
 
@@ -442,12 +462,9 @@ export class SyncService implements OnModuleInit {
     const track = await this.prisma.track.findFirst({
       where: { id: playback.trackIds[playback.trackIndex] },
     });
+    if (!track) throw new NotFoundException('Track not found');
 
-    return this.startStoreTrack({
-      ...playback,
-      s3Key: track?.s3Key ?? null,
-      trackId: playback.trackIds[playback.trackIndex],
-    });
+    return this.startStoreTrack({ ...playback, track });
   }
 
   /** Hết bài trong hàng chờ riêng → bài kế, hết hàng chờ thì dọn state. */
@@ -476,13 +493,13 @@ export class SyncService implements OnModuleInit {
 
     const trackId = playback.trackIds[nextIndex];
     const track = await this.prisma.track.findFirst({ where: { id: trackId } });
+    if (!track) throw new NotFoundException('Track not found');
 
     const next = await this.startStoreTrack({
       ...playback,
       trackIndex: nextIndex,
       positionMs: 0,
-      s3Key: track?.s3Key ?? null,
-      trackId,
+      track,
     });
 
     return { finished: false, rejoined: false, playback: next };
@@ -501,8 +518,7 @@ export class SyncService implements OnModuleInit {
     trackIndex: number;
     positionMs: number;
     returnToGroupOnFinish: boolean;
-    s3Key: string | null;
-    trackId: string;
+    track: TrackRow;
   }): Promise<StorePlaybackState> {
     const serverTs = Date.now();
     const playback: StorePlaybackState = {
@@ -518,13 +534,14 @@ export class SyncService implements OnModuleInit {
 
     await this.redis.setStorePlayback(params.storeId, playback);
 
-    const trackUrl = params.s3Key
-      ? await this.s3.getPresignedUrl(params.s3Key)
+    const trackUrl = params.track.s3Key
+      ? await this.s3.getPresignedUrl(params.track.s3Key)
       : null;
 
     this.gateway.broadcastToStore(params.storeId, 'store-now-playing', {
       storeId: params.storeId,
-      trackId: params.trackId,
+      trackId: params.track.id,
+      track: toTrackMeta(params.track),
       trackUrl,
       positionMs: params.positionMs,
       serverTs,
@@ -597,15 +614,18 @@ export class SyncService implements OnModuleInit {
     const track = await this.prisma.track.findFirst({
       where: { id: state.trackId },
     });
-    const trackUrl = track?.s3Key
+    if (!track) return { rejoined: true, state };
+
+    const trackUrl = track.s3Key
       ? await this.s3.getPresignedUrl(track.s3Key)
       : null;
 
     this.gateway.broadcastToStore(storeId, 'now-playing', {
       groupId: store.syncGroupId,
       trackId: state.trackId,
+      track: toTrackMeta(track),
       trackUrl,
-      positionMs: state.positionMs + (Date.now() - state.startedAtServerTs),
+      positionMs: elapsedPositionMs(state),
       serverTs: Date.now(),
       mode: state.mode,
     });
@@ -621,4 +641,99 @@ export class SyncService implements OnModuleInit {
 
     return this.redis.getGroupState(groupId);
   }
+
+  // ── Ảnh chụp trạng thái khi client mở trang ──────────────────────────────
+  // Broadcast WS không replay khi join room: trang mở sau lúc admin bấm phát sẽ
+  // trắng trơn tới tận lần chuyển bài kế tiếp nếu không hỏi được cái này.
+
+  /** Quán đang phát nhạc riêng thì ưu tiên hàng chờ của quán, không thì theo nhóm. */
+  async nowPlayingForStore(
+    storeId: string,
+    user: JwtPayload,
+  ): Promise<NowPlayingSnapshot | null> {
+    const store = await this.assertStoreAccess(storeId, user);
+
+    const playback = await this.redis.getStorePlayback(storeId);
+    if (playback) {
+      const trackId = playback.trackIds[playback.trackIndex];
+      const track = await this.prisma.track.findFirst({
+        where: { id: trackId },
+      });
+      if (!track) return null;
+
+      return {
+        source: 'STORE',
+        groupId: store.syncGroupId,
+        storeId,
+        track: toTrackMeta(track),
+        trackUrl: await this.presign(track.s3Key),
+        positionMs: elapsedPositionMs(playback),
+        serverTs: Date.now(),
+        isPlaying: playback.isPlaying,
+        queue: {
+          index: playback.trackIndex,
+          total: playback.trackIds.length,
+          remaining: playback.trackIds.length - playback.trackIndex - 1,
+        },
+      };
+    }
+
+    if (!store.syncGroupId) return null;
+    return this.groupSnapshot(store.syncGroupId, storeId);
+  }
+
+  /** Cùng ảnh chụp đó nhưng cho dashboard của admin, không gắn với quán nào. */
+  async nowPlayingForGroup(
+    groupId: string,
+    user: JwtPayload,
+  ): Promise<NowPlayingSnapshot | null> {
+    const group = await this.prisma.syncGroup.findFirst({
+      where: { id: groupId, organizationId: user.organizationId! },
+    });
+    if (!group) throw new NotFoundException('Sync group not found');
+
+    return this.groupSnapshot(groupId, null);
+  }
+
+  private async groupSnapshot(
+    groupId: string,
+    storeId: string | null,
+  ): Promise<NowPlayingSnapshot | null> {
+    const state = await this.redis.getGroupState(groupId);
+    if (!state?.trackId) return null;
+
+    const track = await this.prisma.track.findFirst({
+      where: { id: state.trackId },
+    });
+    if (!track) return null;
+
+    return {
+      source: 'GROUP',
+      groupId,
+      storeId,
+      track: toTrackMeta(track),
+      trackUrl: await this.presign(track.s3Key),
+      positionMs: elapsedPositionMs(state),
+      serverTs: Date.now(),
+      isPlaying: state.isPlaying,
+      queue: null,
+    };
+  }
+
+  private presign(s3Key: string | null) {
+    return s3Key ? this.s3.getPresignedUrl(s3Key) : Promise.resolve(null);
+  }
+}
+
+/**
+ * Vị trí thật tại thời điểm hỏi. Đang phát thì phải cộng khoảng đã trôi kể từ
+ * `startedAtServerTs`, không thì client vào giữa bài sẽ tua ngược về đầu.
+ */
+function elapsedPositionMs(state: {
+  positionMs: number;
+  startedAtServerTs: number | null;
+  isPlaying: boolean;
+}): number {
+  if (!state.isPlaying || !state.startedAtServerTs) return state.positionMs;
+  return state.positionMs + (Date.now() - state.startedAtServerTs);
 }

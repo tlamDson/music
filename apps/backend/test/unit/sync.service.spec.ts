@@ -51,7 +51,13 @@ describe('SyncService', () => {
       {
         trackId: 'track-1',
         position: 0,
-        track: { id: 'track-1', s3Key: 'org-1/tracks/song.mp3' },
+        track: {
+          id: 'track-1',
+          title: 'Cà phê sáng',
+          artist: 'Vũ',
+          durationMs: 180_000,
+          s3Key: 'org-1/tracks/song.mp3',
+        },
       },
     ],
   };
@@ -143,6 +149,35 @@ describe('SyncService', () => {
         expect.objectContaining({
           trackId: 'track-1',
           trackUrl: 'https://s3/presigned/song.mp3',
+        }),
+      );
+    });
+
+    // Thiếu title thì thanh phát của client chỉ có cuid để hiển thị
+    it('should include track metadata so clients can render a player bar', async () => {
+      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
+      prisma.syncGroup.update.mockResolvedValue({
+        ...mockGroup,
+        status: 'PLAYING',
+      } as any);
+
+      await service.play(
+        'group-1',
+        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
+        orgAdminUser,
+      );
+
+      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
+        'group-1',
+        'now-playing',
+        expect.objectContaining({
+          track: {
+            id: 'track-1',
+            title: 'Cà phê sáng',
+            artist: 'Vũ',
+            durationMs: 180_000,
+          },
         }),
       );
     });
@@ -360,20 +395,29 @@ describe('SyncService', () => {
   // Trước đây override() chỉ set cờ: không presign URL, không broadcast gì cả
   // nên quán bấm phát xong là im lặng hoàn toàn.
   describe('store local playback', () => {
+    const storeTracks = {
+      'track-1': {
+        id: 'track-1',
+        title: 'Nắng thuỷ tinh',
+        artist: 'Trịnh Công Sơn',
+        s3Key: 'k1',
+        durationMs: 180_000,
+      },
+      'track-2': {
+        id: 'track-2',
+        title: 'Diễm xưa',
+        artist: 'Trịnh Công Sơn',
+        s3Key: 'k2',
+        durationMs: 200_000,
+      },
+    } as const;
+
     const storePlaylist = {
       id: 'playlist-1',
       name: 'Nhạc quán',
       playlistTracks: [
-        {
-          trackId: 'track-1',
-          position: 0,
-          track: { id: 'track-1', s3Key: 'k1', durationMs: 180_000 },
-        },
-        {
-          trackId: 'track-2',
-          position: 1,
-          track: { id: 'track-2', s3Key: 'k2', durationMs: 200_000 },
-        },
+        { trackId: 'track-1', position: 0, track: storeTracks['track-1'] },
+        { trackId: 'track-2', position: 1, track: storeTracks['track-2'] },
       ],
     };
 
@@ -384,6 +428,13 @@ describe('SyncService', () => {
         syncGroupId: 'group-1',
       } as any);
       prisma.playlist.findFirst.mockResolvedValue(storePlaylist as any);
+      (prisma.track.findFirst as unknown as jest.Mock).mockImplementation(
+        (args: { where?: { id?: string } }) =>
+          Promise.resolve(
+            (storeTracks as Record<string, unknown>)[args?.where?.id ?? ''] ??
+              null,
+          ),
+      );
     });
 
     it('broadcasts the track into the room of that store only', async () => {
@@ -408,6 +459,31 @@ describe('SyncService', () => {
         }),
       );
       expect(gateway.broadcastToGroup).not.toHaveBeenCalled();
+    });
+
+    it('carries track metadata into the store broadcast', async () => {
+      await service.playStore(
+        'store-1',
+        {
+          playlistId: 'playlist-1',
+          trackIndex: 0,
+          returnToGroupOnFinish: true,
+        },
+        storeAdminUser,
+      );
+
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({
+          track: {
+            id: 'track-1',
+            title: 'Nắng thuỷ tinh',
+            artist: 'Trịnh Công Sơn',
+            durationMs: 180_000,
+          },
+        }),
+      );
     });
 
     it('marks the store as overridden so group broadcasts stop applying', async () => {
@@ -595,6 +671,183 @@ describe('SyncService', () => {
       await expect(
         service.getStorePlayback('store-1', storeAdminUser),
       ).resolves.toEqual(playback);
+    });
+  });
+
+  // Broadcast WS không replay khi client join room — mở trang sau lúc admin bấm
+  // phát thì phải hỏi được "giờ đang phát cái gì" chứ không ngồi đợi bài kế.
+  describe('now-playing snapshot', () => {
+    const track = {
+      id: 'track-1',
+      title: 'Hạ trắng',
+      artist: 'Khánh Ly',
+      durationMs: 240_000,
+      s3Key: 'k1',
+    };
+
+    beforeEach(() => {
+      prisma.store.findFirst.mockResolvedValue({
+        id: 'store-1',
+        organizationId: 'org-1',
+        syncGroupId: 'group-1',
+      } as any);
+      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
+      prisma.track.findFirst.mockResolvedValue(track as any);
+    });
+
+    it('reports the local queue when the store plays its own music', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        storeId: 'store-1',
+        playlistId: 'playlist-1',
+        trackIds: ['track-1', 'track-2'],
+        trackIndex: 0,
+        positionMs: 0,
+        startedAtServerTs: Date.now() - 30_000,
+        isPlaying: true,
+        returnToGroupOnFinish: true,
+      });
+
+      const snapshot = await service.nowPlayingForStore(
+        'store-1',
+        storeAdminUser,
+      );
+
+      expect(snapshot).toMatchObject({
+        source: 'STORE',
+        storeId: 'store-1',
+        track: {
+          id: 'track-1',
+          title: 'Hạ trắng',
+          artist: 'Khánh Ly',
+          durationMs: 240_000,
+        },
+        trackUrl: 'https://s3/presigned/song.mp3',
+        isPlaying: true,
+        queue: { index: 0, total: 2, remaining: 1 },
+      });
+    });
+
+    it('falls back to the group track when the store follows the chain', async () => {
+      redis.getStorePlayback.mockResolvedValue(null);
+      redis.getGroupState.mockResolvedValue({
+        groupId: 'group-1',
+        playlistId: 'playlist-1',
+        trackId: 'track-1',
+        trackIndex: 0,
+        positionMs: 0,
+        startedAtServerTs: Date.now() - 30_000,
+        isPlaying: true,
+        mode: 'LOOSE',
+        status: 'PLAYING',
+      });
+
+      const snapshot = await service.nowPlayingForStore(
+        'store-1',
+        storeAdminUser,
+      );
+
+      expect(snapshot).toMatchObject({
+        source: 'GROUP',
+        groupId: 'group-1',
+        track: { title: 'Hạ trắng' },
+        queue: null,
+      });
+    });
+
+    // Quán vào giữa bài phải bắt đúng giây, không phát lại từ đầu
+    it('advances the position by the time already elapsed', async () => {
+      redis.getStorePlayback.mockResolvedValue(null);
+      redis.getGroupState.mockResolvedValue({
+        groupId: 'group-1',
+        playlistId: 'playlist-1',
+        trackId: 'track-1',
+        trackIndex: 0,
+        positionMs: 5_000,
+        startedAtServerTs: Date.now() - 30_000,
+        isPlaying: true,
+        mode: 'LOOSE',
+        status: 'PLAYING',
+      });
+
+      const snapshot = await service.nowPlayingForStore(
+        'store-1',
+        storeAdminUser,
+      );
+
+      expect(snapshot!.positionMs).toBeGreaterThanOrEqual(34_000);
+      expect(snapshot!.positionMs).toBeLessThan(36_000);
+    });
+
+    it('keeps the stored position while playback is paused', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        storeId: 'store-1',
+        playlistId: 'playlist-1',
+        trackIds: ['track-1'],
+        trackIndex: 0,
+        positionMs: 42_000,
+        startedAtServerTs: Date.now() - 30_000,
+        isPlaying: false,
+        returnToGroupOnFinish: true,
+      });
+
+      const snapshot = await service.nowPlayingForStore(
+        'store-1',
+        storeAdminUser,
+      );
+
+      expect(snapshot).toMatchObject({ positionMs: 42_000, isPlaying: false });
+    });
+
+    it('returns null when neither the store nor its group is playing', async () => {
+      redis.getStorePlayback.mockResolvedValue(null);
+      redis.getGroupState.mockResolvedValue(null);
+
+      await expect(
+        service.nowPlayingForStore('store-1', storeAdminUser),
+      ).resolves.toBeNull();
+    });
+
+    it('refuses a store admin asking about another store', async () => {
+      await expect(
+        service.nowPlayingForStore('store-1', {
+          ...storeAdminUser,
+          storeId: 'store-2',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // Dashboard của admin cũng cần biết nhóm đang phát gì để dựng thanh phát
+    it('reports the group track for the admin dashboard', async () => {
+      redis.getGroupState.mockResolvedValue({
+        groupId: 'group-1',
+        playlistId: 'playlist-1',
+        trackId: 'track-1',
+        trackIndex: 0,
+        positionMs: 0,
+        startedAtServerTs: Date.now(),
+        isPlaying: true,
+        mode: 'LOOSE',
+        status: 'PLAYING',
+      });
+
+      const snapshot = await service.nowPlayingForGroup(
+        'group-1',
+        orgAdminUser,
+      );
+
+      expect(snapshot).toMatchObject({
+        source: 'GROUP',
+        groupId: 'group-1',
+        track: { title: 'Hạ trắng' },
+      });
+    });
+
+    it('hides groups of another organization behind a 404', async () => {
+      prisma.syncGroup.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.nowPlayingForGroup('group-9', orgAdminUser),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -792,6 +1045,9 @@ describe('SyncService', () => {
       } as any);
       prisma.track.findFirst.mockResolvedValue({
         id: 'track-9',
+        title: 'Biển nhớ',
+        artist: null,
+        durationMs: 210_000,
         s3Key: 'group-track.mp3',
       } as any);
     });

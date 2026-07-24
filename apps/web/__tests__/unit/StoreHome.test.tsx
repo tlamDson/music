@@ -1,7 +1,8 @@
-import { screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import StoreHome from '../../src/components/store/StoreHome';
 import { renderWithPlayer } from '../utils/renderWithPlayer';
+import { PlayerProvider, usePlayer } from '../../src/components/player/PlayerProvider';
 import { api } from '../../src/lib/api-client';
 import { useSync } from '../../src/hooks/useSync';
 
@@ -15,6 +16,41 @@ jest.mock('../../src/hooks/useSync', () => ({ useSync: jest.fn() }));
 
 const mockApi = api as jest.Mocked<typeof api>;
 const mockUseSync = useSync as jest.MockedFunction<typeof useSync>;
+
+// PlayerProvider dựng `new Audio()` — jsdom không có, mock tối thiểu.
+class MockAudio {
+  src = '';
+  currentTime = 0;
+  duration = 180;
+  volume = 1;
+  paused = true;
+  addEventListener() {}
+  removeEventListener() {}
+  play = jest.fn(async () => {
+    this.paused = false;
+  });
+  pause = jest.fn(() => {
+    this.paused = true;
+  });
+}
+Object.defineProperty(global, 'Audio', { writable: true, value: MockAudio });
+
+// Bơm một bài vào provider để giả lập "quán đang nghe theo nhóm"
+function SeedPlaying() {
+  const { playTrack } = usePlayer();
+  return (
+    <button
+      onClick={() =>
+        playTrack(
+          { id: 'track-1', title: 'Hạ trắng', artist: 'Khánh Ly', url: 'https://s3/1.mp3' },
+          { mode: 'group', storeId: 'store-1' },
+        )
+      }
+    >
+      seed
+    </button>
+  );
+}
 
 const syncState = (overrides: Partial<ReturnType<typeof useSync>> = {}) =>
   ({
@@ -85,6 +121,22 @@ describe('StoreHome', () => {
     await userEvent.click(await screen.findByRole('button', { name: /quay lại nhóm sync ngay/i }));
 
     await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/rejoin'));
+  });
+
+  // Điều QC báo thiếu: bấm phát ở dashboard xong quán phải thấy bài đang chạy
+  it('shows the currently playing track name from the shared player', async () => {
+    render(
+      <PlayerProvider>
+        <SeedPlaying />
+        <StoreHome storeId="store-1" />
+      </PlayerProvider>,
+    );
+
+    await screen.findByText('Quán Nguyễn Huệ');
+    await userEvent.click(screen.getByText('seed'));
+
+    expect(await screen.findByText('Hạ trắng')).toBeInTheDocument();
+    expect(screen.getByText(/đang phát · theo nhóm sync/i)).toBeInTheDocument();
   });
 
   it('plays a suggested playlist through the store endpoint', async () => {
