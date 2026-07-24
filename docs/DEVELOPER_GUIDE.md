@@ -169,6 +169,44 @@ claude mcp list
 >
 > **Không** dán token trực tiếp vào `.mcp.json`. Giữ nguyên dạng `${GITHUB_PAT}`.
 
+### Chrome DevTools MCP Server (cho Claude Code)
+
+Cho phép Claude mở app thật trong Chrome: xem UI đã dựng, đọc console/network, đo performance và chạy Lighthouse. Hữu ích khi review UI ở `/dashboard`, `/store`, `/player/[storeId]?kiosk=1` mà không phải copy screenshot thủ công.
+
+Không cần token, chỉ cần **Google Chrome** đã cài và Node >= 20 (server tải qua `npx` lần chạy đầu).
+
+**1. Bật server trên máy bạn**
+
+`.mcp.json` khai báo sẵn, nhưng mỗi người phải tự opt-in trong `.claude/settings.local.json`:
+
+```jsonc
+{
+  "enabledMcpjsonServers": ["github", "chrome-devtools"],
+}
+```
+
+**2. Kiểm tra**
+
+```bash
+claude mcp list
+# → chrome-devtools: cmd /c npx -y chrome-devtools-mcp@latest ... - ✔ Connected
+```
+
+**3. Dùng thử** — bật hạ tầng + `pnpm dev` trước, rồi bảo Claude _"mở http://localhost:3000/dashboard và chụp màn hình"_.
+
+#### Quyền và phạm vi
+
+| Điểm             | Cấu hình hiện tại                                                                                                                      |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Profile Chrome   | Profile riêng ở `~/.cache/chrome-devtools-mcp/chrome-profile` — **không** đụng cookie / mật khẩu / tab của profile cá nhân             |
+| Tool tự chạy     | Chỉ nhóm đọc: `take_screenshot`, `take_snapshot`, `list_pages`, `select_page`, `*_console_message*`, `*_network_request*`, performance |
+| Tool phải duyệt  | `navigate_page`, `new_page`, `click`, `fill`, `fill_form`, `type_text`, `press_key`, `drag`, `hover`, `upload_file`, `evaluate_script` |
+| Telemetry Google | Tắt bằng `--no-usage-statistics`; `--no-performance-crux` chặn việc gửi URL trong performance trace lên CrUX API                       |
+
+> Server này đọc được mọi thứ trên trang đang mở (kể cả token trong localStorage sau khi đăng nhập). Vì profile tách biệt nên chỉ có session bạn tự đăng nhập trong phiên test mới nằm trong tầm với — đừng đăng nhập tài khoản thật/production vào cửa sổ Chrome do MCP mở.
+
+> **macOS / Linux:** đổi `"command": "cmd"` + `"args": ["/c", "npx", …]` thành `"command": "npx"` + bỏ `"/c"`. Wrapper `cmd /c` chỉ cần trên Windows, vì Node không spawn thẳng được `npx.cmd`.
+
 ### Claude Code Settings — shared vs local
 
 | File                          | Track trong git? | Đặt gì vào đây                                                            |
