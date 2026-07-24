@@ -54,9 +54,11 @@ Object.defineProperty(global, 'Audio', { writable: true, value: MockAudio });
 function Harness({
   mode = 'local',
   storeId = 'store-1',
+  startPositionMs = 0,
 }: {
   mode?: PlayerMode;
   storeId?: string | null;
+  startPositionMs?: number;
 }) {
   const player = usePlayer();
 
@@ -71,12 +73,34 @@ function Harness({
               artist: 'Nguyenn',
               url: 'https://s3/1.mp3',
             },
-            { mode, storeId, queue: { index: 0, total: 3, remaining: 2 } },
+            {
+              mode,
+              storeId,
+              positionMs: startPositionMs,
+              queue: { index: 0, total: 3, remaining: 2 },
+            },
           )
         }
       >
         start
       </button>
+      <button
+        onClick={() =>
+          player.playTrack(
+            {
+              id: 'track-1',
+              title: 'Hẹn Em Ở Lần Yêu Thứ 2',
+              artist: 'Nguyenn',
+              // Rejoin luôn presign lại nên URL đổi dù cùng bài
+              url: 'https://s3/1-rejoin.mp3',
+            },
+            { mode, storeId, positionMs: 50_000 },
+          )
+        }
+      >
+        rejoin-same-track
+      </button>
+      <button onClick={() => player.toggle()}>toggle</button>
       <span data-testid="title">{player.current?.title ?? 'idle'}</span>
       <span data-testid="playing">{String(player.isPlaying)}</span>
       <span data-testid="remaining">{player.queue?.remaining ?? -1}</span>
@@ -152,5 +176,44 @@ describe('PlayerProvider', () => {
     });
 
     expect(mockApi.post).not.toHaveBeenCalled();
+  });
+
+  // rejoin() luôn presign lại nên URL đổi dù cùng bài — reload từ đầu làm mất
+  // buffer và trễ đúng bằng thời gian tải, khiến quán tụt lại sau nhóm vĩnh viễn.
+  it('does not reload the audio element when rejoining the same track, only reseeks', async () => {
+    renderHarness({ mode: 'group', startPositionMs: 10_000 });
+    await userEvent.click(screen.getByText('start'));
+    await waitFor(() => expect(screen.getByTestId('playing')).toHaveTextContent('true'));
+
+    const audio = currentAudio();
+    const originalSrc = audio.src;
+
+    await userEvent.click(screen.getByText('rejoin-same-track'));
+
+    expect(audio.src).toBe(originalSrc);
+    expect(audio.currentTime).toBe(50);
+  });
+
+  // Quán bấm dừng (toggle client-side, không qua server) rồi bấm phát lại phải
+  // nhảy bắt kịp giây hiện tại của nhóm — không phải tiếp tục từ chỗ đã dừng.
+  it('catches up to the live group position when resuming after a local pause', async () => {
+    let now = 1_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+    renderHarness({ mode: 'group', startPositionMs: 10_000 });
+    await userEvent.click(screen.getByText('start'));
+    await waitFor(() => expect(screen.getByTestId('playing')).toHaveTextContent('true'));
+
+    await userEvent.click(screen.getByText('toggle')); // pause
+    await waitFor(() => expect(screen.getByTestId('playing')).toHaveTextContent('false'));
+
+    now += 5_000; // nhóm trôi thêm 5s trong lúc quán tạm dừng
+
+    await userEvent.click(screen.getByText('toggle')); // resume
+    await waitFor(() => expect(screen.getByTestId('playing')).toHaveTextContent('true'));
+
+    expect(currentAudio().currentTime).toBe(15);
+
+    jest.restoreAllMocks();
   });
 });

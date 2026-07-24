@@ -100,6 +100,10 @@ describe('SyncService', () => {
     redis = module.get(RedisService);
     gateway = module.get(SyncGateway);
     s3 = module.get(S3Service);
+
+    // play() kéo mọi quán trong nhóm về in-sync — mặc định không có quán nào,
+    // các test không liên quan đến override không cần stub lại.
+    prisma.store.findMany.mockResolvedValue([]);
   });
 
   describe('play', () => {
@@ -192,6 +196,60 @@ describe('SyncService', () => {
           orgAdminUser,
         ),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    // Quán từng tách ra (hoặc còn override rác từ phiên trước) phải quay lại
+    // "in sync" khi admin phát nhóm — nếu không /dashboard/stores vẫn hiện
+    // "Overriding" dù quán đang nghe đúng nhạc của nhóm qua broadcast.
+    it('should clear override state for every store in the group so they show as in-sync', async () => {
+      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
+      prisma.syncGroup.update.mockResolvedValue({
+        ...mockGroup,
+        status: 'PLAYING',
+      } as any);
+      prisma.store.findMany.mockResolvedValue([
+        { id: 'store-1' },
+        { id: 'store-2' },
+      ] as any);
+      prisma.storeOverride.updateMany.mockResolvedValue({ count: 2 } as any);
+
+      await service.play(
+        'group-1',
+        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
+        orgAdminUser,
+      );
+
+      expect(prisma.store.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { syncGroupId: 'group-1' } }),
+      );
+      expect(redis.clearStoreOverride).toHaveBeenCalledWith('store-1');
+      expect(redis.clearStoreOverride).toHaveBeenCalledWith('store-2');
+      expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-1');
+      expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-2');
+      expect(prisma.storeOverride.updateMany).toHaveBeenCalledWith({
+        where: { storeId: { in: ['store-1', 'store-2'] } },
+        data: { isOverridden: false },
+      });
+    });
+
+    it('should not touch stores when the group has none', async () => {
+      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
+      prisma.syncGroup.update.mockResolvedValue({
+        ...mockGroup,
+        status: 'PLAYING',
+      } as any);
+      prisma.store.findMany.mockResolvedValue([]);
+
+      await service.play(
+        'group-1',
+        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
+        orgAdminUser,
+      );
+
+      expect(redis.clearStoreOverride).not.toHaveBeenCalled();
+      expect(prisma.storeOverride.updateMany).not.toHaveBeenCalled();
     });
   });
 
@@ -388,6 +446,71 @@ describe('SyncService', () => {
         'group-1',
         'now-playing',
         expect.objectContaining({ trackId: 'track-2' }),
+      );
+    });
+  });
+
+  // pauseStore() gộp elapsed vào positionMs đúng cách; pause() của nhóm trước
+  // đây không làm vậy nên elapsedPositionMs() đọc lại state lúc nhóm đang tạm
+  // dừng sẽ trả positionMs cũ (thường là 0) thay vì đúng chỗ vừa dừng lại.
+  describe('pause', () => {
+    it('folds elapsed time into positionMs and stops the server clock', async () => {
+      jest.useFakeTimers();
+      try {
+        const startedAtServerTs = Date.now();
+        prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
+        prisma.syncGroup.update.mockResolvedValue(mockGroup as any);
+        redis.getGroupState.mockResolvedValue({
+          groupId: 'group-1',
+          playlistId: 'playlist-1',
+          trackId: 'track-1',
+          trackIndex: 0,
+          positionMs: 0,
+          startedAtServerTs,
+          isPlaying: true,
+          mode: 'LOOSE',
+          status: 'PLAYING',
+        });
+
+        jest.advanceTimersByTime(45_000);
+        await service.pause('group-1', orgAdminUser);
+
+        expect(redis.setGroupState).toHaveBeenCalledWith(
+          'group-1',
+          expect.objectContaining({
+            isPlaying: false,
+            positionMs: 45_000,
+            startedAtServerTs: null,
+          }),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('leaves positionMs untouched when the group was already paused', async () => {
+      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
+      prisma.syncGroup.update.mockResolvedValue(mockGroup as any);
+      redis.getGroupState.mockResolvedValue({
+        groupId: 'group-1',
+        playlistId: 'playlist-1',
+        trackId: 'track-1',
+        trackIndex: 0,
+        positionMs: 12_000,
+        startedAtServerTs: null,
+        isPlaying: false,
+        mode: 'LOOSE',
+        status: 'PAUSED',
+      });
+
+      await service.pause('group-1', orgAdminUser);
+
+      expect(redis.setGroupState).toHaveBeenCalledWith(
+        'group-1',
+        expect.objectContaining({
+          positionMs: 12_000,
+          startedAtServerTs: null,
+        }),
       );
     });
   });

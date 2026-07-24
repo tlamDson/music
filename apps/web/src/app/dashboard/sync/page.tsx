@@ -55,8 +55,12 @@ export default function SyncPage() {
         mode: modes[groupId] ?? 'LOOSE',
       });
       toast.success('Đang phát cho nhóm');
-    } catch {
-      toast.error('Phát thất bại — playlist có track nào chưa?');
+    } catch (err) {
+      // Trước đây luôn đoán "playlist có track chưa" bất kể lý do thật —
+      // che mất lỗi thật (vd presign S3 lỗi, sai scope playlist, group không
+      // thấy). Hiện message backend trả về, chỉ fallback khi không đọc được.
+      const message = err instanceof Error && err.message ? err.message : 'Phát thất bại';
+      toast.error(message);
     }
   };
 

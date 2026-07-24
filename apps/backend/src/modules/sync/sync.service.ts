@@ -282,6 +282,11 @@ export class SyncService implements OnModuleInit {
 
     await this.redis.setGroupState(groupId, state);
 
+    // Bấm Play cho nhóm coi như mọi quán trong nhóm rejoin — nếu không, quán
+    // từng tách ra (hoặc còn override rác từ phiên trước, TTL 24h) sẽ mãi hiện
+    // "Overriding" ở /dashboard/stores dù đang nghe đúng nhạc của nhóm.
+    await this.clearGroupStoreOverrides(groupId);
+
     await this.prisma.syncGroup.update({
       where: { id: groupId },
       data: {
@@ -328,8 +333,13 @@ export class SyncService implements OnModuleInit {
 
     const state = await this.redis.getGroupState(groupId);
     if (state) {
+      // Gộp elapsed vào positionMs như pauseStore() đã làm — nếu không,
+      // elapsedPositionMs() đọc lại lúc đang tạm dừng sẽ trả positionMs cũ
+      // (thường là 0) thay vì đúng giây vừa dừng.
       const pausedState = {
         ...state,
+        positionMs: elapsedPositionMs(state),
+        startedAtServerTs: null,
         isPlaying: false,
         status: 'PAUSED' as const,
       };
@@ -553,6 +563,30 @@ export class SyncService implements OnModuleInit {
     });
 
     return playback;
+  }
+
+  /** Xoá override + hàng chờ riêng của mọi quán thuộc nhóm — dùng khi nhóm bắt
+   * đầu phát để "kéo" mọi quán về trạng thái in-sync ngay trong DB/Redis, thay
+   * vì chỉ dựa vào việc quán tự bấm "Rejoin Group". */
+  private async clearGroupStoreOverrides(groupId: string): Promise<void> {
+    const stores = await this.prisma.store.findMany({
+      where: { syncGroupId: groupId },
+      select: { id: true },
+    });
+    if (stores.length === 0) return;
+
+    const storeIds = stores.map((store) => store.id);
+    await Promise.all(
+      storeIds.flatMap((storeId) => [
+        this.redis.clearStoreOverride(storeId),
+        this.redis.clearStorePlayback(storeId),
+      ]),
+    );
+
+    await this.prisma.storeOverride.updateMany({
+      where: { storeId: { in: storeIds } },
+      data: { isOverridden: false },
+    });
   }
 
   async override(storeId: string, dto: OverrideDto, user: JwtPayload) {
