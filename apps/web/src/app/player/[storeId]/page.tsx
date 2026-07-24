@@ -27,7 +27,7 @@ export default function PlayerPage() {
 
   const { offset, measureOffset } = useClockOffset();
   const { isConnected, storeQueue } = useSync({ storeId, token, clockOffset: offset });
-  const { current, isPlaying, positionMs, durationMs } = usePlayer();
+  const { current, isPlaying, positionMs, durationMs, mode, pause } = usePlayer();
 
   useEffect(() => {
     setToken(localStorage.getItem('accessToken'));
@@ -37,6 +37,15 @@ export default function PlayerPage() {
   const progressPct = durationMs > 0 ? Math.min(100, (positionMs / durationMs) * 100) : 0;
 
   const handlePause = async () => {
+    // Quán đang theo nhóm không có StorePlaybackState riêng trên server —
+    // POST /sync/stores/:id/pause sẽ 404 ("Store is not playing locally").
+    // Chỉ khi quán có hàng chờ riêng mới cần server broadcast `store-paused`
+    // cho các tab khác của cùng quán; theo nhóm thì dừng cục bộ là đủ.
+    if (mode !== 'local') {
+      pause();
+      return;
+    }
+
     try {
       await api.post(`/sync/stores/${storeId}/pause`);
     } catch {
