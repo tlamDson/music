@@ -68,6 +68,13 @@ export class SyncController {
     return this.syncService.getGroupState(id, user);
   }
 
+  // Dashboard mở giữa chừng vẫn dựng được thanh phát: state thô ở trên không có
+  // url lẫn tên bài, mà broadcast thì không replay cho người vào sau.
+  @Get('groups/:id/now-playing')
+  groupNowPlaying(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.syncService.nowPlayingForGroup(id, user);
+  }
+
   // Phát nhạc riêng của quán — quán tự tách khỏi nhóm sync khi bấm phát
   @Post('stores/:id/play')
   @Roles('ORG_ADMIN', 'STORE_ADMIN')
@@ -102,6 +109,14 @@ export class SyncController {
   @Roles('ORG_ADMIN', 'STORE_ADMIN')
   storePlayback(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.syncService.getStorePlayback(id, user);
+  }
+
+  // Console của quán hỏi cái này lúc mở trang: đang phát nhạc riêng hay đang
+  // theo nhóm, bài nào, tới giây thứ mấy.
+  @Get('stores/:id/now-playing')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
+  storeNowPlaying(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.syncService.nowPlayingForStore(id, user);
   }
 
   @Post('stores/:id/override')

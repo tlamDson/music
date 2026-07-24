@@ -1,10 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import PlayerPage from '../../src/app/player/[storeId]/page';
 import { useSync } from '../../src/hooks/useSync';
+import { usePlayer } from '../../src/components/player/PlayerProvider';
 
 jest.mock('../../src/lib/api-client', () => ({ api: { get: jest.fn(), post: jest.fn() } }));
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
 jest.mock('../../src/hooks/useSync', () => ({ useSync: jest.fn() }));
+jest.mock('../../src/components/player/PlayerProvider', () => ({ usePlayer: jest.fn() }));
 
 const mockSearchParams = { get: jest.fn() };
 jest.mock('next/navigation', () => ({
@@ -13,24 +15,22 @@ jest.mock('next/navigation', () => ({
 }));
 
 const mockUseSync = useSync as jest.MockedFunction<typeof useSync>;
+const mockUsePlayer = usePlayer as jest.MockedFunction<typeof usePlayer>;
 
 describe('player screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseSync.mockReturnValue({
       isConnected: true,
-      isPlaying: true,
-      nowPlaying: {
-        groupId: 'group-1',
-        trackId: 'track-1',
-        trackUrl: 'https://s3/1.mp3',
-        positionMs: 0,
-        serverTs: Date.now(),
-        mode: 'LOOSE',
-      },
-      groupState: null,
+      nowPlaying: null,
       storeQueue: null,
     } as ReturnType<typeof useSync>);
+    mockUsePlayer.mockReturnValue({
+      current: { id: 'track-1', title: 'Cà phê sáng', url: 'https://s3/1.mp3' },
+      isPlaying: true,
+      positionMs: 0,
+      durationMs: 180_000,
+    } as ReturnType<typeof usePlayer>);
   });
 
   // Màn chiếu treo trong quán: chỉ để nhìn, nhân viên không bấm nhầm được

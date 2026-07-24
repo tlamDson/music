@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
 import { formatDuration, formatPosition } from '../../lib/format';
@@ -70,6 +71,11 @@ export default function PlayerBar() {
     changeVolume,
   } = usePlayer();
 
+  const pathname = usePathname();
+
+  // Màn chiếu treo TV (`/player/[storeId]`) chỉ để nhìn — thanh phát có nút bấm
+  // không được xuất hiện ở đó, kể cả khi provider đang phát nhạc.
+  if (pathname?.startsWith('/player/')) return null;
   if (!current) return null;
 
   const progressPct = durationMs > 0 ? Math.min(100, (positionMs / durationMs) * 100) : 0;

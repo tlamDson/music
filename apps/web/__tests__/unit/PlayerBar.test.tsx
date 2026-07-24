@@ -7,6 +7,11 @@ jest.mock('../../src/lib/api-client', () => ({
   api: { get: jest.fn(), post: jest.fn() },
 }));
 
+let mockPathname = '/store';
+jest.mock('next/navigation', () => ({
+  usePathname: () => mockPathname,
+}));
+
 class MockAudio {
   static instances: MockAudio[] = [];
   src = '';
@@ -78,6 +83,7 @@ describe('PlayerBar', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     MockAudio.instances = [];
+    mockPathname = '/store';
   });
 
   it('stays out of the way until something is playing', () => {
@@ -114,6 +120,18 @@ describe('PlayerBar', () => {
     expect(await screen.findByRole('progressbar')).toBeInTheDocument();
     expect(screen.getByText('0:00')).toBeInTheDocument();
     expect(screen.getByText('6:06')).toBeInTheDocument();
+  });
+
+  // Màn chiếu treo trong quán chỉ để nhìn — thanh phát có nút bấm không được
+  // bén mảng tới đó, kể cả khi nhạc đang chạy.
+  it('keeps away from the kiosk screen', async () => {
+    mockPathname = '/player/store-1';
+    renderBar();
+
+    await userEvent.click(screen.getByText('start'));
+
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hẹn Em Ở Lần Yêu Thứ 2')).not.toBeInTheDocument();
   });
 
   // Quán tách khỏi nhóm cần biết còn bao nhiêu bài trước khi tự quay lại

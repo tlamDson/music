@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useSync } from '../../../hooks/useSync';
 import { useClockOffset } from '../../../hooks/useClockOffset';
+import { usePlayer } from '../../../components/player/PlayerProvider';
 import { api } from '../../../lib/api-client';
 import { formatPosition } from '../../../lib/format';
 import CoverArt from '../../../components/media/CoverArt';
@@ -13,45 +14,25 @@ import CoverArt from '../../../components/media/CoverArt';
  * Màn hình phát của quán. Mặc định có vài nút điều khiển cho người mở từ trang
  * Quán; thêm `?kiosk=1` khi treo lên TV để chỉ còn phần hiển thị — nhân viên
  * lau bàn không bấm nhầm được.
+ *
+ * Nhạc đi qua thẻ audio dùng chung (`PlayerProvider`) như mọi trang khác, không
+ * tự `new Audio()` để tránh hai nguồn nhạc phát chồng lên nhau.
  */
 export default function PlayerPage() {
   const { storeId } = useParams<{ storeId: string }>();
   const searchParams = useSearchParams();
   const isKiosk = searchParams.get('kiosk') === '1';
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [positionMs, setPositionMs] = useState(0);
-  const [durationMs, setDurationMs] = useState(0);
 
   const { offset, measureOffset } = useClockOffset();
-  const { isConnected, nowPlaying, isPlaying, storeQueue } = useSync({
-    storeId,
-    token,
-    audioRef,
-    clockOffset: offset,
-  });
+  const { isConnected, storeQueue } = useSync({ storeId, token, clockOffset: offset });
+  const { current, isPlaying, positionMs, durationMs } = usePlayer();
 
   useEffect(() => {
     setToken(localStorage.getItem('accessToken'));
     void measureOffset();
   }, [measureOffset]);
-
-  useEffect(() => {
-    if (!audioRef.current) audioRef.current = new Audio();
-    const audio = audioRef.current;
-
-    const onTime = () => setPositionMs(audio.currentTime * 1000);
-    const onDuration = () =>
-      setDurationMs(Number.isFinite(audio.duration) ? audio.duration * 1000 : 0);
-
-    audio.addEventListener('timeupdate', onTime);
-    audio.addEventListener('durationchange', onDuration);
-    return () => {
-      audio.removeEventListener('timeupdate', onTime);
-      audio.removeEventListener('durationchange', onDuration);
-    };
-  }, []);
 
   const progressPct = durationMs > 0 ? Math.min(100, (positionMs / durationMs) * 100) : 0;
 
@@ -97,15 +78,15 @@ export default function PlayerPage() {
         </div>
 
         <CoverArt
-          seed={nowPlaying?.trackId ?? storeId}
-          label={nowPlaying?.trackId ?? 'Cafe Music'}
+          seed={current?.id ?? storeId}
+          label={current?.title ?? 'Cafe Music'}
           size={384}
           className="w-full aspect-square"
         />
 
         <div className="text-center">
           <p className="text-sm font-medium" style={{ color: 'var(--color-foreground)' }}>
-            {nowPlaying ? nowPlaying.trackId : 'Chưa phát bài nào'}
+            {current ? current.title : 'Chưa phát bài nào'}
           </p>
           <p className="text-xs mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
             {storeQueue

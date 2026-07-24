@@ -132,9 +132,27 @@ export type WsEventName =
   | 'clock-sync'
   | 'error';
 
+/**
+ * Đủ để client dựng thanh phát mà không phải gọi thêm API. Trước đây payload
+ * chỉ có `trackId` nên màn kiosk in thẳng cuid ra TV.
+ */
+export interface WsTrackMeta {
+  id: string;
+  title: string;
+  artist: string | null;
+  durationMs: number;
+}
+
+export interface WsQueueInfo {
+  index: number;
+  total: number;
+  remaining: number;
+}
+
 export interface WsNowPlayingPayload {
   groupId: string;
   trackId: string;
+  track: WsTrackMeta;
   trackUrl: string | null;
   positionMs: number;
   serverTs: number;
@@ -144,10 +162,29 @@ export interface WsNowPlayingPayload {
 export interface WsStoreNowPlayingPayload {
   storeId: string;
   trackId: string;
+  track: WsTrackMeta;
   trackUrl: string | null;
   positionMs: number;
   serverTs: number;
-  queue: { index: number; total: number; remaining: number };
+  queue: WsQueueInfo;
+}
+
+/**
+ * Ảnh chụp "đang phát cái gì" lúc client mở trang. Broadcast WS là
+ * fire-and-forget, không replay khi join room — thiếu cái này thì trang mở sau
+ * lúc admin bấm phát sẽ trắng cho tới lần chuyển bài kế tiếp.
+ */
+export interface NowPlayingSnapshot {
+  source: 'GROUP' | 'STORE';
+  groupId: string | null;
+  storeId: string | null;
+  track: WsTrackMeta;
+  trackUrl: string | null;
+  /** Đã cộng thời gian đã trôi kể từ `startedAtServerTs`. */
+  positionMs: number;
+  serverTs: number;
+  isPlaying: boolean;
+  queue: WsQueueInfo | null;
 }
 
 export interface WsClockSyncPayload {

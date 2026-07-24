@@ -50,6 +50,7 @@ interface PlayerContextValue {
   queue: PlayerQueueInfo | null;
   playTrack: (track: PlayerTrack, options?: PlayOptions) => void;
   toggle: () => void;
+  pause: () => void;
   seek: (positionMs: number) => void;
   changeVolume: (volume: number) => void;
   stop: () => void;
@@ -160,6 +161,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setIsPlaying(false);
   }, [ensureAudio]);
 
+  // Dừng hẳn theo lệnh server — khác `toggle` ở chỗ không bao giờ tự phát lại.
+  const pause = useCallback(() => {
+    const audio = ensureAudio();
+    audio.pause();
+    setIsPlaying(false);
+  }, [ensureAudio]);
+
   const seek = useCallback(
     (nextPositionMs: number) => {
       const audio = ensureAudio();
@@ -201,6 +209,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       queue,
       playTrack,
       toggle,
+      pause,
       seek,
       changeVolume,
       stop,
@@ -216,6 +225,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       queue,
       playTrack,
       toggle,
+      pause,
       seek,
       changeVolume,
       stop,

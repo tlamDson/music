@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
 import { useSync } from '../../hooks/useSync';
 import { useClockOffset } from '../../hooks/useClockOffset';
+import { usePlayer } from '../player/PlayerProvider';
 import CoverArt from '../media/CoverArt';
 import { formatTotalDuration } from '../../lib/format';
 import type { ApiResponse } from '@cafe-music/shared';
@@ -29,13 +30,13 @@ interface SuggestedPlaylist {
  * nhạc riêng, còn mấy bài nữa thì tự quay lại, và danh sách playlist bấm phát.
  */
 export default function StoreHome({ storeId }: { storeId: string }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [status, setStatus] = useState<StoreStatus | null>(null);
   const [playlists, setPlaylists] = useState<SuggestedPlaylist[]>([]);
 
   const { offset, measureOffset } = useClockOffset();
-  const { isConnected, storeQueue } = useSync({ storeId, token, audioRef, clockOffset: offset });
+  const { isConnected, storeQueue } = useSync({ storeId, token, clockOffset: offset });
+  const { current, isPlaying } = usePlayer();
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -113,15 +114,23 @@ export default function StoreHome({ storeId }: { storeId: string }) {
           aria-hidden="true"
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium" style={{ color: 'var(--color-foreground)' }}>
-            {isConnected ? 'Đã kết nối máy chủ' : 'Mất kết nối máy chủ — đang thử lại'}
+          <p className="text-sm font-medium truncate" style={{ color: 'var(--color-foreground)' }}>
+            {!isConnected
+              ? 'Mất kết nối máy chủ — đang thử lại'
+              : current
+                ? current.title
+                : 'Đã kết nối máy chủ'}
           </p>
-          <p className="text-xs mt-0.5" style={{ color: 'rgba(248,250,252,0.5)' }}>
-            {isOverriding
-              ? 'Đang phát nhạc riêng của quán'
-              : status?.syncGroupId
-                ? 'Đang theo nhóm sync của chuỗi'
-                : 'Quán chưa được gán nhóm sync nào'}
+          <p className="text-xs mt-0.5 truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+            {current
+              ? `${isPlaying ? 'Đang phát' : 'Tạm dừng'} · ${
+                  isOverriding ? 'nhạc riêng của quán' : 'theo nhóm sync của chuỗi'
+                }`
+              : isOverriding
+                ? 'Đang phát nhạc riêng của quán'
+                : status?.syncGroupId
+                  ? 'Đang theo nhóm sync của chuỗi'
+                  : 'Quán chưa được gán nhóm sync nào'}
           </p>
         </div>
 

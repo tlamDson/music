@@ -63,18 +63,21 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 - **Giới hạn: timer nằm trong bộ nhớ process** → chỉ đúng khi chạy 1 instance backend. Scale nhiều instance phải chuyển sang khoá phân tán trên Redis.
 - Track có `durationMs = 0` (upload trước khi web biết đo thời lượng) → không auto-next được, UI hiện `--:--`.
 - WS event: `now-playing` / `paused` / `stopped` (nhóm) · `store-now-playing` / `store-paused` / `store-stopped` (quán). Client join `join-group` + `join-store`.
+- Payload `now-playing` / `store-now-playing` **kèm `track: WsTrackMeta` ({id,title,artist,durationMs})** để client dựng thanh phát mà không phải gọi thêm API — đừng chỉ gửi `trackId`.
+- **Broadcast WS không replay khi join room.** Client mở trang sau lúc admin bấm phát phải gọi `GET /sync/stores/:id/now-playing` (hoặc `/sync/groups/:id/now-playing`) để hydrate — trả `NowPlayingSnapshot` với `positionMs` đã bù thời gian trôi. Thiếu bước này thì trang trắng tới lần chuyển bài kế.
+- Frontend: `hooks/useSync.ts` **không tự lái audio**, nó đẩy vào `PlayerProvider` (`playTrack`/`pause`/`stop`); thanh phát dùng chung tự hiện. Dashboard admin mount `components/sync/DashboardSyncBridge.tsx` để chính tab admin cũng nghe được nhóm.
 
 ## Bản đồ API (`/api/v1`)
 
-| Nhóm       | Endpoint chính                                                                                                                           |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Auth       | `POST /auth/login`, `/auth/refresh`                                                                                                      |
-| Sync group | `GET                                                                                                                                     | POST /sync/groups`·`POST /sync/groups/:id/play\|pause\|skip`·`GET /sync/groups/:id/state`    |
-| Quán       | `POST /sync/stores/:id/play\|pause\|resume\|next\|override\|rejoin` · `GET /sync/stores/:id/playback` · `GET /sync/overview` (ORG_ADMIN) |
-| Playlist   | `GET /playlists?scope=&q=&sort=` (trả kèm `totalDurationMs`) · CRUD `/playlists/:id` · `/playlists/:id/tracks[/reorder]`                 |
-| Folder     | `GET                                                                                                                                     | POST                                                                                         | DELETE /folders`— **không phải**`/playlists/folders`, tách controller riêng để `@Get(':id')` không nuốt route |
-| Track      | `GET                                                                                                                                     | POST /tracks`(multipart kèm`durationMs`) · `GET /tracks/:id/stream-url`·`DELETE /tracks/:id` |
-| Khác       | `/stores`, `/users`, `/schedules`, `/health`, `/health/ready`                                                                            |
+| Nhóm       | Endpoint chính                                                                                                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Auth       | `POST /auth/login`, `/auth/refresh`                                                                                                                                                        |
+| Sync group | `GET                                                                                                                                                                                       | POST /sync/groups`·`POST /sync/groups/:id/play\|pause\|skip`·`GET /sync/groups/:id/state`    |
+| Quán       | `POST /sync/stores/:id/play\|pause\|resume\|next\|override\|rejoin` · `GET /sync/stores/:id/playback\|now-playing` · `GET /sync/groups/:id/now-playing` · `GET /sync/overview` (ORG_ADMIN) |
+| Playlist   | `GET /playlists?scope=&q=&sort=` (trả kèm `totalDurationMs`) · CRUD `/playlists/:id` · `/playlists/:id/tracks[/reorder]`                                                                   |
+| Folder     | `GET                                                                                                                                                                                       | POST                                                                                         | DELETE /folders`— **không phải**`/playlists/folders`, tách controller riêng để `@Get(':id')` không nuốt route |
+| Track      | `GET                                                                                                                                                                                       | POST /tracks`(multipart kèm`durationMs`) · `GET /tracks/:id/stream-url`·`DELETE /tracks/:id` |
+| Khác       | `/stores`, `/users`, `/schedules`, `/health`, `/health/ready`                                                                                                                              |
 
 ## Frontend — quy ước dùng chung
 
