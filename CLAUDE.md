@@ -31,4 +31,11 @@ Nợ đã biết: chưa có bảng `Artist`; track upload trước đợt này c
 
 ## MCP Servers
 
-Project dùng GitHub MCP server (khai báo ở [.mcp.json](.mcp.json)) để thao tác issue/PR/code search trực tiếp. Cần set biến môi trường `GITHUB_PAT` trên máy — xem [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) mục _GitHub MCP Server_.
+Khai báo ở [.mcp.json](.mcp.json), mỗi người tự bật trong `.claude/settings.local.json` (`enabledMcpjsonServers`). Chi tiết setup: [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md).
+
+| Server            | Dùng để                                                                      | Cần gì trên máy                       |
+| ----------------- | ---------------------------------------------------------------------------- | ------------------------------------- |
+| `github`          | Thao tác issue / PR / code search trực tiếp                                  | Biến môi trường `GITHUB_PAT`          |
+| `chrome-devtools` | Mở app thật trong Chrome để xem UI, đọc console/network, đo performance/a11y | Google Chrome + Node (chạy qua `npx`) |
+
+`chrome-devtools` chạy Chrome bằng **profile riêng** (`~/.cache/chrome-devtools-mcp/chrome-profile`), không đụng vào profile cá nhân đang đăng nhập. Chỉ nhóm tool đọc (screenshot, snapshot, console, network) được auto-allow; navigate / click / gõ phím / `evaluate_script` vẫn hỏi từng lần.
