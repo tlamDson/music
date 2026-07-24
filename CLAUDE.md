@@ -27,7 +27,9 @@ Chi tiết merge policy: [.claude/rules/workflow.md](.claude/rules/workflow.md).
 - Quán có console riêng ở `/store` (không có Sync Control); `/dashboard` dành cho ORG_ADMIN; `/player/[storeId]?kiosk=1` là màn chiếu TV.
 - UI dựng lại quanh sidebar thư viện, card playlist, bảng track và thanh phát cố định dùng chung.
 
-Nợ đã biết: chưa có bảng `Artist`; track upload trước đợt này còn `durationMs = 0` nên không auto-next; timer auto-next chỉ đúng khi backend chạy 1 instance; `SchedulerService.matchesCron` vẫn bỏ qua ngày/tháng/thứ.
+**PR #39 — thanh nhạc hiện trên console quán + dashboard:** `ORG_ADMIN` bấm phát thì cả `/store` lẫn `/dashboard` đều hiện thanh nhạc đang chạy (đúng bài, đúng giây, tự cập nhật). `useSync` đẩy nhạc vào `PlayerProvider` thay vì tự lái thẻ audio; broadcast WS kèm `track: WsTrackMeta`; thêm `GET /sync/{stores|groups}/:id/now-playing` để hydrate khi mở trang sau lúc admin đã phát; dashboard mount `components/sync/DashboardSyncBridge.tsx`. Chi tiết mục Sync engine trong [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md).
+
+Nợ đã biết: chưa có bảng `Artist`; track upload trước đợt này còn `durationMs = 0` nên không auto-next (nhóm phát quá thời lượng thật → thanh phát của quán khớp trạng thái nhưng progress lệch); timer auto-next chỉ đúng khi backend chạy 1 instance; `SchedulerService.matchesCron` vẫn bỏ qua ngày/tháng/thứ.
 
 ## MCP Servers
 
