@@ -71,10 +71,27 @@ export function usePlayer() {
  * (TrackPlayButton giữ biến module-level, player page giữ ref riêng) nên hai
  * nguồn nhạc phát chồng lên nhau.
  */
+// Lệch quá ngưỡng này (đồng hồ nhóm so với currentTime thật) mới re-seek —
+// tránh giật hình do jitter nhỏ của timeupdate.
+const DRIFT_THRESHOLD_MS = 750;
+
+/** "Neo" đồng bộ: tại thời điểm cục bộ `atLocalTs`, vị trí phát đúng là
+ * `positionMs`. Đồng hồ chạy 1x nên vị trí sống = positionMs + thời gian đã
+ * trôi kể từ atLocalTs — không phụ thuộc việc client này có đang pause hay
+ * không, vì nhóm/quán vẫn tính giờ ở server bất kể client làm gì.
+ */
+interface SyncAnchor {
+  positionMs: number;
+  atLocalTs: number;
+}
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const modeRef = useRef<PlayerMode>('preview');
   const storeIdRef = useRef<string | null>(null);
+  const currentTrackIdRef = useRef<string | null>(null);
+  const anchorRef = useRef<SyncAnchor | null>(null);
+  const pendingSeekMsRef = useRef<number | null>(null);
 
   const [current, setCurrent] = useState<PlayerTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -90,12 +107,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return audioRef.current;
   }, []);
 
+  /** Vị trí "đúng ra phải ở đâu ngay bây giờ" theo neo đồng bộ hiện tại. */
+  const liveTargetMs = useCallback(() => {
+    const anchor = anchorRef.current;
+    if (!anchor) return null;
+    return Math.max(0, anchor.positionMs + (Date.now() - anchor.atLocalTs));
+  }, []);
+
   useEffect(() => {
     const audio = ensureAudio();
 
-    const handleTimeUpdate = () => setPositionMs(audio.currentTime * 1000);
+    const handleTimeUpdate = () => {
+      setPositionMs(audio.currentTime * 1000);
+
+      // Tự chỉnh trôi: quán bấm dừng cục bộ rồi phát lại (hoặc mạng chậm) sẽ
+      // tụt dần so với đồng hồ nhóm — kéo về đúng giây mà không cần gọi server.
+      if (modeRef.current !== 'group' && modeRef.current !== 'local') return;
+      if (audio.paused || audio.seeking) return;
+      const target = liveTargetMs();
+      if (target === null) return;
+      if (Math.abs(audio.currentTime * 1000 - target) > DRIFT_THRESHOLD_MS) {
+        audio.currentTime = target / 1000;
+      }
+    };
     const handleDuration = () =>
       setDurationMs(Number.isFinite(audio.duration) ? audio.duration * 1000 : 0);
+    const handleCanPlay = () => {
+      if (pendingSeekMsRef.current === null) return;
+      // Đã tải xong metadata rồi mới seek — set currentTime trước đó bị trình
+      // duyệt bỏ qua/kẹp về 0 vì media chưa seekable.
+      audio.currentTime = pendingSeekMsRef.current / 1000;
+      pendingSeekMsRef.current = null;
+    };
     const handleEnded = () => {
       setIsPlaying(false);
 
@@ -108,20 +151,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('durationchange', handleDuration);
     audio.addEventListener('loadedmetadata', handleDuration);
+    audio.addEventListener('loadedmetadata', handleCanPlay);
+    audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('ended', handleEnded);
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('durationchange', handleDuration);
       audio.removeEventListener('loadedmetadata', handleDuration);
+      audio.removeEventListener('loadedmetadata', handleCanPlay);
+      audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [ensureAudio]);
+  }, [ensureAudio, liveTargetMs]);
 
   const playTrack = useCallback(
     (track: PlayerTrack, options: PlayOptions = {}) => {
       const audio = ensureAudio();
       const nextMode = options.mode ?? 'preview';
+      const startPositionMs = options.positionMs ?? 0;
 
       modeRef.current = nextMode;
       storeIdRef.current = options.storeId ?? null;
@@ -131,10 +179,31 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setQueue(options.queue ?? null);
       setCurrent(track);
       setDurationMs(track.durationMs ?? 0);
-      setPositionMs(options.positionMs ?? 0);
+      setPositionMs(startPositionMs);
 
-      if (audio.src !== track.url) audio.src = track.url;
-      audio.currentTime = (options.positionMs ?? 0) / 1000;
+      // Neo lại đồng hồ đồng bộ ở mọi lần nhận vị trí từ server (play mới,
+      // rejoin, resume) — đây là điểm tham chiếu để tự bắt kịp nhóm sau này.
+      anchorRef.current =
+        nextMode === 'group' || nextMode === 'local'
+          ? { positionMs: startPositionMs, atLocalTs: Date.now() }
+          : null;
+
+      // rejoin() presign lại URL mỗi lần dù cùng bài — so theo track id để
+      // khỏi reload từ đầu (mất buffer, trễ đúng bằng thời gian tải lại).
+      const sameTrack = currentTrackIdRef.current === track.id;
+      currentTrackIdRef.current = track.id;
+
+      if (sameTrack) {
+        pendingSeekMsRef.current = null;
+        audio.currentTime = startPositionMs / 1000;
+      } else {
+        audio.src = track.url;
+        // Set ngay phòng khi media đã sẵn sàng đồng bộ (từ cache); nếu trình
+        // duyệt bỏ qua vì chưa seekable thì handleCanPlay sẽ seek lại đúng
+        // vị trí đã trôi thêm trong lúc tải, thay vì kẹt ở vị trí cũ.
+        audio.currentTime = startPositionMs / 1000;
+        pendingSeekMsRef.current = startPositionMs;
+      }
 
       void audio
         .play()
@@ -150,6 +219,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = ensureAudio();
 
     if (audio.paused) {
+      // Quán/nhóm đang đồng bộ thì dừng cục bộ không dừng đồng hồ server —
+      // phát lại phải nhảy tới vị trí sống hiện tại, không tiếp tục từ chỗ cũ.
+      if (modeRef.current === 'group' || modeRef.current === 'local') {
+        const target = liveTargetMs();
+        if (target !== null) audio.currentTime = target / 1000;
+      }
+
       void audio
         .play()
         .then(() => setIsPlaying(true))
@@ -159,7 +235,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     audio.pause();
     setIsPlaying(false);
-  }, [ensureAudio]);
+  }, [ensureAudio, liveTargetMs]);
 
   // Dừng hẳn theo lệnh server — khác `toggle` ở chỗ không bao giờ tự phát lại.
   const pause = useCallback(() => {
@@ -173,6 +249,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const audio = ensureAudio();
       audio.currentTime = nextPositionMs / 1000;
       setPositionMs(nextPositionMs);
+
+      // Seek tay cũng phải dời neo, nếu không lần timeupdate kế tự kéo ngược
+      // về vị trí cũ vì lệch quá ngưỡng.
+      if (anchorRef.current) {
+        anchorRef.current = { positionMs: nextPositionMs, atLocalTs: Date.now() };
+      }
     },
     [ensureAudio],
   );
@@ -190,6 +272,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = ensureAudio();
     audio.pause();
     audio.currentTime = 0;
+
+    anchorRef.current = null;
+    currentTrackIdRef.current = null;
+    pendingSeekMsRef.current = null;
 
     setIsPlaying(false);
     setCurrent(null);
