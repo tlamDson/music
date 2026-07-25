@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import AppShell from '../../src/components/layout/AppShell';
 import { dashboardNavItems, storeNavItems } from '../../src/lib/nav';
 import { api } from '../../src/lib/api-client';
@@ -67,5 +67,37 @@ describe('AppShell', () => {
 
     expect(screen.getByText('nội dung trang')).toBeInTheDocument();
     await waitFor(() => expect(mockApi.get).toHaveBeenCalledWith('/playlists'));
+  });
+
+  it('pins the sidebar to the viewport so it never scrolls away with the page', () => {
+    renderShell('ORG_ADMIN');
+
+    const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+    expect(nav.className).toEqual(expect.stringContaining('sticky'));
+    expect(nav.className).toEqual(expect.stringContaining('top-0'));
+    expect(nav.className).toEqual(expect.stringContaining('h-screen'));
+    expect(nav.className).toEqual(expect.stringContaining('overflow-y-auto'));
+  });
+
+  it('hides the sidebar off-canvas on small screens until the menu button opens it', () => {
+    renderShell('ORG_ADMIN');
+
+    const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+    expect(nav.className).toEqual(expect.stringContaining('-translate-x-full'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mở menu điều hướng' }));
+
+    expect(nav.className).not.toEqual(expect.stringContaining('-translate-x-full'));
+    expect(screen.getByRole('button', { name: 'Đóng menu điều hướng' })).toBeInTheDocument();
+  });
+
+  it('closes the mobile sidebar when the backdrop is clicked', () => {
+    renderShell('ORG_ADMIN');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mở menu điều hướng' }));
+    fireEvent.click(screen.getByTestId('mobile-nav-backdrop'));
+
+    const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+    expect(nav.className).toEqual(expect.stringContaining('-translate-x-full'));
   });
 });

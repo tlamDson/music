@@ -1,17 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
-  --color-primary: #1E1B4B;
-  --color-on-primary: #FFFFFF;
-  --color-secondary: #4338CA;
-  --color-accent: #22C55E;
-  --color-background: #0F0F23;
-  --color-foreground: #F8FAFC;
-  --color-muted: #27273B;
-  --color-border: #312E81;
-  --color-destructive: #EF4444;
-  --color-ring: #1E1B4B;
+  --color-primary: #1e1b4b;
+  --color-on-primary: #ffffff;
+  --color-secondary: #4338ca;
+  --color-accent: #22c55e;
+  --color-background: #0f0f23;
+  --color-foreground: #f8fafc;
+  --color-muted: #27273b;
+  --color-border: #312e81;
+  --color-destructive: #ef4444;
+  --color-ring: #1e1b4b;
 
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;
@@ -21,10 +21,10 @@
   --space-2xl: 3rem;
   --space-3xl: 4rem;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
-  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
-  --shadow-xl: 0 20px 25px rgba(0,0,0,0.15);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
 }
 
 @theme inline {
@@ -52,8 +52,50 @@ body {
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
+  *,
+  ::before,
+  ::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Dialog enter/exit — dùng bởi components/ui/Dialog.tsx */
+.dialog-overlay {
+  transition: opacity 180ms ease;
+}
+.dialog-overlay[data-state='closed'] {
+  opacity: 0;
+}
+.dialog-overlay[data-state='open'] {
+  opacity: 1;
+}
+
+.dialog-panel {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+.dialog-panel[data-state='closed'] {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.dialog-panel[data-state='open'] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Fade-in nhẹ khi chuyển route — dùng bởi components/layout/AppShell.tsx */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fade-in 200ms ease;
 }
