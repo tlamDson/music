@@ -38,6 +38,13 @@ Nợ đã biết: chưa có bảng `Artist`; track upload trước đợt này c
 - Bấm Play/Skip cho nhóm tự kéo mọi quán trong nhóm về "in sync" (xoá override cũ) — quán từng tách ra không còn mãi hiện "Overriding".
 - Quán dừng cục bộ rồi phát lại (hoặc rejoin) tự bắt kịp đúng giây của nhóm nhờ "neo đồng bộ" + tự chỉnh trôi ở `PlayerProvider`, thay vì tiếp tục từ chỗ đã dừng. Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _Sync engine_.
 
+**PR #48–#51 (QC quản lý người dùng + cải tiến UI/UX dashboard) đã merge vào `develop`:**
+
+- `/dashboard/users` thêm nút "Sửa" (trước đó **hoàn toàn chưa tồn tại**, không phải bug ẩn theo `storeId` như báo cáo QC ban đầu) và "Vô hiệu hoá tài khoản" — dialog bắt gõ đúng **tên quán** để xác nhận, fallback gõ **tên người dùng** nếu `STORE_ADMIN` chưa gán quán. Cả 2 hành động bị khoá trên hàng của chính admin đang đăng nhập (tránh tự khoá mình).
+- `User.isActive` (mặc định `true`) được `AuthService` check ở cả 3 điểm: `login`, `refreshTokens`, và `validateJwtPayload` (chạy mỗi request có JWT) — access token còn hạn của tài khoản vừa bị vô hiệu hoá cũng bị từ chối ngay, không cần token blocklist. Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _Auth — vô hiệu hoá tài khoản_.
+- Sidebar `dashboard`/`store` giờ `sticky` full-height + có mobile drawer (trước đó cuộn mất theo trang, tràn ngang trên mobile). Modal dùng chung qua `components/ui/Dialog.tsx` (enter/exit animation 180ms) thay vì mỗi nơi tự viết overlay riêng — chi tiết ở [.claude/rules/design.md](.claude/rules/design.md).
+- `apps/web/src/lib/api-client.ts` tự đăng xuất (xoá token + redirect `/login`) khi nhận `401` ngoài `/auth/login` — tài khoản bị vô hiệu hoá giữa phiên không còn thấy lỗi rải rác trên UI mà được đưa thẳng về màn login.
+
 ## MCP Servers
 
 Khai báo ở [.mcp.json](.mcp.json), mỗi người tự bật trong `.claude/settings.local.json` (`enabledMcpjsonServers`). Chi tiết setup: [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md).

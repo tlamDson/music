@@ -21,6 +21,8 @@ Layout lấy cảm hứng từ Spotify (sidebar thư viện, hàng card cuộn n
 - Panel "Đang phát" ẩn dưới breakpoint `xl` để trang không tràn ngang.
 - Nhãn và `aria-label` viết tiếng Việt, thống nhất với phần còn lại của app.
 - Chưa có bảng `Artist` → **không** dựng card "Giới thiệu nghệ sĩ"/"Người tham gia" như ảnh tham chiếu; panel phải dùng cho trạng thái phát + hàng chờ.
+- Modal/dialog dùng chung `components/ui/Dialog.tsx` — overlay + panel đã có sẵn animation enter/exit (180ms, tự tôn trọng `prefers-reduced-motion` qua rule global trong `globals.css`, không cần logic riêng). Đừng tự viết lại overlay/Escape/click-outside ở component mới — bọc nội dung trong `<Dialog open={...} onClose={...} ariaLabel="...">`, và render component cha **không điều kiện** (`open` prop điều khiển mount/unmount nội bộ) nếu muốn animation exit chạy được — xem `AddTrackDialog.tsx` + call site ở `PlaylistDetail.tsx` làm ví dụ.
+- Sidebar (`components/layout/AppShell.tsx`) là `sticky top-0 h-screen overflow-y-auto` + off-canvas drawer dưới `md` (hamburger + backdrop) — theo pattern này khi thêm layout mới có sidebar, đừng dùng `w-64` cố định không responsive.
 
 ## Checklist pre-delivery cho mọi UI
 
