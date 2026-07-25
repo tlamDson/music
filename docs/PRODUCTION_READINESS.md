@@ -1,17 +1,17 @@
 # Production Readiness — Trạng thái & Bước tiếp theo
 
 > File này là **điểm bắt đầu** cho bất kỳ ai (người hoặc AI) tiếp tục việc đưa dự án lên production.
-> Cập nhật lần cuối: 2026-07-23 · Nhánh chuẩn: `develop`
+> Cập nhật lần cuối: 2026-07-25 · Nhánh chuẩn: `develop`
 
 ## TL;DR
 
 Hạ tầng đích: **Vercel** (web) · **Railway** (backend + Postgres + Redis) · **Cloudflare R2** (lưu track).
 
-| Phase | Nội dung                                                                                              | Trạng thái                  |
-| ----- | ----------------------------------------------------------------------------------------------------- | --------------------------- |
-| **0** | Code readiness — vá blocker config/security, migration, Dockerfile, CI, health check, logging         | ✅ **Xong** (10 PR, #9–#18) |
-| **1** | Staging — dựng Railway env `staging` + R2 bucket + Vercel preview, seed tài khoản, test tay           | ⬜ Chưa bắt đầu             |
-| **2** | Production — provision prod, cắt release `v0.1.0` (tag + GitHub Release), bootstrap admin, smoke test | ⬜ Chưa bắt đầu             |
+| Phase | Nội dung                                                                                              | Trạng thái                                                            |
+| ----- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| **0** | Code readiness — vá blocker config/security, migration, Dockerfile, CI, health check, logging         | ✅ **Xong** (10 PR, #9–#18)                                           |
+| **1** | Staging — dựng Railway env `staging` + R2 bucket + Vercel preview, seed tài khoản, test tay           | ✅ **Live** (2026-07-25) — xem "Trạng thái staging hiện tại" bên dưới |
+| **2** | Production — provision prod, cắt release `v0.1.0` (tag + GitHub Release), bootstrap admin, smoke test | ⬜ Chưa bắt đầu                                                       |
 
 **Việc code còn nợ trước khi sang Phase 2:** bump `version` lên `0.1.0` ở 3 `package.json` (hiện đều là `0.0.1`) + viết `CHANGELOG.md`. Cố ý để dành đến khi test local xong để khỏi bump hai lần.
 
@@ -65,17 +65,46 @@ Hạ tầng đích: **Vercel** (web) · **Railway** (backend + Postgres + Redis)
 
 8. **`apps/web/AGENTS.md` bảo đọc `node_modules/next/dist/docs/` trước khi code, nhưng thư mục đó không tồn tại** (Next 15.3.4 là bản chuẩn). Ghi chú này có vẻ đã lỗi thời — verify bằng cách chạy thật thay vì tin vào nó.
 
+9. **Vercel tự chặn deploy nếu Next.js dính CVE đã biết** — lỗi `"Vulnerable version of Next.js detected, please update immediately"`. Next 15.3.4 dính, phải nâng lên bản patch mới nhất **cùng minor** (`15.3.9`) thay vì nhảy thẳng lên major mới (Next 16 breaking change lớn, xem cạm bẫy #8). Bump cả `next` lẫn `eslint-config-next` cùng version, chạy `pnpm install` cập nhật lockfile.
+
+10. **Vercel monorepo: "New Project" tự đoán nhầm Root Directory** — với repo này nó chọn `apps/backend` (preset NestJS) thay vì `apps/web`. Backend **không** deploy trên Vercel (đã có Railway) — luôn kiểm tra/sửa Root Directory = `apps/web` trước khi bấm Deploy lần đầu.
+
+11. **Biến `NEXT_PUBLIC_*` trên Vercel scope theo từng Environment riêng (Production / Preview / Development), không dùng chung.** Thêm biến ở tab Production thì tab Preview vẫn trống — build nhánh `develop` (chạy trong Preview) sẽ fallback về giá trị mặc định trong code (`localhost:4000`), khiến web gọi API vào máy người dùng thay vì backend thật. Luôn kiểm tra đúng tab Environment trước khi thêm biến, và **phải trigger rebuild** sau khi sửa vì `NEXT_PUBLIC_*` chỉ được đọc lúc build, không phải runtime.
+
+12. **Vercel Deployment Protection (SSO) chặn cả người ngoài lẫn công cụ tự động khỏi preview deployment theo mặc định** — bất kỳ ai không phải thành viên team Vercel (kể cả `curl`) mở domain branch sẽ bị `302` redirect sang `vercel.com/sso-api`, không bao giờ chạm tới app thật. Cần tắt ở **Settings → Deployment Protection** (chọn "Only Production" hoặc tắt hẳn cho Preview) nếu staging cần ai cũng test được qua trình duyệt bình thường.
+
+13. **Không cần lên Vercel Pro để có domain cố định theo nhánh.** Mỗi branch tự có sẵn URL miễn phí dạng `<project>-git-<branch>-<team>.vercel.app`, luôn trỏ tới deployment mới nhất của nhánh đó — dùng thẳng cho `WEB_URL`. Tính năng **Custom Environments** (trả phí, ~$30+/tháng) là thứ khác, không cần cho nhu cầu này.
+
+14. **`railway ssh` trên Windows Git Bash: 2 lỗi âm thầm dễ dính cùng lúc.**
+    - Đường dẫn Unix (`/app/...`) bị Git Bash tự dịch thành đường dẫn Windows (`C:/Program Files/Git/app/...`) trước khi gửi đi — set `MSYS_NO_PATHCONV=1` trước lệnh `railway ssh` nếu remote command có path bắt đầu bằng `/`.
+    - `railway ssh -- sh -c "VAR=a VAR2=b cmd"` (3 tham số riêng: `sh`, `-c`, chuỗi lệnh) bị Railway CLI nối lại bằng dấu cách trước khi gửi remote, xoá mất ranh giới của `-c` — remote shell chỉ chạy đúng từ đầu tiên (`VAR=a`) rồi thoát, **exit code 0, không output, không chạy lệnh thật**. Luôn gộp toàn bộ remote command thành **một chuỗi duy nhất** sau `--` (không tự thêm `sh -c`), và tránh khoảng trắng trong giá trị biến để không dính lại vấn đề tương tự.
+    - CLI cũng hay mất link project/environment/service giữa các lần gọi riêng biệt (mỗi lệnh terminal mới) — báo `No linked project found`. Chạy lại `railway link --project <id> --environment <env> --service <name>` (dùng flag, không chọn tương tác) trước khi chạy lệnh phụ thuộc link.
+
 ---
 
-## Phase 1 — Staging (chưa làm, cần tài khoản của chủ repo)
+## Phase 1 — Staging
 
 Mô hình: `develop` → **staging**, `main` → **production**. Mỗi môi trường có DB/Redis/bucket/JWT secret **riêng**.
 
+### Trạng thái staging hiện tại (live từ 2026-07-25)
+
+| Thành phần             | Giá trị                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Railway project        | `awake-endurance`, environment `staging`, service `backend`                                                        |
+| Backend domain         | `https://backend-staging-6091.up.railway.app`                                                                      |
+| Web domain (`develop`) | `https://cafe-music-web-git-develop-lam-phams-projects-44c4677b.vercel.app` (free git-branch URL, xem cạm bẫy #13) |
+| R2 bucket              | `cafe-music-staging`                                                                                               |
+| Deployment Protection  | Đã tắt cho Preview (xem cạm bẫy #12) — ai cũng vào được domain trên qua trình duyệt bình thường                    |
+
+Đã verify end-to-end qua chrome-devtools MCP: login → vào đúng `/dashboard`, đúng role `ORG_ADMIN`. `/health` và `/health/ready` đều `up` (database + redis).
+
+**Nợ đã biết, chưa chặn launch:** rate limit `/auth/login` (`@Throttle({limit:5, ttl:60000})`) có hoạt động (`429` xuất hiện) nhưng **không nhất quán** khi test dồn dập trên Railway — có lúc 6+ request sai liên tiếp vẫn lọt qua trót lọt (401 thay vì 429), có lúc chặn rồi lại mở ra giữa chừng trong cùng cửa sổ 60s, dù cùng 1 deployment instance và cùng client IP (xác nhận qua `railway logs --http`). Nghi vấn: cơ chế lưu trạng thái in-memory của `@nestjs/throttler` có vấn đề timing/race trên môi trường Railway. **Cần điều tra thêm trước khi có user thật** (brute-force login có thể không bị chặn triệt để) — chưa xác định được có phải bug code hay đặc thù platform.
+
 1. **Railway** — tạo environment `staging`, backend deploy từ nhánh `develop`, kèm Postgres + Redis riêng.
 2. **Cloudflare R2** — bucket `cafe-music-staging`, API token scope riêng, bật CORS cho origin web staging.
-3. **Vercel** — gán **branch domain cố định** cho `develop` (không dùng preview URL đổi theo mỗi commit); env ở scope **Preview** trỏ về backend staging.
+3. **Vercel** — gán **branch domain cố định** cho `develop` (không dùng preview URL đổi theo mỗi commit — hoặc dùng luôn free git-branch URL, xem cạm bẫy #13); env ở scope **Preview** trỏ về backend staging (nhớ scope đúng tab, xem cạm bẫy #11); tắt **Deployment Protection** cho Preview nếu cần ai cũng test được (cạm bẫy #12).
    ⚠️ **CORS production chỉ nhận đúng một origin** (`WEB_URL`, xem `apps/backend/src/main.ts` + `ws-cors-origin.ts`) — cả HTTP lẫn WebSocket. Nếu `WEB_URL` không khớp đúng domain branch cố định này, web staging bị chặn CORS (API 4xx, WS không connect được).
-4. **Tài khoản admin thật** — staging chạy `NODE_ENV=production` như prod nên `prisma:seed` **từ chối chạy**. Dùng `prisma:bootstrap` (one-off command trong service backend trên Railway, để dùng đúng `DATABASE_URL` nội bộ) để tạo 1 org + 1 `ORG_ADMIN`, xem chi tiết ở Phase 2 bước 4.
+4. **Tài khoản admin thật** — staging chạy `NODE_ENV=production` như prod nên `prisma:seed` **từ chối chạy**. Dùng `prisma:bootstrap` qua `railway ssh` (không dùng `railway run` — `DATABASE_URL` trỏ `*.railway.internal`, chỉ resolve được bên trong mạng Railway, xem cạm bẫy #14) để tạo 1 org + 1 `ORG_ADMIN`, xem chi tiết ở Phase 2 bước 4.
 5. Smoke test tay theo checklist dưới.
 
 ### Biến môi trường backend (dùng chung cho staging & production, giá trị khác nhau)
@@ -154,13 +183,14 @@ BASE_URL=https://<railway-backend-domain>/api/v1 sh scripts/smoke-staging.sh
 
 ## Fast-follow (không chặn launch — quyết định sau)
 
-| Việc                           | Khi nào cần                                                                                                         |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| Socket.IO Redis adapter        | **Bắt buộc** trước khi chạy ≥ 2 instance, nếu không sync group bị split-brain. 5 cửa hàng / 1 instance thì chưa cần |
-| Refresh token revocation       | Token 7 ngày hiện không thu hồi được. Nên làm trước khi có user thật                                                |
-| Upload streaming lên R2        | Hiện buffer tối đa 50MB vào RAM. Đủ dùng ở concurrency thấp                                                         |
-| Dùng `CDN_BASE_URL`            | Env đã có nhưng chưa consume — tối ưu chi phí/độ trễ                                                                |
-| Bật integration + E2E trong CI | Scaffolding đã có, CI mới chạy unit test                                                                            |
+| Việc                                                   | Khi nào cần                                                                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Socket.IO Redis adapter                                | **Bắt buộc** trước khi chạy ≥ 2 instance, nếu không sync group bị split-brain. 5 cửa hàng / 1 instance thì chưa cần |
+| Refresh token revocation                               | Token 7 ngày hiện không thu hồi được. Nên làm trước khi có user thật                                                |
+| Upload streaming lên R2                                | Hiện buffer tối đa 50MB vào RAM. Đủ dùng ở concurrency thấp                                                         |
+| Dùng `CDN_BASE_URL`                                    | Env đã có nhưng chưa consume — tối ưu chi phí/độ trễ                                                                |
+| Bật integration + E2E trong CI                         | Scaffolding đã có, CI mới chạy unit test                                                                            |
+| Điều tra rate limit login không nhất quán trên Railway | **Nên làm trước khi có user thật** — xem chi tiết ở Phase 1 mục "Trạng thái staging hiện tại"                       |
 
 ## Quyết định thiết kế đã chốt (đừng lật lại nếu không có lý do mới)
 
