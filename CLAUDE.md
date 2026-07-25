@@ -29,6 +29,12 @@ Chi tiết merge policy: [.claude/rules/workflow.md](.claude/rules/workflow.md).
 
 Nợ đã biết: chưa có bảng `Artist`; track upload trước đợt này còn `durationMs = 0` nên không auto-next; timer auto-next chỉ đúng khi backend chạy 1 instance; `SchedulerService.matchesCron` vẫn bỏ qua ngày/tháng/thứ.
 
+**PR #42 (fix 3 bug QC luồng sync playback) đã merge vào `develop`:**
+
+- Play nhóm giờ báo đúng lỗi thật (không đoán bừa "playlist có track chưa"); dashboard admin nghe được mọi sync group thay vì chỉ nhóm đầu tiên.
+- Bấm Play/Skip cho nhóm tự kéo mọi quán trong nhóm về "in sync" (xoá override cũ) — quán từng tách ra không còn mãi hiện "Overriding".
+- Quán dừng cục bộ rồi phát lại (hoặc rejoin) tự bắt kịp đúng giây của nhóm nhờ "neo đồng bộ" + tự chỉnh trôi ở `PlayerProvider`, thay vì tiếp tục từ chỗ đã dừng. Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _Sync engine_.
+
 ## MCP Servers
 
 Khai báo ở [.mcp.json](.mcp.json), mỗi người tự bật trong `.claude/settings.local.json` (`enabledMcpjsonServers`). Chi tiết setup: [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md).

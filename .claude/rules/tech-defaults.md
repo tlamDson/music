@@ -65,7 +65,9 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 - WS event: `now-playing` / `paused` / `stopped` (nhóm) · `store-now-playing` / `store-paused` / `store-stopped` (quán). Client join `join-group` + `join-store`.
 - Payload `now-playing` / `store-now-playing` **kèm `track: WsTrackMeta` ({id,title,artist,durationMs})** để client dựng thanh phát mà không phải gọi thêm API — đừng chỉ gửi `trackId`.
 - **Broadcast WS không replay khi join room.** Client mở trang sau lúc admin bấm phát phải gọi `GET /sync/stores/:id/now-playing` (hoặc `/sync/groups/:id/now-playing`) để hydrate — trả `NowPlayingSnapshot` với `positionMs` đã bù thời gian trôi. Thiếu bước này thì trang trắng tới lần chuyển bài kế.
-- Frontend: `hooks/useSync.ts` **không tự lái audio**, nó đẩy vào `PlayerProvider` (`playTrack`/`pause`/`stop`); thanh phát dùng chung tự hiện. Dashboard admin mount `components/sync/DashboardSyncBridge.tsx` để chính tab admin cũng nghe được nhóm.
+- Frontend: `hooks/useSync.ts` **không tự lái audio**, nó đẩy vào `PlayerProvider` (`playTrack`/`pause`/`stop`); thanh phát dùng chung tự hiện. Dashboard admin mount `components/sync/DashboardSyncBridge.tsx`, mở **một socket con cho mỗi sync group** của tổ chức (không chỉ nhóm đầu tiên) — nếu không, bấm Play cho nhóm khác nhóm đầu vẫn trả 200 nhưng tab admin không nghe được gì.
+- **`SyncService.play()`/`skip()`/`advance()` tự xoá override + hàng chờ riêng của mọi quán trong nhóm** (`clearGroupStoreOverrides`) trước khi broadcast — nếu không, quán từng tách ra (hoặc còn state rác TTL 24h) sẽ mãi hiện "Overriding" ở `/dashboard/stores` dù đang nghe đúng nhạc nhóm. Group `pause()` cũng gộp elapsed vào `positionMs` (null `startedAtServerTs`) giống `pauseStore()`, để hydrate lúc đang dừng đọc đúng vị trí.
+- **Client tự bắt kịp nhóm sau khi dừng/rejoin**: `PlayerProvider` giữ một "neo đồng bộ" (`positionMs` + `atLocalTs`) — so track theo id để rejoin (URL presign lại mỗi lần) không reload audio nếu cùng bài, seek sau khi media sẵn sàng thay vì ngay lúc gán `src`, và tự chỉnh trôi trên `timeupdate` nếu lệch > 750ms. Quán bấm dừng cục bộ (qua `toggle()` ở `PlayerBar`, không gọi server) rồi phát lại sẽ tự nhảy tới vị trí sống của nhóm thay vì tiếp tục từ chỗ cũ. `/player/[storeId]` nút "Tạm dừng" chỉ gọi `POST /sync/stores/:id/pause` khi quán có hàng chờ riêng (mode `local`) — quán đang theo nhóm thì dừng cục bộ, tránh 404 "Store is not playing locally".
 
 ## Bản đồ API (`/api/v1`)
 
@@ -112,6 +114,8 @@ Vercel (web) · Railway (backend + Postgres + Redis) · Cloudflare R2 (track). T
 - **Xoá một route Next rồi typecheck đỏ** vì `.next/types` cũ còn sót → `rm -rf apps/web/.next` một lần.
 - **Zod `.default()` làm field thành bắt buộc trong type sau parse** (`z.infer`) — service nhận DTO đó sẽ bắt mọi call site phải truyền. Muốn giữ optional cho client cũ thì dùng `.optional()` + fallback trong service.
 - **Route Nest ăn nhau theo thứ tự khai báo**: `@Get(':id')` đặt trước `@Get('/folders')` sẽ nuốt luôn `/folders`. Prefix tĩnh phải khai báo trước, hoặc tách controller riêng.
+- **Docker Desktop trên Windows thỉnh thoảng treo** (`docker ps`/`docker info` không phản hồi, không timeout) — backend vẫn "chạy" nhưng không kết nối được DB/Redis rồi crash. Nhận ra bằng: lệnh `docker` bị treo quá vài giây. Fix: tắt hẳn `Docker Desktop.exe` + mọi process `docker*`/`com.docker.*` (lọc theo tên, không đụng process `node` khác), mở lại `Docker Desktop.exe`, đợi `docker info` trả lời rồi mới `docker compose up -d` và khởi động lại backend.
+- **`next dev` có thể kẹt ở build cũ sau khi pull code mới** (chunk 404, MIME type sai khi load `.js`/`.css`) — dừng tiến trình `next dev` (lọc `CommandLine` chứa `next` + `dev`), `rm -rf apps/web/.next`, chạy lại `pnpm dev`.
 
 ## Yêu cầu tối thiểu
 
