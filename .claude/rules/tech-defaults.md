@@ -116,6 +116,7 @@ Vercel (web) · Railway (backend + Postgres + Redis) · Cloudflare R2 (track). T
 - **Route Nest ăn nhau theo thứ tự khai báo**: `@Get(':id')` đặt trước `@Get('/folders')` sẽ nuốt luôn `/folders`. Prefix tĩnh phải khai báo trước, hoặc tách controller riêng.
 - **Docker Desktop trên Windows thỉnh thoảng treo** (`docker ps`/`docker info` không phản hồi, không timeout) — backend vẫn "chạy" nhưng không kết nối được DB/Redis rồi crash. Nhận ra bằng: lệnh `docker` bị treo quá vài giây. Fix: tắt hẳn `Docker Desktop.exe` + mọi process `docker*`/`com.docker.*` (lọc theo tên, không đụng process `node` khác), mở lại `Docker Desktop.exe`, đợi `docker info` trả lời rồi mới `docker compose up -d` và khởi động lại backend.
 - **`next dev` có thể kẹt ở build cũ sau khi pull code mới** (chunk 404, MIME type sai khi load `.js`/`.css`) — dừng tiến trình `next dev` (lọc `CommandLine` chứa `next` + `dev`), `rm -rf apps/web/.next`, chạy lại `pnpm dev`.
+- **`railway ssh` trên Windows Git Bash âm thầm không chạy lệnh thật** — Git Bash tự dịch path Unix (`/app/...`) thành path Windows (set `MSYS_NO_PATHCONV=1` để tắt), và `railway ssh -- sh -c "..."` (nhiều tham số riêng) bị CLI nối lại làm mất ranh giới `-c`, remote chỉ chạy đúng từ đầu rồi thoát exit 0 không output. Gộp remote command thành **một chuỗi duy nhất** sau `--`, tránh khoảng trắng trong giá trị biến. Chi tiết đầy đủ + ví dụ ở [docs/PRODUCTION_READINESS.md](../../docs/PRODUCTION_READINESS.md) cạm bẫy #14.
 
 ## Yêu cầu tối thiểu
 
