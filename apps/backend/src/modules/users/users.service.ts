@@ -20,6 +20,7 @@ export const UpdateUserSchema = z.object({
   name: z.string().min(1).optional(),
   role: z.enum(['ORG_ADMIN', 'STORE_ADMIN']).optional(),
   storeId: z.string().min(1).nullable().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export type CreateUserDto = z.infer<typeof CreateUserSchema>;
@@ -38,6 +39,7 @@ export class UsersService {
         name: true,
         role: true,
         storeId: true,
+        isActive: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -68,6 +70,7 @@ export class UsersService {
         name: true,
         role: true,
         storeId: true,
+        isActive: true,
         createdAt: true,
       },
     });
@@ -87,8 +90,16 @@ export class UsersService {
         name: dto.name,
         role: dto.role,
         storeId: dto.storeId,
+        isActive: dto.isActive,
       },
-      select: { id: true, email: true, name: true, role: true, storeId: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        storeId: true,
+        isActive: true,
+      },
     });
   }
 }

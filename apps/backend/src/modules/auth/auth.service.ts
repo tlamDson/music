@@ -24,6 +24,10 @@ export class AuthService {
     const passwordMatch = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account has been deactivated');
+    }
+
     return this.generateTokens(user);
   }
 
@@ -37,6 +41,9 @@ export class AuthService {
         where: { id: payload.sub },
       });
       if (!user) throw new UnauthorizedException('User not found');
+      if (!user.isActive) {
+        throw new UnauthorizedException('Account has been deactivated');
+      }
 
       return this.generateTokens(user);
     } catch {
@@ -48,7 +55,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
-    return user ?? null;
+    if (!user) return null;
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account has been deactivated');
+    }
+    return user;
   }
 
   private generateTokens(user: {
