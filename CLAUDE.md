@@ -19,7 +19,7 @@ Chi tiết merge policy: [.claude/rules/workflow.md](.claude/rules/workflow.md).
 
 ## Trạng thái dự án
 
-Đang chuẩn bị release production đầu tiên (`v0.1.0`). **Phase 0 (code readiness) đã xong** — xem [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) để biết đã làm gì, còn nợ gì và bước tiếp theo. Đọc file đó trước khi bắt tay vào việc liên quan deploy/staging/release.
+Đang chuẩn bị release production đầu tiên (`v0.1.0`). **Phase 0 (code readiness) và Phase 1 (staging) đã xong** — staging đang chạy live trên Railway (backend + Postgres + Redis) + Vercel (web, nhánh `develop`) + Cloudflare R2 (track), đã verify end-to-end (login → dashboard). Xem [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) để biết chi tiết domain/trạng thái, đã làm gì, còn nợ gì (kể cả nợ đang mở: rate limit login không nhất quán trên Railway, cần điều tra trước khi có user thật) và bước tiếp theo (Phase 2 — production). Đọc file đó trước khi bắt tay vào việc liên quan deploy/staging/release.
 
 **Đợt store console + redesign UI (PR #20–#35) đã merge vào `develop`:**
 
