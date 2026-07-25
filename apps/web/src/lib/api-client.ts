@@ -25,6 +25,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
   if (!res.ok) {
+    // 401 ngoài /auth/login nghĩa là phiên đã hết hạn hoặc tài khoản vừa bị
+    // vô hiệu hoá giữa chừng — đăng xuất sạch thay vì để lỗi rải rác trên UI.
+    // Không áp dụng cho /auth/login vì đó là sai mật khẩu, LoginForm tự xử lý.
+    if (res.status === 401 && path !== '/auth/login' && typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.href = '/login';
+    }
     const data = await res.json().catch(() => ({}));
     throw new ApiError(res.status, (data as { message?: string }).message ?? res.statusText, data);
   }
