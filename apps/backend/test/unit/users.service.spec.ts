@@ -23,6 +23,7 @@ describe('UsersService', () => {
     name: 'Staff',
     role: 'STORE_ADMIN' as const,
     storeId: 'store-1',
+    isActive: true,
     createdAt: new Date(),
   };
 
@@ -59,6 +60,7 @@ describe('UsersService', () => {
           name: true,
           role: true,
           storeId: true,
+          isActive: true,
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -108,6 +110,7 @@ describe('UsersService', () => {
           name: true,
           role: true,
           storeId: true,
+          isActive: true,
           createdAt: true,
         },
       });
@@ -164,6 +167,39 @@ describe('UsersService', () => {
           name: true,
           role: true,
           storeId: true,
+          isActive: true,
+        },
+      });
+    });
+
+    it('should allow setting isActive to false for a STORE_ADMIN without a store assigned', async () => {
+      const unassignedStoreAdmin = {
+        ...selectedUser,
+        storeId: null,
+      };
+      prisma.user.findFirst.mockResolvedValue(unassignedStoreAdmin as any);
+      prisma.user.update.mockResolvedValue({
+        ...unassignedStoreAdmin,
+        isActive: false,
+      } as any);
+
+      const result = await service.update(
+        'user-2',
+        { isActive: false },
+        orgAdminUser,
+      );
+
+      expect(result).toMatchObject({ isActive: false });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-2' },
+        data: { isActive: false },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          storeId: true,
+          isActive: true,
         },
       });
     });

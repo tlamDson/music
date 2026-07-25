@@ -20,6 +20,7 @@ describe('AuthService', () => {
     role: 'ORG_ADMIN' as const,
     organizationId: 'org-1',
     storeId: null,
+    isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -83,6 +84,60 @@ describe('AuthService', () => {
         service.login({ email: 'admin@cafe.com', password: 'wrongpassword' }),
       ).rejects.toThrow(UnauthorizedException);
     });
+
+    it('should throw UnauthorizedException when the account is deactivated', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        isActive: false,
+      } as any);
+      jest.spyOn(require('bcrypt'), 'compare').mockResolvedValue(true as never);
+
+      await expect(
+        service.login({ email: 'admin@cafe.com', password: 'password123' }),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('refreshTokens', () => {
+    const payload = {
+      sub: 'user-1',
+      email: 'admin@cafe.com',
+      role: 'ORG_ADMIN' as const,
+      organizationId: 'org-1',
+      storeId: null,
+    };
+
+    it('should return new tokens for an active user', async () => {
+      (jwtService.verify as jest.Mock).mockReturnValue(payload);
+      prisma.user.findUnique.mockResolvedValue(mockUser as any);
+
+      const result = await service.refreshTokens('valid-refresh-token');
+
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+    });
+
+    it('should throw UnauthorizedException when the user no longer exists', async () => {
+      (jwtService.verify as jest.Mock).mockReturnValue(payload);
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.refreshTokens('valid-refresh-token'),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException when the account is deactivated', async () => {
+      (jwtService.verify as jest.Mock).mockReturnValue(payload);
+      prisma.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        isActive: false,
+      } as any);
+
+      await expect(
+        service.refreshTokens('valid-refresh-token'),
+      ).rejects.toThrow(UnauthorizedException);
+    });
   });
 
   describe('validateToken', () => {
@@ -113,6 +168,24 @@ describe('AuthService', () => {
 
       const result = await service.validateJwtPayload(payload);
       expect(result).toBeNull();
+    });
+
+    it('should throw UnauthorizedException when the account is deactivated', async () => {
+      const payload = {
+        sub: 'user-1',
+        email: 'admin@cafe.com',
+        role: 'ORG_ADMIN' as const,
+        organizationId: 'org-1',
+        storeId: null,
+      };
+      prisma.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        isActive: false,
+      } as any);
+
+      await expect(service.validateJwtPayload(payload)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 });
