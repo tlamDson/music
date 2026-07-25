@@ -103,6 +103,16 @@ LOG_LEVEL=info             # tuỳ chọn
 
 Generate secret: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
 
+**Set hết một lần bằng script** thay vì gõ tay từng biến trên dashboard (staging):
+
+```bash
+cp scripts/staging.env.example .env.staging.local   # điền giá trị thật, file này bị .gitignore chặn
+railway login && railway link                        # chọn đúng project, environment "staging", service backend
+sh scripts/setup-railway-staging-env.sh
+```
+
+Script tự sinh `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` nếu để trống (và ghi lại vào `.env.staging.local` để chạy lại không đổi secret), bỏ qua biến còn trống (vd `WEB_URL` trước khi có domain Vercel — điền rồi chạy lại), và **chặn cứng** nếu `railway status` cho thấy đang trỏ vào environment `production`.
+
 Biến của web (Vercel): `NEXT_PUBLIC_API_URL` (**có** `/api/v1`) và `NEXT_PUBLIC_WS_URL` (**không** có `/api/v1`).
 
 ---
