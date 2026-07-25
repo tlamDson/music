@@ -73,9 +73,9 @@ Mô hình: `develop` → **staging**, `main` → **production**. Mỗi môi trư
 
 1. **Railway** — tạo environment `staging`, backend deploy từ nhánh `develop`, kèm Postgres + Redis riêng.
 2. **Cloudflare R2** — bucket `cafe-music-staging`, API token scope riêng, bật CORS cho origin web staging.
-3. **Vercel** — gán branch domain cố định cho `develop`; env ở scope **Preview** trỏ về backend staging.
-4. **Seed tài khoản test** — đặt `SEED_ADMIN_PASSWORD` / `SEED_STORE_PASSWORD` trong env staging rồi chạy `prisma:seed`.
-   ⚠️ Nếu staging chạy `NODE_ENV=production` thì seed **từ chối chạy** (đúng thiết kế) — khi đó dùng `prisma:bootstrap`.
+3. **Vercel** — gán **branch domain cố định** cho `develop` (không dùng preview URL đổi theo mỗi commit); env ở scope **Preview** trỏ về backend staging.
+   ⚠️ **CORS production chỉ nhận đúng một origin** (`WEB_URL`, xem `apps/backend/src/main.ts` + `ws-cors-origin.ts`) — cả HTTP lẫn WebSocket. Nếu `WEB_URL` không khớp đúng domain branch cố định này, web staging bị chặn CORS (API 4xx, WS không connect được).
+4. **Tài khoản admin thật** — staging chạy `NODE_ENV=production` như prod nên `prisma:seed` **từ chối chạy**. Dùng `prisma:bootstrap` (one-off command trong service backend trên Railway, để dùng đúng `DATABASE_URL` nội bộ) để tạo 1 org + 1 `ORG_ADMIN`, xem chi tiết ở Phase 2 bước 4.
 5. Smoke test tay theo checklist dưới.
 
 ### Biến môi trường backend (dùng chung cho staging & production, giá trị khác nhau)
@@ -89,7 +89,10 @@ JWT_ACCESS_SECRET        # >= 32 ký tự, generate riêng cho từng môi trư�
 JWT_REFRESH_SECRET       # >= 32 ký tự, KHÔNG dùng lại giữa staging và prod
 JWT_ACCESS_TTL=15m
 JWT_REFRESH_TTL=7d
-WEB_URL                  # URL web của môi trường đó — CORS (HTTP + WS) phụ thuộc biến này
+WEB_URL                  # URL web của môi trường đó — CORS (HTTP + WS) phụ thuộc biến này.
+                          # Phải khớp CHÍNH XÁC domain đang mở (staging: branch domain cố
+                          # định của Vercel, không phải preview URL đổi theo commit) — CORS
+                          # production chỉ nhận đúng một origin, không có danh sách hay wildcard.
 S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 S3_REGION=auto
 S3_BUCKET
@@ -99,6 +102,16 @@ LOG_LEVEL=info             # tuỳ chọn
 ```
 
 Generate secret: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+
+**Set hết một lần bằng script** thay vì gõ tay từng biến trên dashboard (staging):
+
+```bash
+cp scripts/staging.env.example .env.staging.local   # điền giá trị thật, file này bị .gitignore chặn
+railway login && railway link                        # chọn đúng project, environment "staging", service backend
+sh scripts/setup-railway-staging-env.sh
+```
+
+Script tự sinh `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` nếu để trống (và ghi lại vào `.env.staging.local` để chạy lại không đổi secret), bỏ qua biến còn trống (vd `WEB_URL` trước khi có domain Vercel — điền rồi chạy lại), và **chặn cứng** nếu `railway status` cho thấy đang trỏ vào environment `production`.
 
 Biến của web (Vercel): `NEXT_PUBLIC_API_URL` (**có** `/api/v1`) và `NEXT_PUBLIC_WS_URL` (**không** có `/api/v1`).
 
@@ -119,6 +132,12 @@ Biến của web (Vercel): `NEXT_PUBLIC_API_URL` (**có** `/api/v1`) và `NEXT_P
 5. Smoke test (dưới đây).
 
 ### Smoke test checklist
+
+Phần tự động hoá được (health check + rate limit login) có sẵn ở `scripts/smoke-staging.sh`:
+
+```bash
+BASE_URL=https://<railway-backend-domain>/api/v1 sh scripts/smoke-staging.sh
+```
 
 - [ ] `GET /api/v1/health` → 200; `GET /api/v1/health/ready` → 200 với `database` và `redis` đều `up`
 - [ ] Đăng nhập từ web production được
