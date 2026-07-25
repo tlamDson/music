@@ -23,6 +23,11 @@ interface AppShellProps {
 export default function AppShell({ navItems, user, onLogout, children }: AppShellProps) {
   const pathname = usePathname();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     api
@@ -39,8 +44,36 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
       className="min-h-screen flex pb-28"
       style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-foreground)' }}
     >
+      <button
+        type="button"
+        onClick={() => setMobileNavOpen((v) => !v)}
+        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg cursor-pointer transition-all duration-150 hover:opacity-80"
+        style={{ backgroundColor: 'var(--color-primary)', border: '1px solid var(--color-border)' }}
+        aria-label={mobileNavOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
+        aria-expanded={mobileNavOpen}
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d={mobileNavOpen ? 'M4 4l12 12M16 4L4 16' : 'M2 5h16M2 10h16M2 15h16'}
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
+
+      {mobileNavOpen && (
+        <div
+          data-testid="mobile-nav-backdrop"
+          onClick={() => setMobileNavOpen(false)}
+          className="md:hidden fixed inset-0 z-30 bg-black/50 transition-opacity duration-200"
+        />
+      )}
+
       <nav
-        className="w-64 flex-shrink-0 flex flex-col gap-1 p-4"
+        className={`w-64 flex-shrink-0 flex flex-col gap-1 overflow-y-auto px-4 pt-4 pb-28 fixed inset-y-0 left-0 z-40 transition-transform duration-200 md:sticky md:top-0 md:h-screen md:z-auto ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
         style={{
           backgroundColor: 'var(--color-primary)',
           borderRight: '1px solid var(--color-border)',
@@ -131,7 +164,9 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
         </div>
       </nav>
 
-      <main className="flex-1 p-8 overflow-auto">{children}</main>
+      <main key={pathname} className="flex-1 p-8 overflow-auto animate-fade-in">
+        {children}
+      </main>
     </div>
   );
 }

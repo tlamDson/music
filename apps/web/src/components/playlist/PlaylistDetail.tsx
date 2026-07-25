@@ -443,13 +443,12 @@ export default function PlaylistDetail({
         )}
       </aside>
 
-      {dialogOpen && (
-        <AddTrackDialog
-          existingTrackIds={rows.map((row) => row.trackId)}
-          onAdd={(trackId, title) => void addTrack(trackId, title)}
-          onClose={() => setDialogOpen(false)}
-        />
-      )}
+      <AddTrackDialog
+        open={dialogOpen}
+        existingTrackIds={rows.map((row) => row.trackId)}
+        onAdd={(trackId, title) => void addTrack(trackId, title)}
+        onClose={() => setDialogOpen(false)}
+      />
     </div>
   );
 }
