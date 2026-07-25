@@ -14,6 +14,7 @@ Các rule chi tiết dưới đây áp dụng luôn, không chỉ khi được h
 - **`main` do chủ repo quản lý** — Claude không merge, không push vào `main`.
 - **Chỉ merge vào `develop` khi CI + test pass hết** — phải xanh **cả 3 job**: `Lint + Unit Tests`, `Typecheck + Build`, `Backend Docker Build`.
 - **Cập nhật `CLAUDE.md` + `.claude/rules/*`** khi task làm thay đổi convention, tooling hay quy trình.
+- **Sửa bug quan sát được qua trình duyệt phải verify bằng MCP `chrome-devtools` cả trước lẫn sau khi fix** — không báo "đã fix" nếu chưa tái hiện lại thao tác gây bug sau khi sửa. Chi tiết: [.claude/rules/workflow.md](.claude/rules/workflow.md) mục _Debug bug_.
 
 Chi tiết merge policy: [.claude/rules/workflow.md](.claude/rules/workflow.md).
 
