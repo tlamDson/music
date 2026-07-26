@@ -15,6 +15,11 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
+// Khớp --duration-base (200ms) trong globals.css — .mobile-nav-backdrop dùng
+// cùng token cho transition opacity, nên timer unmount ở đây phải chờ đúng
+// bằng thời lượng đó để animation exit chạy hết trước khi gỡ khỏi DOM.
+const BACKDROP_EXIT_MS = 200;
+
 /**
  * Khung dùng chung cho console chuỗi (`/dashboard`) và console quán (`/store`):
  * cùng sidebar thư viện, khác danh sách nav. Thanh phát nằm ở layout gốc nên
@@ -24,10 +29,23 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
   const pathname = usePathname();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [backdropRendered, setBackdropRendered] = useState(false);
 
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname]);
+
+  // Cùng pattern với components/ui/Dialog.tsx: giữ backdrop trong DOM thêm
+  // một nhịp sau khi đóng để animation exit (.mobile-nav-backdrop[data-state])
+  // chạy hết, thay vì unmount ngay theo mobileNavOpen làm nó biến mất đột ngột.
+  useEffect(() => {
+    if (mobileNavOpen) {
+      setBackdropRendered(true);
+      return;
+    }
+    const timer = setTimeout(() => setBackdropRendered(false), BACKDROP_EXIT_MS);
+    return () => clearTimeout(timer);
+  }, [mobileNavOpen]);
 
   useEffect(() => {
     api
@@ -53,20 +71,40 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
         aria-expanded={mobileNavOpen}
       >
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          {/* Hai path chồng lên nhau, mờ/xoay chéo nhau (xem .menu-icon-path
+              trong globals.css) thay vì đổi thẳng `d` — hamburger và dấu X
+              không cùng số điểm nên đổi `d` trực tiếp sẽ snap cứng. */}
           <path
-            d={mobileNavOpen ? 'M4 4l12 12M16 4L4 16' : 'M2 5h16M2 10h16M2 15h16'}
+            d="M2 5h16M2 10h16M2 15h16"
             stroke="currentColor"
             strokeWidth="1.5"
             strokeLinecap="round"
+            className="menu-icon-path"
+            style={{
+              opacity: mobileNavOpen ? 0 : 1,
+              transform: mobileNavOpen ? 'rotate(-45deg)' : 'rotate(0deg)',
+            }}
+          />
+          <path
+            d="M4 4l12 12M16 4L4 16"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className="menu-icon-path"
+            style={{
+              opacity: mobileNavOpen ? 1 : 0,
+              transform: mobileNavOpen ? 'rotate(0deg)' : 'rotate(45deg)',
+            }}
           />
         </svg>
       </button>
 
-      {mobileNavOpen && (
+      {backdropRendered && (
         <div
           data-testid="mobile-nav-backdrop"
+          data-state={mobileNavOpen ? 'open' : 'closed'}
           onClick={() => setMobileNavOpen(false)}
-          className="md:hidden fixed inset-0 z-30 bg-black/50 transition-opacity duration-200"
+          className="mobile-nav-backdrop md:hidden fixed inset-0 z-30 bg-black/50"
         />
       )}
 

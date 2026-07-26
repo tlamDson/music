@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import AppShell from '../../src/components/layout/AppShell';
 import { dashboardNavItems, storeNavItems } from '../../src/lib/nav';
 import { api } from '../../src/lib/api-client';
@@ -99,5 +99,31 @@ describe('AppShell', () => {
 
     const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
     expect(nav.className).toEqual(expect.stringContaining('-translate-x-full'));
+  });
+
+  it('keeps the mobile nav backdrop mounted briefly after closing so the exit transition can play', () => {
+    jest.useFakeTimers();
+    renderShell('ORG_ADMIN');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mở menu điều hướng' }));
+    expect(screen.getByTestId('mobile-nav-backdrop')).toHaveAttribute('data-state', 'open');
+
+    fireEvent.click(screen.getByTestId('mobile-nav-backdrop'));
+
+    // Ngay sau khi đóng, backdrop vẫn còn trong DOM (đổi sang trạng thái closed)
+    // để animation exit chạy hết, không biến mất đột ngột.
+    expect(screen.getByTestId('mobile-nav-backdrop')).toHaveAttribute('data-state', 'closed');
+
+    act(() => {
+      jest.advanceTimersByTime(199);
+    });
+    expect(screen.getByTestId('mobile-nav-backdrop')).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(50);
+    });
+    expect(screen.queryByTestId('mobile-nav-backdrop')).not.toBeInTheDocument();
+
+    jest.useRealTimers();
   });
 });

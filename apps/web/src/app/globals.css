@@ -25,6 +25,14 @@
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
   --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+
+  /* Motion tokens — nguồn duy nhất cho mọi transition/animation trong app.
+     Giữ trong khoảng 150–300ms đã chốt ở design-system/cafe-music/MASTER.md. */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --ease-standard: ease;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @theme inline {
@@ -60,9 +68,13 @@ body {
   }
 }
 
-/* Dialog enter/exit — dùng bởi components/ui/Dialog.tsx */
+/* Dialog enter/exit — dùng bởi components/ui/Dialog.tsx.
+   Thời lượng đọc từ biến `--dialog-exit-ms` mà Dialog.tsx set inline theo
+   hằng số JS `EXIT_ANIMATION_MS` (giá trị fallback 180ms chỉ dùng nếu class
+   này lỡ được gắn ở nơi khác chưa set biến) — một nguồn duy nhất, JS và CSS
+   không còn phải đồng bộ tay hai con số. */
 .dialog-overlay {
-  transition: opacity 180ms ease;
+  transition: opacity var(--dialog-exit-ms, 180ms) var(--ease-standard);
 }
 .dialog-overlay[data-state='closed'] {
   opacity: 0;
@@ -73,8 +85,8 @@ body {
 
 .dialog-panel {
   transition:
-    opacity 180ms ease,
-    transform 180ms ease;
+    opacity var(--dialog-exit-ms, 180ms) var(--ease-standard),
+    transform var(--dialog-exit-ms, 180ms) var(--ease-standard);
 }
 .dialog-panel[data-state='closed'] {
   opacity: 0;
@@ -97,5 +109,97 @@ body {
   }
 }
 .animate-fade-in {
-  animation: fade-in 200ms ease;
+  animation: fade-in var(--duration-base) var(--ease-standard);
+}
+
+/* Backdrop menu mobile — dùng bởi components/layout/AppShell.tsx, cùng
+   pattern data-state với .dialog-overlay ở trên (render thêm một nhịp sau
+   khi đóng để animation exit chạy hết trước khi unmount). */
+.mobile-nav-backdrop {
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+.mobile-nav-backdrop[data-state='closed'] {
+  opacity: 0;
+}
+.mobile-nav-backdrop[data-state='open'] {
+  opacity: 1;
+}
+
+/* Icon hamburger/close crossfade — dùng bởi components/layout/AppShell.tsx.
+   Hai <path> chồng lên nhau, mờ/xoay chéo nhau trong --duration-fast thay vì
+   đổi thẳng thuộc tính `d` (snap cứng vì hai hình không cùng số điểm). */
+.menu-icon-path {
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+  transform-origin: center;
+}
+
+/* Enter animation dạng trượt lên — dùng cho panel/overlay cần vào từ dưới
+   lên (khác .dialog-panel là scale). Các PR sau (list mới thêm, toast, menu
+   thả xuống...) dùng class này thay vì tự viết keyframe riêng. */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-slide-up {
+  animation: slide-up var(--duration-base) var(--ease-out);
+}
+
+/* Stagger cho danh sách (card playlist, track, item sidebar...) — mỗi item
+   truyền index qua CSS variable `--i` (inline style `{ '--i': index }`) để
+   animation-delay dãn ra dần, tránh cả list bật lên cùng lúc. */
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-stagger-item {
+  --i: 0;
+  opacity: 0;
+  animation: stagger-in var(--duration-base) var(--ease-out) forwards;
+  animation-delay: calc(var(--i) * 40ms);
+}
+
+/* Khung xương shimmer — thay cho chữ "Đang tải..." ở mọi nơi đang fetch dữ
+   liệu. Thời lượng dài hơn khoảng 150–300ms vì đây là animation lặp vô hạn
+   báo trạng thái đang tải, không phải transition phản hồi tương tác. */
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-muted) 25%,
+    rgba(248, 250, 252, 0.08) 50%,
+    var(--color-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Nhấn xuống nhẹ khi bấm — dùng cho nút/card cần phản hồi rõ lúc :active,
+   bổ sung cho hover (transition-all đã có sẵn ở nhiều nơi). */
+.press {
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+.press:active {
+  transform: scale(0.97);
 }

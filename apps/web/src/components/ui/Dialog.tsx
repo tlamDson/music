@@ -12,6 +12,14 @@ interface DialogProps {
 const EXIT_ANIMATION_MS = 180;
 
 /**
+ * Set thành biến CSS `--dialog-exit-ms` trên overlay/panel để globals.css
+ * (`.dialog-overlay` / `.dialog-panel`) đọc đúng thời lượng animation exit
+ * từ hằng số JS này — một nguồn duy nhất, đổi `EXIT_ANIMATION_MS` là cả
+ * `setTimeout` unmount lẫn CSS transition đổi theo, không phải sửa hai nơi.
+ */
+const exitDurationVar = { '--dialog-exit-ms': `${EXIT_ANIMATION_MS}ms` } as React.CSSProperties;
+
+/**
  * Overlay + panel dùng chung cho mọi modal trong app. Giữ `rendered` true
  * thêm một nhịp sau khi `open` tắt để animation exit (xem globals.css
  * `.dialog-panel[data-state]`) có thời gian chạy trước khi unmount hẳn —
@@ -48,7 +56,11 @@ export default function Dialog({ open, onClose, ariaLabel, children }: DialogPro
       data-state={state}
       onClick={onClose}
       className="dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+      style={{
+        ...exitDurationVar,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        backdropFilter: 'blur(4px)',
+      }}
     >
       <div
         role="dialog"
@@ -58,6 +70,7 @@ export default function Dialog({ open, onClose, ariaLabel, children }: DialogPro
         onClick={(e) => e.stopPropagation()}
         className="dialog-panel w-full max-w-lg max-h-[80vh] flex flex-col gap-4 p-6 rounded-2xl"
         style={{
+          ...exitDurationVar,
           backgroundColor: 'var(--color-background)',
           border: '1px solid var(--color-border)',
           boxShadow: 'var(--shadow-xl)',
