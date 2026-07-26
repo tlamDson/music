@@ -49,15 +49,31 @@ const playlistDetail = {
   ],
 };
 
+// PlayerProvider dựng `new Audio()` — jsdom không implement play(), mock tối thiểu.
+class MockAudio {
+  src = '';
+  currentTime = 0;
+  duration = 180;
+  volume = 1;
+  paused = true;
+  addEventListener() {}
+  removeEventListener() {}
+  play = jest.fn(async () => {
+    this.paused = false;
+  });
+  pause = jest.fn(() => {
+    this.paused = true;
+  });
+}
+Object.defineProperty(global, 'Audio', { writable: true, value: MockAudio });
+
 describe('PlaylistDetail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockApi.get.mockImplementation((path: string) => {
       if (path === '/playlists/playlist-1') return Promise.resolve(playlistDetail);
-      if (path.startsWith('/sync/groups')) {
-        return Promise.resolve({
-          data: [{ id: 'group-1', name: 'Nhóm chính', mode: 'LOOSE', status: 'STOPPED' }],
-        });
+      if (path.includes('/stream-url')) {
+        return Promise.resolve({ url: 'https://s3/preview.mp3' });
       }
       if (path.startsWith('/tracks')) {
         return Promise.resolve({
@@ -100,37 +116,34 @@ describe('PlaylistDetail', () => {
     expect(row).toHaveTextContent('6:06');
   });
 
-  it('plays the whole playlist from the header button', async () => {
+  // Admin chuỗi chỉ nghe thử tại chỗ — muốn phát ra loa quán thì vào
+  // /dashboard/stores/[id]. Bấm ở đây mà broadcast là phát nhầm ra cả chuỗi.
+  it('chỉ nghe thử tại chỗ khi admin chuỗi bấm phát, không gọi lệnh phát nào', async () => {
     mockApi.post.mockResolvedValue({});
     renderDetail();
 
     await userEvent.click(await screen.findByRole('button', { name: /phát playlist/i }));
 
     await waitFor(() =>
-      expect(mockApi.post).toHaveBeenCalledWith('/sync/groups/group-1/play', {
-        playlistId: 'playlist-1',
-        trackIndex: 0,
-        mode: 'LOOSE',
-      }),
+      expect(mockApi.get).toHaveBeenCalledWith('/tracks/track-1/stream-url'),
     );
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
-  it('starts from the clicked track', async () => {
+  it('nghe thử đúng bài được bấm', async () => {
     mockApi.post.mockResolvedValue({});
     renderDetail();
 
     await userEvent.click(await screen.findByRole('button', { name: /phát rồi sẽ đến nơi/i }));
 
     await waitFor(() =>
-      expect(mockApi.post).toHaveBeenCalledWith(
-        '/sync/groups/group-1/play',
-        expect.objectContaining({ trackIndex: 1 }),
-      ),
+      expect(mockApi.get).toHaveBeenCalledWith('/tracks/track-2/stream-url'),
     );
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
-  // Quán phát playlist là tách khỏi nhóm sync, không điều khiển cả chuỗi
-  it('plays locally when a store opens the playlist', async () => {
+  // Quán bấm phát là phát thật ra loa quán mình
+  it('plays at the store when a store admin opens the playlist', async () => {
     mockApi.post.mockResolvedValue({});
     renderDetail('STORE_ADMIN');
 
@@ -140,7 +153,6 @@ describe('PlaylistDetail', () => {
       expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/play', {
         playlistId: 'playlist-1',
         trackIndex: 0,
-        returnToGroupOnFinish: true,
       }),
     );
   });

@@ -56,41 +56,7 @@ describe('RedisService', () => {
     );
   });
 
-  it('stores group state as JSON with a 24h TTL', async () => {
-    const service = buildService({ REDIS_URL: 'redis://localhost:6379' });
-    const state = {
-      groupId: 'group-1',
-      playlistId: 'playlist-1',
-      trackId: 'track-1',
-      trackIndex: 0,
-      positionMs: 0,
-      startedAtServerTs: 1_700_000_000_000,
-      isPlaying: true,
-      mode: 'LOOSE' as const,
-      status: 'PLAYING' as const,
-    };
-
-    await service.setGroupState('group-1', state);
-
-    const client = (service as unknown as { client: { setex: jest.Mock } })
-      .client;
-    expect(client.setex).toHaveBeenCalledWith(
-      'sync-group:group-1:state',
-      86400,
-      JSON.stringify(state),
-    );
-  });
-
-  it('returns null when no group state is cached', async () => {
-    const service = buildService({ REDIS_URL: 'redis://localhost:6379' });
-    const client = (service as unknown as { client: { get: jest.Mock } })
-      .client;
-    client.get.mockResolvedValue(null);
-
-    await expect(service.getGroupState('group-1')).resolves.toBeNull();
-  });
-
-  // Hàng chờ khi quán phát nhạc riêng — tách hẳn khỏi state của sync group
+  // Trạng thái phát của quán — quán là đơn vị phát duy nhất
   describe('store playback', () => {
     const playback = {
       storeId: 'store-1',
@@ -100,7 +66,6 @@ describe('RedisService', () => {
       positionMs: 0,
       startedAtServerTs: 1_700_000_000_000,
       isPlaying: true,
-      returnToGroupOnFinish: true,
     };
 
     it('caches playback under a key of its own', async () => {

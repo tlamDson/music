@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
-import { useSyncGroups } from '../../hooks/useSyncGroups';
 import { usePlayer } from '../player/PlayerProvider';
 import { readRecentPlaylists, rememberRecentPlaylist } from '../../lib/recent-playlists';
 import { formatTotalDuration } from '../../lib/format';
@@ -35,8 +34,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
   const [newName, setNewName] = useState('');
   const [recentIds, setRecentIds] = useState<string[]>([]);
 
-  const { defaultGroupId } = useSyncGroups();
-  const { current, isPlaying, queue } = usePlayer();
+  const { current, isPlaying, queue, playTrack } = usePlayer();
 
   const isStore = role === 'STORE_ADMIN';
 
@@ -65,6 +63,11 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
     return () => clearTimeout(timer);
   }, [fetchPlaylists]);
 
+  /**
+   * Quán bấm phát = phát thật ra loa quán. Admin chuỗi bấm phát = **nghe thử
+   * tại chỗ**, chỉ tab đang bấm nghe được — muốn phát ra quán thì vào
+   * `/dashboard/stores/[id]`, nơi chọn đúng quán để phát.
+   */
   const handlePlay = async (playlist: BrowsePlaylist) => {
     try {
       if (isStore) {
@@ -72,30 +75,40 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
           toast.error('Tài khoản chưa gắn với quán nào');
           return;
         }
-        // Quán phát playlist riêng: tự tách khỏi nhóm sync, hết hàng chờ tự quay lại
         await api.post(`/sync/stores/${storeId}/play`, {
           playlistId: playlist.id,
           trackIndex: 0,
-          returnToGroupOnFinish: true,
         });
         toast.success(`Đang phát "${playlist.name}" tại quán`);
       } else {
-        if (!defaultGroupId) {
-          toast.error('Chưa có sync group nào — tạo nhóm ở trang Sync Control trước');
-          return;
-        }
-        await api.post(`/sync/groups/${defaultGroupId}/play`, {
-          playlistId: playlist.id,
-          trackIndex: 0,
-          mode: 'LOOSE',
-        });
-        toast.success(`Đang phát "${playlist.name}" trên hệ thống`);
+        await previewFirstTrack(playlist);
       }
 
       setRecentIds(rememberRecentPlaylist(playlist.id));
-    } catch {
-      toast.error('Phát playlist thất bại — playlist có track nào chưa?');
+    } catch (err) {
+      toast.error(
+        err instanceof Error && err.message ? err.message : 'Phát playlist thất bại',
+      );
     }
+  };
+
+  const previewFirstTrack = async (playlist: BrowsePlaylist) => {
+    const detail = await api.get<{
+      playlistTracks: Array<{ track: { id: string; title: string; artist: string | null; durationMs: number } }>;
+    }>(`/playlists/${playlist.id}`);
+
+    const first = detail.playlistTracks[0]?.track;
+    if (!first) {
+      toast.error(`"${playlist.name}" chưa có bài nào`);
+      return;
+    }
+
+    const { url } = await api.get<{ url: string }>(`/tracks/${first.id}/stream-url`);
+    playTrack(
+      { id: first.id, title: first.title, artist: first.artist, url, durationMs: first.durationMs },
+      { mode: 'preview' },
+    );
+    toast.success(`Nghe thử "${playlist.name}"`);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -272,7 +285,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
             </div>
             {queue && (
               <p className="text-xs" style={{ color: 'var(--color-accent)' }}>
-                Còn {queue.remaining} bài · sau đó quay lại nhóm sync
+                Còn {queue.remaining} bài trong hàng chờ
               </p>
             )}
           </>

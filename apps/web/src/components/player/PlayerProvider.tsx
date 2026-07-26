@@ -9,9 +9,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { api } from '../../lib/api-client';
 
-export type PlayerMode = 'group' | 'local' | 'preview';
+export type PlayerMode = 'store' | 'preview';
 
 export interface PlayerTrack {
   id: string;
@@ -29,9 +28,8 @@ export interface PlayerQueueInfo {
 
 interface PlayOptions {
   /**
-   * `group` — nghe theo nhóm sync, server điều khiển hoàn toàn.
-   * `local` — quán tách ra phát playlist riêng, hết bài thì hỏi server bài kế.
-   * `preview` — nghe thử một bài trong dashboard, hết là dừng.
+   * `store` — nhạc của một quán, server điều khiển (kể cả chuyển bài).
+   * `preview` — nghe thử tại chỗ trong dashboard, chỉ người bấm nghe, hết là dừng.
    */
   mode?: PlayerMode;
   storeId?: string | null;
@@ -71,14 +69,14 @@ export function usePlayer() {
  * (TrackPlayButton giữ biến module-level, player page giữ ref riêng) nên hai
  * nguồn nhạc phát chồng lên nhau.
  */
-// Lệch quá ngưỡng này (đồng hồ nhóm so với currentTime thật) mới re-seek —
+// Lệch quá ngưỡng này (đồng hồ quán so với currentTime thật) mới re-seek —
 // tránh giật hình do jitter nhỏ của timeupdate.
 const DRIFT_THRESHOLD_MS = 750;
 
 /** "Neo" đồng bộ: tại thời điểm cục bộ `atLocalTs`, vị trí phát đúng là
  * `positionMs`. Đồng hồ chạy 1x nên vị trí sống = positionMs + thời gian đã
  * trôi kể từ atLocalTs — không phụ thuộc việc client này có đang pause hay
- * không, vì nhóm/quán vẫn tính giờ ở server bất kể client làm gì.
+ * không, vì quán vẫn tính giờ ở server bất kể client làm gì.
  */
 interface SyncAnchor {
   positionMs: number;
@@ -121,8 +119,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setPositionMs(audio.currentTime * 1000);
 
       // Tự chỉnh trôi: quán bấm dừng cục bộ rồi phát lại (hoặc mạng chậm) sẽ
-      // tụt dần so với đồng hồ nhóm — kéo về đúng giây mà không cần gọi server.
-      if (modeRef.current !== 'group' && modeRef.current !== 'local') return;
+      // tụt dần so với đồng hồ server — kéo về đúng giây mà không cần gọi API.
+      if (modeRef.current !== 'store') return;
       if (audio.paused || audio.seeking) return;
       const target = liveTargetMs();
       if (target === null) return;
@@ -139,14 +137,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.currentTime = pendingSeekMsRef.current / 1000;
       pendingSeekMsRef.current = null;
     };
-    const handleEnded = () => {
-      setIsPlaying(false);
-
-      // Chỉ chế độ local mới do client lái hàng chờ; server quyết định là bài
-      // kế hay đã tới lúc quay lại nhóm sync.
-      if (modeRef.current !== 'local' || !storeIdRef.current) return;
-      void api.post(`/sync/stores/${storeIdRef.current}/next`).catch(() => null);
-    };
+    // Chuyển bài do server hẹn giờ và broadcast `store-now-playing`, client
+    // không tự gọi `/next` nữa: quán mở hai màn hình thì mỗi màn sẽ bắn một
+    // lệnh và nhạc nhảy cóc, còn không màn nào mở thì nhạc đứng im.
+    const handleEnded = () => setIsPlaying(false);
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('durationchange', handleDuration);
@@ -182,14 +176,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setPositionMs(startPositionMs);
 
       // Neo lại đồng hồ đồng bộ ở mọi lần nhận vị trí từ server (play mới,
-      // rejoin, resume) — đây là điểm tham chiếu để tự bắt kịp nhóm sau này.
+      // chuyển bài, resume) — điểm tham chiếu để tự bắt kịp quán sau này.
       anchorRef.current =
-        nextMode === 'group' || nextMode === 'local'
-          ? { positionMs: startPositionMs, atLocalTs: Date.now() }
-          : null;
+        nextMode === 'store' ? { positionMs: startPositionMs, atLocalTs: Date.now() } : null;
 
-      // rejoin() presign lại URL mỗi lần dù cùng bài — so theo track id để
-      // khỏi reload từ đầu (mất buffer, trễ đúng bằng thời gian tải lại).
+      // Server presign lại URL mỗi lần broadcast dù cùng bài — so theo track id
+      // để khỏi reload từ đầu (mất buffer, trễ đúng bằng thời gian tải lại).
       const sameTrack = currentTrackIdRef.current === track.id;
       currentTrackIdRef.current = track.id;
 
@@ -219,9 +211,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = ensureAudio();
 
     if (audio.paused) {
-      // Quán/nhóm đang đồng bộ thì dừng cục bộ không dừng đồng hồ server —
-      // phát lại phải nhảy tới vị trí sống hiện tại, không tiếp tục từ chỗ cũ.
-      if (modeRef.current === 'group' || modeRef.current === 'local') {
+      // Dừng cục bộ không dừng đồng hồ server — phát lại phải nhảy tới vị trí
+      // sống hiện tại của quán, không tiếp tục từ chỗ đã dừng.
+      if (modeRef.current === 'store') {
         const target = liveTargetMs();
         if (target !== null) audio.currentTime = target / 1000;
       }

@@ -37,11 +37,9 @@ export default function PlayerPage() {
   const progressPct = durationMs > 0 ? Math.min(100, (positionMs / durationMs) * 100) : 0;
 
   const handlePause = async () => {
-    // Quán đang theo nhóm không có StorePlaybackState riêng trên server —
-    // POST /sync/stores/:id/pause sẽ 404 ("Store is not playing locally").
-    // Chỉ khi quán có hàng chờ riêng mới cần server broadcast `store-paused`
-    // cho các tab khác của cùng quán; theo nhóm thì dừng cục bộ là đủ.
-    if (mode !== 'local') {
+    // Quán chưa có state trên server (đang nghe thử chẳng hạn) thì
+    // POST /sync/stores/:id/pause sẽ 404 — dừng cục bộ là đủ.
+    if (mode !== 'store') {
       pause();
       return;
     }
@@ -50,15 +48,6 @@ export default function PlayerPage() {
       await api.post(`/sync/stores/${storeId}/pause`);
     } catch {
       toast.error('Tạm dừng thất bại');
-    }
-  };
-
-  const handleRejoin = async () => {
-    try {
-      await api.post(`/sync/stores/${storeId}/rejoin`);
-      toast.success('Đã quay lại nhóm sync');
-    } catch {
-      toast.error('Quay lại nhóm sync thất bại');
     }
   };
 
@@ -99,9 +88,9 @@ export default function PlayerPage() {
           </p>
           <p className="text-xs mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
             {storeQueue
-              ? `Nhạc riêng của quán · còn ${storeQueue.remaining} bài`
+              ? `Còn ${storeQueue.remaining} bài trong hàng chờ`
               : isPlaying
-                ? 'Đang phát theo nhóm sync'
+                ? 'Đang phát'
                 : 'Đang chờ tín hiệu từ máy chủ'}
           </p>
         </div>
@@ -135,28 +124,18 @@ export default function PlayerPage() {
         </div>
 
         {!isKiosk && (
-          <div className="flex gap-3">
-            <button
-              onClick={() => void handlePause()}
-              className="flex-1 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
-              style={{
-                backgroundColor: 'var(--color-primary)',
-                color: 'var(--color-foreground)',
-                border: '1px solid var(--color-border)',
-              }}
-              aria-label="Tạm dừng"
-            >
-              Tạm dừng
-            </button>
-            <button
-              onClick={() => void handleRejoin()}
-              className="flex-1 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
-              style={{ backgroundColor: 'var(--color-secondary)', color: 'white' }}
-              aria-label="Quay lại nhóm sync"
-            >
-              Quay lại nhóm sync
-            </button>
-          </div>
+          <button
+            onClick={() => void handlePause()}
+            className="w-full py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
+            style={{
+              backgroundColor: 'var(--color-primary)',
+              color: 'var(--color-foreground)',
+              border: '1px solid var(--color-border)',
+            }}
+            aria-label="Tạm dừng"
+          >
+            Tạm dừng
+          </button>
         )}
       </div>
     </main>

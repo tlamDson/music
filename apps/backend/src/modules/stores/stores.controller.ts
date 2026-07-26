@@ -20,8 +20,6 @@ import {
 } from '@cafe-music/shared';
 import { z } from 'zod';
 
-const AssignGroupSchema = z.object({ syncGroupId: z.string().min(1) });
-
 @Controller('stores')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class StoresController {
@@ -56,17 +54,6 @@ export class StoresController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.storesService.update(id, dto, user);
-  }
-
-  @Post(':id/assign-group')
-  @Roles('ORG_ADMIN')
-  assignGroup(
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(AssignGroupSchema))
-    body: { syncGroupId: string },
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.storesService.assignGroup(id, body.syncGroupId, user);
   }
 
   @Get(':id/status')

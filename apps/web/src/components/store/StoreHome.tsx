@@ -13,8 +13,8 @@ import type { ApiResponse } from '@cafe-music/shared';
 interface StoreStatus {
   storeId: string;
   name: string;
-  syncGroupId: string | null;
-  override: { isOverridden: boolean; overriddenAt: string | null } | null;
+  status: 'PLAYING' | 'PAUSED' | 'STOPPED';
+  connectedScreens: number;
 }
 
 interface SuggestedPlaylist {
@@ -59,29 +59,16 @@ export default function StoreHome({ storeId }: { storeId: string }) {
       .catch(() => setPlaylists([]));
   }, [refreshStatus]);
 
-  const isOverriding = Boolean(storeQueue) || Boolean(status?.override?.isOverridden);
-
-  const handleRejoin = async () => {
-    try {
-      await api.post(`/sync/stores/${storeId}/rejoin`);
-      await refreshStatus();
-      toast.success('Đã quay lại nhóm sync');
-    } catch {
-      toast.error('Quay lại nhóm sync thất bại');
-    }
-  };
-
   const handlePlay = async (playlist: SuggestedPlaylist) => {
     try {
       await api.post(`/sync/stores/${storeId}/play`, {
         playlistId: playlist.id,
         trackIndex: 0,
-        returnToGroupOnFinish: true,
       });
       await refreshStatus();
       toast.success(`Đang phát "${playlist.name}" tại quán`);
-    } catch {
-      toast.error('Phát thất bại — playlist có bài nào chưa?');
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Phát thất bại');
     }
   };
 
@@ -122,35 +109,18 @@ export default function StoreHome({ storeId }: { storeId: string }) {
           </p>
           <p className="text-xs mt-0.5 truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
             {current
-              ? `${isPlaying ? 'Đang phát' : 'Tạm dừng'} · ${
-                  isOverriding ? 'nhạc riêng của quán' : 'theo nhóm sync của chuỗi'
-                }`
-              : isOverriding
-                ? 'Đang phát nhạc riêng của quán'
-                : status?.syncGroupId
-                  ? 'Đang theo nhóm sync của chuỗi'
-                  : 'Quán chưa được gán nhóm sync nào'}
+              ? `${isPlaying ? 'Đang phát' : 'Tạm dừng'} tại quán`
+              : 'Quán đang im lặng — chọn playlist bên dưới để phát'}
           </p>
         </div>
 
-        {isOverriding && (
-          <div className="flex items-center gap-3">
-            {storeQueue && (
-              <span
-                className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
-                style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: 'var(--color-accent)' }}
-              >
-                Còn {storeQueue.remaining} bài · sau đó quay lại nhóm sync
-              </span>
-            )}
-            <button
-              onClick={() => void handleRejoin()}
-              className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
-              style={{ backgroundColor: 'var(--color-secondary)', color: 'white' }}
-            >
-              Quay lại nhóm sync ngay
-            </button>
-          </div>
+        {storeQueue && (
+          <span
+            className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+            style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: 'var(--color-accent)' }}
+          >
+            Còn {storeQueue.remaining} bài trong hàng chờ
+          </span>
         )}
       </div>
 

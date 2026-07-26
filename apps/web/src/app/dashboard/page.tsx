@@ -40,7 +40,7 @@ export default function DashboardPage() {
           Bắt đầu phát
         </h2>
         <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-          Chọn playlist ở trang{' '}
+          Bấm vào một quán ở trên để chọn nhạc và phát ra loa quán đó. Trang{' '}
           <Link
             href="/dashboard/playlists"
             className="underline cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
@@ -48,7 +48,7 @@ export default function DashboardPage() {
           >
             Playlists
           </Link>{' '}
-          để phát cho cả nhóm sync.
+          chỉ để nghe thử tại chỗ.
         </p>
       </section>
     </div>

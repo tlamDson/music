@@ -6,8 +6,8 @@ export interface NavItem {
 }
 
 /**
- * Nav của console quản trị. Sync Control, Stores và Users là việc của cả chuỗi
- * nên chỉ ORG_ADMIN thấy — store admin có console riêng ở `/store`.
+ * Nav của console quản trị. Quán và Người dùng là việc của cả chuỗi nên chỉ
+ * ORG_ADMIN thấy — store admin có console riêng ở `/store`.
  */
 export function dashboardNavItems(role: UserRole): NavItem[] {
   const items: NavItem[] = [
@@ -18,7 +18,6 @@ export function dashboardNavItems(role: UserRole): NavItem[] {
 
   if (role === 'ORG_ADMIN' || role === 'SUPER_ADMIN') {
     items.push(
-      { href: '/dashboard/sync', label: 'Sync Control' },
       { href: '/dashboard/stores', label: 'Quán' },
       { href: '/dashboard/users', label: 'Người dùng' },
     );
@@ -27,7 +26,7 @@ export function dashboardNavItems(role: UserRole): NavItem[] {
   return items;
 }
 
-/** Nav của console quán: không có Sync Control, không có quản lý người dùng. */
+/** Nav của console quán: không quản lý quán khác, không quản lý người dùng. */
 export function storeNavItems(): NavItem[] {
   return [
     { href: '/store', label: 'Trang chủ' },

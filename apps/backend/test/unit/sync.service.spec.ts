@@ -13,7 +13,6 @@ describe('SyncService', () => {
   let prisma: DeepMockProxy<PrismaClient>;
   let redis: jest.Mocked<RedisService>;
   let gateway: jest.Mocked<SyncGateway>;
-  let s3: jest.Mocked<S3Service>;
 
   const orgAdminUser = {
     sub: 'user-1',
@@ -31,11 +30,10 @@ describe('SyncService', () => {
     storeId: 'store-1',
   };
 
-  const mockGroup = {
-    id: 'group-1',
-    name: 'Main Group',
+  const mockStore = {
+    id: 'store-1',
+    name: 'Quán Nguyễn Huệ',
     organizationId: 'org-1',
-    mode: 'LOOSE' as const,
     status: 'STOPPED' as const,
     currentTrackId: null,
     trackIndex: 0,
@@ -44,39 +42,52 @@ describe('SyncService', () => {
     updatedAt: new Date(),
   };
 
+  const trackA = {
+    id: 'track-1',
+    title: 'Cà phê sáng',
+    artist: 'Vũ',
+    durationMs: 180_000,
+    s3Key: 'org-1/tracks/a.mp3',
+  };
+
+  const trackB = {
+    id: 'track-2',
+    title: 'Hạ trắng',
+    artist: 'Khánh Ly',
+    durationMs: 200_000,
+    s3Key: 'org-1/tracks/b.mp3',
+  };
+
   const mockPlaylist = {
     id: 'playlist-1',
     name: 'Test',
     playlistTracks: [
-      {
-        trackId: 'track-1',
-        position: 0,
-        track: {
-          id: 'track-1',
-          title: 'Cà phê sáng',
-          artist: 'Vũ',
-          durationMs: 180_000,
-          s3Key: 'org-1/tracks/song.mp3',
-        },
-      },
+      { trackId: trackA.id, position: 0, track: trackA },
+      { trackId: trackB.id, position: 1, track: trackB },
     ],
   };
+
+  /** Hàng chờ 2 bài của quán, đang ở bài thứ `trackIndex`. */
+  const playbackAt = (trackIndex: number, isPlaying = true) => ({
+    storeId: 'store-1',
+    playlistId: 'playlist-1',
+    trackIds: [trackA.id, trackB.id],
+    trackIndex,
+    positionMs: 0,
+    startedAtServerTs: Date.now(),
+    isPlaying,
+  });
 
   beforeEach(async () => {
     const prismaMock = mockDeep<PrismaClient>();
     const redisMock = {
-      setGroupState: jest.fn().mockResolvedValue(undefined),
-      getGroupState: jest.fn().mockResolvedValue(null),
-      setStoreOverride: jest.fn().mockResolvedValue(undefined),
-      getStoreOverride: jest.fn().mockResolvedValue(null),
-      clearStoreOverride: jest.fn().mockResolvedValue(undefined),
       setStorePlayback: jest.fn().mockResolvedValue(undefined),
       getStorePlayback: jest.fn().mockResolvedValue(null),
       clearStorePlayback: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<RedisService>;
     const gatewayMock = {
-      broadcastToGroup: jest.fn(),
       broadcastToStore: jest.fn(),
+      countStoreClients: jest.fn().mockReturnValue(0),
       server: { to: jest.fn().mockReturnThis(), emit: jest.fn() },
     } as unknown as jest.Mocked<SyncGateway>;
     const s3Mock = {
@@ -99,545 +110,24 @@ describe('SyncService', () => {
     prisma = module.get(PrismaService);
     redis = module.get(RedisService);
     gateway = module.get(SyncGateway);
-    s3 = module.get(S3Service);
 
-    // play() kéo mọi quán trong nhóm về in-sync — mặc định không có quán nào,
-    // các test không liên quan đến override không cần stub lại.
+    prisma.store.findFirst.mockResolvedValue(mockStore as never);
+    prisma.store.update.mockResolvedValue(mockStore as never);
     prisma.store.findMany.mockResolvedValue([]);
   });
 
-  describe('play', () => {
-    it('should set Redis state and broadcast now-playing event', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
-      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
-      prisma.syncGroup.update.mockResolvedValue({
-        ...mockGroup,
-        status: 'PLAYING',
-      } as any);
-
-      await service.play(
-        'group-1',
-        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
-        orgAdminUser,
-      );
-
-      expect(redis.setGroupState).toHaveBeenCalledWith(
-        'group-1',
-        expect.objectContaining({ isPlaying: true }),
-      );
-      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
-        'group-1',
-        'now-playing',
-        expect.any(Object),
-      );
-    });
-
-    it('should include presigned trackUrl in now-playing broadcast so players can load audio', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
-      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
-      prisma.syncGroup.update.mockResolvedValue({
-        ...mockGroup,
-        status: 'PLAYING',
-      } as any);
-
-      await service.play(
-        'group-1',
-        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
-        orgAdminUser,
-      );
-
-      expect(s3.getPresignedUrl).toHaveBeenCalledWith('org-1/tracks/song.mp3');
-      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
-        'group-1',
-        'now-playing',
-        expect.objectContaining({
-          trackId: 'track-1',
-          trackUrl: 'https://s3/presigned/song.mp3',
-        }),
-      );
-    });
-
-    // Thiếu title thì thanh phát của client chỉ có cuid để hiển thị
-    it('should include track metadata so clients can render a player bar', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
-      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
-      prisma.syncGroup.update.mockResolvedValue({
-        ...mockGroup,
-        status: 'PLAYING',
-      } as any);
-
-      await service.play(
-        'group-1',
-        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
-        orgAdminUser,
-      );
-
-      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
-        'group-1',
-        'now-playing',
-        expect.objectContaining({
-          track: {
-            id: 'track-1',
-            title: 'Cà phê sáng',
-            artist: 'Vũ',
-            durationMs: 180_000,
-          },
-        }),
-      );
-    });
-
-    it('should throw NotFoundException when group does not exist', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue(null);
-
-      await expect(
-        service.play(
-          'nonexistent',
-          { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
-          orgAdminUser,
-        ),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    // Quán từng tách ra (hoặc còn override rác từ phiên trước) phải quay lại
-    // "in sync" khi admin phát nhóm — nếu không /dashboard/stores vẫn hiện
-    // "Overriding" dù quán đang nghe đúng nhạc của nhóm qua broadcast.
-    it('should clear override state for every store in the group so they show as in-sync', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
-      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
-      prisma.syncGroup.update.mockResolvedValue({
-        ...mockGroup,
-        status: 'PLAYING',
-      } as any);
-      prisma.store.findMany.mockResolvedValue([
-        { id: 'store-1' },
-        { id: 'store-2' },
-      ] as any);
-      prisma.storeOverride.updateMany.mockResolvedValue({ count: 2 } as any);
-
-      await service.play(
-        'group-1',
-        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
-        orgAdminUser,
-      );
-
-      expect(prisma.store.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { syncGroupId: 'group-1' } }),
-      );
-      expect(redis.clearStoreOverride).toHaveBeenCalledWith('store-1');
-      expect(redis.clearStoreOverride).toHaveBeenCalledWith('store-2');
-      expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-1');
-      expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-2');
-      expect(prisma.storeOverride.updateMany).toHaveBeenCalledWith({
-        where: { storeId: { in: ['store-1', 'store-2'] } },
-        data: { isOverridden: false },
-      });
-    });
-
-    it('should not touch stores when the group has none', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
-      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as any);
-      prisma.syncGroup.update.mockResolvedValue({
-        ...mockGroup,
-        status: 'PLAYING',
-      } as any);
-      prisma.store.findMany.mockResolvedValue([]);
-
-      await service.play(
-        'group-1',
-        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
-        orgAdminUser,
-      );
-
-      expect(redis.clearStoreOverride).not.toHaveBeenCalled();
-      expect(prisma.storeOverride.updateMany).not.toHaveBeenCalled();
-    });
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
-  // Web từng hardcode groupId 'sync-group-main' vì không có endpoint nào liệt
-  // kê sync group.
-  describe('groups', () => {
-    it('lists sync groups of the caller organization with store counts', async () => {
-      prisma.syncGroup.findMany.mockResolvedValue([mockGroup] as any);
+  describe('playStore', () => {
+    it('lưu hàng chờ vào Redis và broadcast store-now-playing kèm metadata bài', async () => {
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as never);
 
-      const result = await service.listGroups(orgAdminUser);
-
-      expect(prisma.syncGroup.findMany).toHaveBeenCalledWith({
-        where: { organizationId: 'org-1' },
-        include: { _count: { select: { stores: true } } },
-        orderBy: { name: 'asc' },
-      });
-      expect(result).toEqual({ data: [mockGroup] });
-    });
-
-    it('creates a sync group inside the caller organization', async () => {
-      prisma.syncGroup.create.mockResolvedValue(mockGroup as any);
-
-      await service.createGroup(
-        { name: 'Quán trung tâm', mode: 'TIGHT' },
-        orgAdminUser,
-      );
-
-      expect(prisma.syncGroup.create).toHaveBeenCalledWith({
-        data: {
-          name: 'Quán trung tâm',
-          mode: 'TIGHT',
-          organizationId: 'org-1',
-        },
-      });
-    });
-
-    it('defaults new groups to LOOSE mode', async () => {
-      prisma.syncGroup.create.mockResolvedValue(mockGroup as any);
-
-      await service.createGroup({ name: 'Nhóm mặc định' }, orgAdminUser);
-
-      expect(prisma.syncGroup.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ mode: 'LOOSE' }),
-      });
-    });
-  });
-
-  // Trước đây play() phát đúng một bài rồi im: hết bài là nhóm đứng hình, store
-  // rejoin giữa chừng không có gì để nghe.
-  describe('auto-next', () => {
-    const twoTrackPlaylist = {
-      id: 'playlist-1',
-      name: 'Test',
-      playlistTracks: [
-        {
-          trackId: 'track-1',
-          position: 0,
-          track: { id: 'track-1', s3Key: 'k1', durationMs: 180_000 },
-        },
-        {
-          trackId: 'track-2',
-          position: 1,
-          track: { id: 'track-2', s3Key: 'k2', durationMs: 200_000 },
-        },
-      ],
-    };
-
-    const playingState = (trackIndex: number) => ({
-      groupId: 'group-1',
-      playlistId: 'playlist-1',
-      trackId: `track-${trackIndex + 1}`,
-      trackIndex,
-      positionMs: 0,
-      startedAtServerTs: Date.now(),
-      isPlaying: true,
-      mode: 'LOOSE' as const,
-      status: 'PLAYING' as const,
-    });
-
-    beforeEach(() => {
-      jest.useFakeTimers();
-      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
-      prisma.playlist.findFirst.mockResolvedValue(twoTrackPlaylist as any);
-      prisma.syncGroup.update.mockResolvedValue(mockGroup as any);
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it('plays the next track once the current one ends', async () => {
-      redis.getGroupState.mockResolvedValue(playingState(0));
-
-      await service.play(
-        'group-1',
-        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
-        orgAdminUser,
-      );
-      gateway.broadcastToGroup.mockClear();
-
-      await jest.advanceTimersByTimeAsync(180_000);
-
-      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
-        'group-1',
-        'now-playing',
-        expect.objectContaining({ trackId: 'track-2' }),
-      );
-    });
-
-    it('stops the group after the last track instead of looping', async () => {
-      redis.getGroupState.mockResolvedValue(playingState(1));
-
-      await service.play(
-        'group-1',
-        { playlistId: 'playlist-1', trackIndex: 1, mode: 'LOOSE' },
-        orgAdminUser,
-      );
-      gateway.broadcastToGroup.mockClear();
-
-      await jest.advanceTimersByTimeAsync(200_000);
-
-      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
-        'group-1',
-        'stopped',
-        expect.any(Object),
-      );
-      expect(gateway.broadcastToGroup).not.toHaveBeenCalledWith(
-        'group-1',
-        'now-playing',
-        expect.anything(),
-      );
-    });
-
-    it('cancels the pending advance when the group is paused', async () => {
-      redis.getGroupState.mockResolvedValue(playingState(0));
-
-      await service.play(
-        'group-1',
-        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
-        orgAdminUser,
-      );
-      await service.pause('group-1', orgAdminUser);
-      gateway.broadcastToGroup.mockClear();
-
-      await jest.advanceTimersByTimeAsync(180_000);
-
-      expect(gateway.broadcastToGroup).not.toHaveBeenCalled();
-    });
-
-    it('does not schedule anything for tracks with unknown duration', async () => {
-      prisma.playlist.findFirst.mockResolvedValue({
-        ...twoTrackPlaylist,
-        playlistTracks: [
-          {
-            trackId: 'track-1',
-            position: 0,
-            track: { id: 'track-1', s3Key: 'k1', durationMs: 0 },
-          },
-        ],
-      } as any);
-      redis.getGroupState.mockResolvedValue(playingState(0));
-
-      await service.play(
-        'group-1',
-        { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
-        orgAdminUser,
-      );
-      gateway.broadcastToGroup.mockClear();
-
-      await jest.advanceTimersByTimeAsync(600_000);
-
-      expect(gateway.broadcastToGroup).not.toHaveBeenCalled();
-    });
-
-    // Timer nằm trong bộ nhớ nên restart backend là mất — phải dựng lại theo
-    // thời lượng còn lại, nếu không nhạc đứng im sau mỗi lần deploy.
-    it('reschedules playing groups after a restart', async () => {
-      prisma.syncGroup.findMany.mockResolvedValue([mockGroup] as any);
-      redis.getGroupState.mockResolvedValue({
-        ...playingState(0),
-        startedAtServerTs: Date.now() - 60_000,
-      });
-      prisma.track.findFirst.mockResolvedValue({
-        id: 'track-1',
-        durationMs: 180_000,
-      } as any);
-
-      await service.onModuleInit();
-      gateway.broadcastToGroup.mockClear();
-
-      await jest.advanceTimersByTimeAsync(120_000);
-
-      expect(gateway.broadcastToGroup).toHaveBeenCalledWith(
-        'group-1',
-        'now-playing',
-        expect.objectContaining({ trackId: 'track-2' }),
-      );
-    });
-  });
-
-  // pauseStore() gộp elapsed vào positionMs đúng cách; pause() của nhóm trước
-  // đây không làm vậy nên elapsedPositionMs() đọc lại state lúc nhóm đang tạm
-  // dừng sẽ trả positionMs cũ (thường là 0) thay vì đúng chỗ vừa dừng lại.
-  describe('pause', () => {
-    it('folds elapsed time into positionMs and stops the server clock', async () => {
-      jest.useFakeTimers();
-      try {
-        const startedAtServerTs = Date.now();
-        prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
-        prisma.syncGroup.update.mockResolvedValue(mockGroup as any);
-        redis.getGroupState.mockResolvedValue({
-          groupId: 'group-1',
-          playlistId: 'playlist-1',
-          trackId: 'track-1',
-          trackIndex: 0,
-          positionMs: 0,
-          startedAtServerTs,
-          isPlaying: true,
-          mode: 'LOOSE',
-          status: 'PLAYING',
-        });
-
-        jest.advanceTimersByTime(45_000);
-        await service.pause('group-1', orgAdminUser);
-
-        expect(redis.setGroupState).toHaveBeenCalledWith(
-          'group-1',
-          expect.objectContaining({
-            isPlaying: false,
-            positionMs: 45_000,
-            startedAtServerTs: null,
-          }),
-        );
-      } finally {
-        jest.useRealTimers();
-      }
-    });
-
-    it('leaves positionMs untouched when the group was already paused', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
-      prisma.syncGroup.update.mockResolvedValue(mockGroup as any);
-      redis.getGroupState.mockResolvedValue({
-        groupId: 'group-1',
-        playlistId: 'playlist-1',
-        trackId: 'track-1',
-        trackIndex: 0,
-        positionMs: 12_000,
-        startedAtServerTs: null,
-        isPlaying: false,
-        mode: 'LOOSE',
-        status: 'PAUSED',
-      });
-
-      await service.pause('group-1', orgAdminUser);
-
-      expect(redis.setGroupState).toHaveBeenCalledWith(
-        'group-1',
-        expect.objectContaining({
-          positionMs: 12_000,
-          startedAtServerTs: null,
-        }),
-      );
-    });
-  });
-
-  // Trước đây override() chỉ set cờ: không presign URL, không broadcast gì cả
-  // nên quán bấm phát xong là im lặng hoàn toàn.
-  describe('store local playback', () => {
-    const storeTracks = {
-      'track-1': {
-        id: 'track-1',
-        title: 'Nắng thuỷ tinh',
-        artist: 'Trịnh Công Sơn',
-        s3Key: 'k1',
-        durationMs: 180_000,
-      },
-      'track-2': {
-        id: 'track-2',
-        title: 'Diễm xưa',
-        artist: 'Trịnh Công Sơn',
-        s3Key: 'k2',
-        durationMs: 200_000,
-      },
-    } as const;
-
-    const storePlaylist = {
-      id: 'playlist-1',
-      name: 'Nhạc quán',
-      playlistTracks: [
-        { trackId: 'track-1', position: 0, track: storeTracks['track-1'] },
-        { trackId: 'track-2', position: 1, track: storeTracks['track-2'] },
-      ],
-    };
-
-    beforeEach(() => {
-      prisma.store.findFirst.mockResolvedValue({
-        id: 'store-1',
-        organizationId: 'org-1',
-        syncGroupId: 'group-1',
-      } as any);
-      prisma.playlist.findFirst.mockResolvedValue(storePlaylist as any);
-      (prisma.track.findFirst as unknown as jest.Mock).mockImplementation(
-        (args: { where?: { id?: string } }) =>
-          Promise.resolve(
-            (storeTracks as Record<string, unknown>)[args?.where?.id ?? ''] ??
-              null,
-          ),
-      );
-    });
-
-    it('broadcasts the track into the room of that store only', async () => {
       await service.playStore(
         'store-1',
-        {
-          playlistId: 'playlist-1',
-          trackIndex: 0,
-          returnToGroupOnFinish: true,
-        },
-        storeAdminUser,
-      );
-
-      expect(s3.getPresignedUrl).toHaveBeenCalledWith('k1');
-      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
-        'store-1',
-        'store-now-playing',
-        expect.objectContaining({
-          storeId: 'store-1',
-          trackId: 'track-1',
-          trackUrl: 'https://s3/presigned/song.mp3',
-        }),
-      );
-      expect(gateway.broadcastToGroup).not.toHaveBeenCalled();
-    });
-
-    it('carries track metadata into the store broadcast', async () => {
-      await service.playStore(
-        'store-1',
-        {
-          playlistId: 'playlist-1',
-          trackIndex: 0,
-          returnToGroupOnFinish: true,
-        },
-        storeAdminUser,
-      );
-
-      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
-        'store-1',
-        'store-now-playing',
-        expect.objectContaining({
-          track: {
-            id: 'track-1',
-            title: 'Nắng thuỷ tinh',
-            artist: 'Trịnh Công Sơn',
-            durationMs: 180_000,
-          },
-        }),
-      );
-    });
-
-    it('marks the store as overridden so group broadcasts stop applying', async () => {
-      await service.playStore(
-        'store-1',
-        {
-          playlistId: 'playlist-1',
-          trackIndex: 0,
-          returnToGroupOnFinish: true,
-        },
-        storeAdminUser,
-      );
-
-      expect(redis.setStoreOverride).toHaveBeenCalledWith(
-        'store-1',
-        expect.objectContaining({
-          isOverridden: true,
-          overridePlaylistId: 'playlist-1',
-        }),
-      );
-    });
-
-    it('stores the queue so a refresh can pick it back up', async () => {
-      await service.playStore(
-        'store-1',
-        {
-          playlistId: 'playlist-1',
-          trackIndex: 0,
-          returnToGroupOnFinish: true,
-        },
-        storeAdminUser,
+        { playlistId: 'playlist-1', trackIndex: 0 },
+        orgAdminUser,
       );
 
       expect(redis.setStorePlayback).toHaveBeenCalledWith(
@@ -645,68 +135,149 @@ describe('SyncService', () => {
         expect.objectContaining({
           storeId: 'store-1',
           playlistId: 'playlist-1',
-          trackIds: ['track-1', 'track-2'],
+          trackIds: [trackA.id, trackB.id],
           trackIndex: 0,
           isPlaying: true,
-          returnToGroupOnFinish: true,
         }),
       );
-    });
 
-    it('reports how many tracks are left before returning to the group', async () => {
-      await service.playStore(
-        'store-1',
-        {
-          playlistId: 'playlist-1',
-          trackIndex: 0,
-          returnToGroupOnFinish: true,
-        },
-        storeAdminUser,
-      );
-
+      // Thiếu `track` thì client phải gọi thêm API mới dựng được thanh phát,
+      // và màn kiosk in thẳng cuid ra TV.
       expect(gateway.broadcastToStore).toHaveBeenCalledWith(
         'store-1',
         'store-now-playing',
         expect.objectContaining({
+          storeId: 'store-1',
+          trackId: trackA.id,
+          track: expect.objectContaining({
+            id: trackA.id,
+            title: 'Cà phê sáng',
+            durationMs: 180_000,
+          }),
+          trackUrl: 'https://s3/presigned/song.mp3',
           queue: { index: 0, total: 2, remaining: 1 },
         }),
       );
     });
 
-    it('refuses a store admin playing on another store', async () => {
+    it('ghi trạng thái phát xuống DB để sống sót qua restart', async () => {
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as never);
+
+      await service.playStore(
+        'store-1',
+        { playlistId: 'playlist-1', trackIndex: 0 },
+        orgAdminUser,
+      );
+
+      expect(prisma.store.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'store-1' },
+          data: expect.objectContaining({
+            status: 'PLAYING',
+            currentTrackId: trackA.id,
+            trackIndex: 0,
+          }),
+        }),
+      );
+    });
+
+    it('phát từ giữa playlist khi có trackIndex', async () => {
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as never);
+
+      await service.playStore(
+        'store-1',
+        { playlistId: 'playlist-1', trackIndex: 1 },
+        orgAdminUser,
+      );
+
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({
+          trackId: trackB.id,
+          queue: { index: 1, total: 2, remaining: 0 },
+        }),
+      );
+    });
+
+    it('báo lỗi thật khi playlist rỗng, không đoán bừa', async () => {
+      prisma.playlist.findFirst.mockResolvedValue({
+        ...mockPlaylist,
+        playlistTracks: [],
+      } as never);
+
       await expect(
         service.playStore(
           'store-1',
-          {
-            playlistId: 'playlist-1',
-            trackIndex: 0,
-            returnToGroupOnFinish: true,
-          },
-          { ...storeAdminUser, storeId: 'store-2' },
+          { playlistId: 'playlist-1', trackIndex: 0 },
+          orgAdminUser,
         ),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-
-      expect(gateway.broadcastToStore).not.toHaveBeenCalled();
+      ).rejects.toThrow(NotFoundException);
     });
 
-    it('pauses local playback and keeps the position', async () => {
+    it('không cho phát playlist của tổ chức khác', async () => {
+      prisma.playlist.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.playStore(
+          'store-1',
+          { playlistId: 'playlist-other-org', trackIndex: 0 },
+          orgAdminUser,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('phân quyền theo quán', () => {
+    it('chặn store admin điều khiển quán khác', async () => {
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as never);
+
+      await expect(
+        service.playStore(
+          'store-2',
+          { playlistId: 'playlist-1', trackIndex: 0 },
+          storeAdminUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('cho store admin điều khiển đúng quán của mình', async () => {
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as never);
+
+      await expect(
+        service.playStore(
+          'store-1',
+          { playlistId: 'playlist-1', trackIndex: 0 },
+          storeAdminUser,
+        ),
+      ).resolves.toBeDefined();
+    });
+
+    it('trả 404 cho quán ngoài tổ chức để không lộ sự tồn tại', async () => {
+      prisma.store.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.playStore(
+          'store-other-org',
+          { playlistId: 'playlist-1', trackIndex: 0 },
+          orgAdminUser,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('pauseStore', () => {
+    it('gộp thời gian đã trôi vào positionMs để hydrate lúc dừng đọc đúng chỗ', async () => {
       redis.getStorePlayback.mockResolvedValue({
-        storeId: 'store-1',
-        playlistId: 'playlist-1',
-        trackIds: ['track-1', 'track-2'],
-        trackIndex: 0,
-        positionMs: 0,
+        ...playbackAt(0),
+        positionMs: 5_000,
         startedAtServerTs: Date.now() - 30_000,
-        isPlaying: true,
-        returnToGroupOnFinish: true,
-      });
+      } as never);
 
-      await service.pauseStore('store-1', storeAdminUser);
+      const paused = await service.pauseStore('store-1', orgAdminUser);
 
-      expect(redis.setStorePlayback).toHaveBeenCalledWith(
-        'store-1',
-        expect.objectContaining({ isPlaying: false }),
-      );
+      expect(paused.isPlaying).toBe(false);
+      expect(paused.positionMs).toBeGreaterThanOrEqual(34_000);
       expect(gateway.broadcastToStore).toHaveBeenCalledWith(
         'store-1',
         'store-paused',
@@ -714,63 +285,112 @@ describe('SyncService', () => {
       );
     });
 
-    it('resumes from the stored position instead of restarting the track', async () => {
-      redis.getStorePlayback.mockResolvedValue({
-        storeId: 'store-1',
-        playlistId: 'playlist-1',
-        trackIds: ['track-1', 'track-2'],
-        trackIndex: 0,
-        positionMs: 42_000,
-        startedAtServerTs: Date.now() - 42_000,
-        isPlaying: false,
-        returnToGroupOnFinish: true,
-      });
+    it('báo lỗi khi quán không phát gì', async () => {
+      redis.getStorePlayback.mockResolvedValue(null);
 
-      await service.resumeStore('store-1', storeAdminUser);
+      await expect(service.pauseStore('store-1', orgAdminUser)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
 
+  describe('nextStore', () => {
+    it('sang bài kế và cập nhật hàng chờ', async () => {
+      redis.getStorePlayback.mockResolvedValue(playbackAt(0) as never);
+      prisma.track.findFirst.mockResolvedValue(trackB as never);
+
+      const result = await service.nextStore('store-1', orgAdminUser);
+
+      expect(result.finished).toBe(false);
       expect(gateway.broadcastToStore).toHaveBeenCalledWith(
         'store-1',
         'store-now-playing',
-        expect.objectContaining({ trackId: 'track-1', positionMs: 42_000 }),
+        expect.objectContaining({
+          trackId: trackB.id,
+          queue: { index: 1, total: 2, remaining: 0 },
+        }),
       );
     });
 
-    it('plays the next track in the local queue', async () => {
-      redis.getStorePlayback.mockResolvedValue({
-        storeId: 'store-1',
-        playlistId: 'playlist-1',
-        trackIds: ['track-1', 'track-2'],
-        trackIndex: 0,
-        positionMs: 0,
-        startedAtServerTs: Date.now(),
-        isPlaying: true,
-        returnToGroupOnFinish: true,
-      });
+    it('hết hàng chờ thì dừng hẳn và dọn state', async () => {
+      redis.getStorePlayback.mockResolvedValue(playbackAt(1) as never);
 
-      await service.nextStore('store-1', storeAdminUser);
+      const result = await service.nextStore('store-1', orgAdminUser);
 
-      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
-        'store-1',
-        'store-now-playing',
-        expect.objectContaining({ trackId: 'track-2' }),
-      );
-    });
-
-    it('clears the queue once the last track finishes', async () => {
-      redis.getStorePlayback.mockResolvedValue({
-        storeId: 'store-1',
-        playlistId: 'playlist-1',
-        trackIds: ['track-1', 'track-2'],
-        trackIndex: 1,
-        positionMs: 0,
-        startedAtServerTs: Date.now(),
-        isPlaying: true,
-        returnToGroupOnFinish: true,
-      });
-
-      await service.nextStore('store-1', storeAdminUser);
-
+      expect(result.finished).toBe(true);
       expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-1');
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-stopped',
+        expect.objectContaining({ storeId: 'store-1' }),
+      );
+    });
+  });
+
+  describe('auto-next do server lái', () => {
+    // Để client bắt `ended` rồi gọi next là sai: quán mở hai màn hình thì mỗi
+    // màn bắn một lệnh và nhạc nhảy cóc, còn không màn nào mở thì nhạc đứng im.
+    it('tự chuyển bài đúng lúc hết thời lượng mà không cần client', async () => {
+      jest.useFakeTimers();
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as never);
+
+      await service.playStore(
+        'store-1',
+        { playlistId: 'playlist-1', trackIndex: 0 },
+        orgAdminUser,
+      );
+
+      redis.getStorePlayback.mockResolvedValue(playbackAt(0) as never);
+      prisma.track.findFirst.mockResolvedValue(trackB as never);
+      gateway.broadcastToStore.mockClear();
+
+      await jest.advanceTimersByTimeAsync(trackA.durationMs + 10);
+
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({ trackId: trackB.id }),
+      );
+    });
+
+    it('dừng hẳn sau bài cuối, không lặp lại playlist', async () => {
+      jest.useFakeTimers();
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as never);
+
+      await service.playStore(
+        'store-1',
+        { playlistId: 'playlist-1', trackIndex: 1 },
+        orgAdminUser,
+      );
+
+      redis.getStorePlayback.mockResolvedValue(playbackAt(1) as never);
+      gateway.broadcastToStore.mockClear();
+
+      await jest.advanceTimersByTimeAsync(trackB.durationMs + 10);
+
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-stopped',
+        expect.objectContaining({ storeId: 'store-1' }),
+      );
+    });
+
+    it('tạm dừng thì huỷ timer, không tự nhảy bài trong lúc đang dừng', async () => {
+      jest.useFakeTimers();
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as never);
+
+      await service.playStore(
+        'store-1',
+        { playlistId: 'playlist-1', trackIndex: 0 },
+        orgAdminUser,
+      );
+
+      redis.getStorePlayback.mockResolvedValue(playbackAt(0) as never);
+      await service.pauseStore('store-1', orgAdminUser);
+      gateway.broadcastToStore.mockClear();
+
+      await jest.advanceTimersByTimeAsync(trackA.durationMs + 10);
+
       expect(gateway.broadcastToStore).not.toHaveBeenCalledWith(
         'store-1',
         'store-now-playing',
@@ -778,513 +398,151 @@ describe('SyncService', () => {
       );
     });
 
-    it('returns the current local playback state', async () => {
-      const playback = {
-        storeId: 'store-1',
-        playlistId: 'playlist-1',
-        trackIds: ['track-1'],
-        trackIndex: 0,
-        positionMs: 0,
-        startedAtServerTs: Date.now(),
-        isPlaying: true,
-        returnToGroupOnFinish: true,
-      };
-      redis.getStorePlayback.mockResolvedValue(playback);
+    it('track chưa biết thời lượng (durationMs = 0) thì không hẹn giờ bừa', async () => {
+      jest.useFakeTimers();
+      prisma.playlist.findFirst.mockResolvedValue({
+        ...mockPlaylist,
+        playlistTracks: [
+          {
+            trackId: 'track-0',
+            position: 0,
+            track: { ...trackA, durationMs: 0 },
+          },
+          { trackId: trackB.id, position: 1, track: trackB },
+        ],
+      } as never);
 
-      await expect(
-        service.getStorePlayback('store-1', storeAdminUser),
-      ).resolves.toEqual(playback);
+      await service.playStore(
+        'store-1',
+        { playlistId: 'playlist-1', trackIndex: 0 },
+        orgAdminUser,
+      );
+      gateway.broadcastToStore.mockClear();
+
+      await jest.advanceTimersByTimeAsync(600_000);
+
+      expect(gateway.broadcastToStore).not.toHaveBeenCalled();
     });
   });
 
-  // Broadcast WS không replay khi client join room — mở trang sau lúc admin bấm
-  // phát thì phải hỏi được "giờ đang phát cái gì" chứ không ngồi đợi bài kế.
-  describe('now-playing snapshot', () => {
-    const track = {
-      id: 'track-1',
-      title: 'Hạ trắng',
-      artist: 'Khánh Ly',
-      durationMs: 240_000,
-      s3Key: 'k1',
-    };
-
-    beforeEach(() => {
-      prisma.store.findFirst.mockResolvedValue({
-        id: 'store-1',
-        organizationId: 'org-1',
-        syncGroupId: 'group-1',
-      } as any);
-      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
-      prisma.track.findFirst.mockResolvedValue(track as any);
-    });
-
-    it('reports the local queue when the store plays its own music', async () => {
+  describe('nowPlayingForStore', () => {
+    // Broadcast WS không replay khi join room — mở trang sau lúc admin bấm phát
+    // mà thiếu cái này thì trang trắng tới tận lần chuyển bài kế tiếp.
+    it('bù thời gian đã trôi để client vào giữa bài không tua về đầu', async () => {
       redis.getStorePlayback.mockResolvedValue({
-        storeId: 'store-1',
-        playlistId: 'playlist-1',
-        trackIds: ['track-1', 'track-2'],
-        trackIndex: 0,
+        ...playbackAt(0),
         positionMs: 0,
-        startedAtServerTs: Date.now() - 30_000,
-        isPlaying: true,
-        returnToGroupOnFinish: true,
-      });
+        startedAtServerTs: Date.now() - 42_000,
+      } as never);
+      prisma.track.findFirst.mockResolvedValue(trackA as never);
 
       const snapshot = await service.nowPlayingForStore(
         'store-1',
-        storeAdminUser,
-      );
-
-      expect(snapshot).toMatchObject({
-        source: 'STORE',
-        storeId: 'store-1',
-        track: {
-          id: 'track-1',
-          title: 'Hạ trắng',
-          artist: 'Khánh Ly',
-          durationMs: 240_000,
-        },
-        trackUrl: 'https://s3/presigned/song.mp3',
-        isPlaying: true,
-        queue: { index: 0, total: 2, remaining: 1 },
-      });
-    });
-
-    it('falls back to the group track when the store follows the chain', async () => {
-      redis.getStorePlayback.mockResolvedValue(null);
-      redis.getGroupState.mockResolvedValue({
-        groupId: 'group-1',
-        playlistId: 'playlist-1',
-        trackId: 'track-1',
-        trackIndex: 0,
-        positionMs: 0,
-        startedAtServerTs: Date.now() - 30_000,
-        isPlaying: true,
-        mode: 'LOOSE',
-        status: 'PLAYING',
-      });
-
-      const snapshot = await service.nowPlayingForStore(
-        'store-1',
-        storeAdminUser,
-      );
-
-      expect(snapshot).toMatchObject({
-        source: 'GROUP',
-        groupId: 'group-1',
-        track: { title: 'Hạ trắng' },
-        queue: null,
-      });
-    });
-
-    // Quán vào giữa bài phải bắt đúng giây, không phát lại từ đầu
-    it('advances the position by the time already elapsed', async () => {
-      redis.getStorePlayback.mockResolvedValue(null);
-      redis.getGroupState.mockResolvedValue({
-        groupId: 'group-1',
-        playlistId: 'playlist-1',
-        trackId: 'track-1',
-        trackIndex: 0,
-        positionMs: 5_000,
-        startedAtServerTs: Date.now() - 30_000,
-        isPlaying: true,
-        mode: 'LOOSE',
-        status: 'PLAYING',
-      });
-
-      const snapshot = await service.nowPlayingForStore(
-        'store-1',
-        storeAdminUser,
-      );
-
-      expect(snapshot!.positionMs).toBeGreaterThanOrEqual(34_000);
-      expect(snapshot!.positionMs).toBeLessThan(36_000);
-    });
-
-    it('keeps the stored position while playback is paused', async () => {
-      redis.getStorePlayback.mockResolvedValue({
-        storeId: 'store-1',
-        playlistId: 'playlist-1',
-        trackIds: ['track-1'],
-        trackIndex: 0,
-        positionMs: 42_000,
-        startedAtServerTs: Date.now() - 30_000,
-        isPlaying: false,
-        returnToGroupOnFinish: true,
-      });
-
-      const snapshot = await service.nowPlayingForStore(
-        'store-1',
-        storeAdminUser,
-      );
-
-      expect(snapshot).toMatchObject({ positionMs: 42_000, isPlaying: false });
-    });
-
-    it('returns null when neither the store nor its group is playing', async () => {
-      redis.getStorePlayback.mockResolvedValue(null);
-      redis.getGroupState.mockResolvedValue(null);
-
-      await expect(
-        service.nowPlayingForStore('store-1', storeAdminUser),
-      ).resolves.toBeNull();
-    });
-
-    it('refuses a store admin asking about another store', async () => {
-      await expect(
-        service.nowPlayingForStore('store-1', {
-          ...storeAdminUser,
-          storeId: 'store-2',
-        }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-    });
-
-    // Dashboard của admin cũng cần biết nhóm đang phát gì để dựng thanh phát
-    it('reports the group track for the admin dashboard', async () => {
-      redis.getGroupState.mockResolvedValue({
-        groupId: 'group-1',
-        playlistId: 'playlist-1',
-        trackId: 'track-1',
-        trackIndex: 0,
-        positionMs: 0,
-        startedAtServerTs: Date.now(),
-        isPlaying: true,
-        mode: 'LOOSE',
-        status: 'PLAYING',
-      });
-
-      const snapshot = await service.nowPlayingForGroup(
-        'group-1',
         orgAdminUser,
       );
 
       expect(snapshot).toMatchObject({
-        source: 'GROUP',
-        groupId: 'group-1',
-        track: { title: 'Hạ trắng' },
+        storeId: 'store-1',
+        isPlaying: true,
+        queue: { index: 0, total: 2, remaining: 1 },
       });
+      expect(snapshot!.positionMs).toBeGreaterThanOrEqual(42_000);
+      expect(snapshot!.track.title).toBe('Cà phê sáng');
     });
 
-    it('hides groups of another organization behind a 404', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue(null);
+    it('trả null khi quán chưa phát gì', async () => {
+      redis.getStorePlayback.mockResolvedValue(null);
 
       await expect(
-        service.nowPlayingForGroup('group-9', orgAdminUser),
-      ).rejects.toBeInstanceOf(NotFoundException);
+        service.nowPlayingForStore('store-1', orgAdminUser),
+      ).resolves.toBeNull();
+    });
+
+    it('giữ nguyên positionMs khi đang tạm dừng', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        ...playbackAt(0, false),
+        positionMs: 12_000,
+        startedAtServerTs: Date.now() - 99_000,
+      } as never);
+      prisma.track.findFirst.mockResolvedValue(trackA as never);
+
+      const snapshot = await service.nowPlayingForStore(
+        'store-1',
+        orgAdminUser,
+      );
+
+      expect(snapshot!.positionMs).toBe(12_000);
+      expect(snapshot!.isPlaying).toBe(false);
     });
   });
 
-  // Admin cần nhìn một chỗ biết quán nào đang nghe theo chuỗi, quán nào tách ra
   describe('overview', () => {
-    const stores = [
-      {
-        id: 'store-1',
+    it('liệt kê từng quán kèm hàng chờ và số màn hình đang kết nối', async () => {
+      prisma.store.findMany.mockResolvedValue([mockStore] as never);
+      redis.getStorePlayback.mockResolvedValue(playbackAt(0) as never);
+      (gateway.countStoreClients as jest.Mock).mockReturnValue(2);
+
+      const { data } = await service.overview(orgAdminUser);
+
+      expect(data).toHaveLength(1);
+      expect(data[0]).toMatchObject({
+        storeId: 'store-1',
         name: 'Quán Nguyễn Huệ',
-        organizationId: 'org-1',
-        syncGroupId: 'group-1',
-        syncGroup: { id: 'group-1', name: 'Nhóm chính' },
-        storeOverride: null,
-      },
-      {
-        id: 'store-2',
-        name: 'Quán Lê Lợi',
-        organizationId: 'org-1',
-        syncGroupId: 'group-1',
-        syncGroup: { id: 'group-1', name: 'Nhóm chính' },
-        storeOverride: { isOverridden: true },
-      },
-    ];
-
-    it('lists stores of the caller organization only', async () => {
-      prisma.store.findMany.mockResolvedValue(stores as any);
-
-      await service.overview(orgAdminUser);
-
-      expect(prisma.store.findMany).toHaveBeenCalledWith({
-        where: { organizationId: 'org-1' },
-        include: { storeOverride: true, syncGroup: true },
-        orderBy: { name: 'asc' },
+        isPlaying: true,
+        trackId: trackA.id,
+        queueRemaining: 1,
+        connectedScreens: 2,
       });
     });
 
-    it('reports the group track for a store following the chain', async () => {
-      prisma.store.findMany.mockResolvedValue([stores[0]] as any);
+    it('quán không phát gì thì báo dừng, không vỡ', async () => {
+      prisma.store.findMany.mockResolvedValue([mockStore] as never);
       redis.getStorePlayback.mockResolvedValue(null);
-      redis.getGroupState.mockResolvedValue({
-        groupId: 'group-1',
-        playlistId: 'playlist-1',
-        trackId: 'track-9',
-        trackIndex: 0,
-        positionMs: 0,
-        startedAtServerTs: Date.now(),
-        isPlaying: true,
-        mode: 'LOOSE',
-        status: 'PLAYING',
-      });
 
-      const result = await service.overview(orgAdminUser);
+      const { data } = await service.overview(orgAdminUser);
 
-      expect(result.data[0]).toMatchObject({
-        storeId: 'store-1',
-        name: 'Quán Nguyễn Huệ',
-        syncGroupName: 'Nhóm chính',
-        isOverridden: false,
-        trackId: 'track-9',
-        isPlaying: true,
+      expect(data[0]).toMatchObject({
+        isPlaying: false,
+        trackId: null,
         queueRemaining: null,
       });
     });
+  });
 
-    it('reports the local queue for a store playing on its own', async () => {
-      prisma.store.findMany.mockResolvedValue([stores[1]] as any);
+  describe('onModuleInit', () => {
+    it('dựng lại timer chuyển bài theo thời lượng còn lại sau restart', async () => {
+      jest.useFakeTimers();
+      prisma.store.findMany.mockResolvedValue([
+        { ...mockStore, status: 'PLAYING' },
+      ] as never);
       redis.getStorePlayback.mockResolvedValue({
-        storeId: 'store-2',
-        playlistId: 'playlist-2',
-        trackIds: ['track-1', 'track-2', 'track-3'],
-        trackIndex: 1,
+        ...playbackAt(0),
         positionMs: 0,
-        startedAtServerTs: Date.now(),
-        isPlaying: true,
-        returnToGroupOnFinish: true,
-      });
+        startedAtServerTs: Date.now() - 179_000,
+      } as never);
+      prisma.track.findFirst.mockResolvedValue(trackA as never);
 
-      const result = await service.overview(orgAdminUser);
+      await service.onModuleInit();
+      prisma.track.findFirst.mockResolvedValue(trackB as never);
+      gateway.broadcastToStore.mockClear();
 
-      expect(result.data[0]).toMatchObject({
-        storeId: 'store-2',
-        isOverridden: true,
-        trackId: 'track-2',
-        queueRemaining: 1,
-      });
-    });
-  });
-
-  describe('override', () => {
-    it('should set store override in Redis and disconnect store from sync group', async () => {
-      prisma.store.findFirst.mockResolvedValue({
-        id: 'store-1',
-        organizationId: 'org-1',
-        syncGroupId: 'group-1',
-      } as any);
-
-      await service.override('store-1', { trackId: 'track-2' }, storeAdminUser);
-
-      expect(redis.setStoreOverride).toHaveBeenCalledWith(
-        'store-1',
-        expect.objectContaining({ isOverridden: true }),
-      );
-    });
-  });
-
-  // Role guard chỉ chứng minh "là store admin", chưa nói gì về việc đó là store
-  // admin của quán NÀO — thiếu check này thì quán A điều khiển được quán B.
-  describe('store access control', () => {
-    const otherStoreAdmin = {
-      ...storeAdminUser,
-      sub: 'user-3',
-      storeId: 'store-2',
-    };
-
-    beforeEach(() => {
-      prisma.store.findFirst.mockResolvedValue({
-        id: 'store-1',
-        organizationId: 'org-1',
-        syncGroupId: 'group-1',
-      } as any);
-    });
-
-    it('refuses override from a store admin of another store', async () => {
-      await expect(
-        service.override('store-1', {}, otherStoreAdmin),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-
-      expect(redis.setStoreOverride).not.toHaveBeenCalled();
-      expect(prisma.storeOverride.upsert).not.toHaveBeenCalled();
-    });
-
-    it('refuses rejoin from a store admin of another store', async () => {
-      await expect(
-        service.rejoin('store-1', otherStoreAdmin),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-
-      expect(redis.clearStoreOverride).not.toHaveBeenCalled();
-    });
-
-    it('allows an org admin to override any store in their organization', async () => {
-      await expect(
-        service.override('store-1', {}, orgAdminUser),
-      ).resolves.toEqual(expect.objectContaining({ isOverridden: true }));
-    });
-
-    it('scopes the store lookup to the caller organization', async () => {
-      await service.override('store-1', {}, orgAdminUser);
-
-      expect(prisma.store.findFirst).toHaveBeenCalledWith({
-        where: { id: 'store-1', organizationId: 'org-1' },
-      });
-    });
-
-    it('hides stores from other organizations behind a 404', async () => {
-      prisma.store.findFirst.mockResolvedValue(null);
-
-      await expect(
-        service.override('store-9', {}, orgAdminUser),
-      ).rejects.toBeInstanceOf(NotFoundException);
-      expect(redis.setStoreOverride).not.toHaveBeenCalled();
-    });
-  });
-
-  // "Phát xong từng đây bài thì quay lại playlist ban đầu": hết hàng chờ riêng
-  // là quán tự về dòng sync của admin, đúng bài đang phát và đúng giây.
-  describe('auto rejoin after the local queue ends', () => {
-    const groupPlaying = {
-      groupId: 'group-1',
-      playlistId: 'playlist-9',
-      trackId: 'track-9',
-      trackIndex: 0,
-      positionMs: 0,
-      startedAtServerTs: Date.now() - 45_000,
-      isPlaying: true,
-      mode: 'LOOSE' as const,
-      status: 'PLAYING' as const,
-    };
-
-    const lastTrackQueue = {
-      storeId: 'store-1',
-      playlistId: 'playlist-1',
-      trackIds: ['track-1', 'track-2'],
-      trackIndex: 1,
-      positionMs: 0,
-      startedAtServerTs: Date.now(),
-      isPlaying: true,
-      returnToGroupOnFinish: true,
-    };
-
-    beforeEach(() => {
-      prisma.store.findFirst.mockResolvedValue({
-        id: 'store-1',
-        organizationId: 'org-1',
-        syncGroupId: 'group-1',
-      } as any);
-      prisma.track.findFirst.mockResolvedValue({
-        id: 'track-9',
-        title: 'Biển nhớ',
-        artist: null,
-        durationMs: 210_000,
-        s3Key: 'group-track.mp3',
-      } as any);
-    });
-
-    it('drops the override when the last local track finishes', async () => {
-      redis.getStorePlayback.mockResolvedValue(lastTrackQueue);
-      redis.getGroupState.mockResolvedValue(groupPlaying);
-
-      await service.nextStore('store-1', storeAdminUser);
-
-      expect(redis.clearStoreOverride).toHaveBeenCalledWith('store-1');
-      expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-1');
-    });
-
-    it('resumes the group track at the position it is already at', async () => {
-      redis.getStorePlayback.mockResolvedValue(lastTrackQueue);
-      redis.getGroupState.mockResolvedValue(groupPlaying);
-
-      await service.nextStore('store-1', storeAdminUser);
+      // Còn khoảng 1s nữa là hết bài đầu
+      await jest.advanceTimersByTimeAsync(1_500);
 
       expect(gateway.broadcastToStore).toHaveBeenCalledWith(
         'store-1',
-        'now-playing',
-        expect.objectContaining({
-          trackId: 'track-9',
-          trackUrl: 'https://s3/presigned/song.mp3',
-          positionMs: expect.any(Number),
-        }),
-      );
-
-      const call = gateway.broadcastToStore.mock.calls.find(
-        ([, event]) => event === 'now-playing',
-      );
-      const payload = call?.[2] as { positionMs: number };
-      expect(payload.positionMs).toBeGreaterThanOrEqual(45_000);
-    });
-
-    it('stays detached when the store asked not to return', async () => {
-      redis.getStorePlayback.mockResolvedValue({
-        ...lastTrackQueue,
-        returnToGroupOnFinish: false,
-      });
-
-      await service.nextStore('store-1', storeAdminUser);
-
-      expect(redis.clearStoreOverride).not.toHaveBeenCalled();
-      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
-        'store-1',
-        'store-stopped',
-        expect.any(Object),
+        'store-now-playing',
+        expect.objectContaining({ trackId: trackB.id }),
       );
     });
 
-    it('stays silent when the group itself is stopped', async () => {
-      redis.getStorePlayback.mockResolvedValue(lastTrackQueue);
-      redis.getGroupState.mockResolvedValue({
-        ...groupPlaying,
-        isPlaying: false,
-        status: 'STOPPED',
-      });
+    it('bỏ qua quán không còn state trong Redis', async () => {
+      prisma.store.findMany.mockResolvedValue([
+        { ...mockStore, status: 'PLAYING' },
+      ] as never);
+      redis.getStorePlayback.mockResolvedValue(null);
 
-      await service.nextStore('store-1', storeAdminUser);
-
-      expect(redis.clearStoreOverride).toHaveBeenCalledWith('store-1');
-      expect(gateway.broadcastToStore).not.toHaveBeenCalledWith(
-        'store-1',
-        'now-playing',
-        expect.anything(),
-      );
-    });
-
-    it('catches up mid-track when rejoining by hand', async () => {
-      redis.getGroupState.mockResolvedValue(groupPlaying);
-
-      await service.rejoin('store-1', storeAdminUser);
-
-      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
-        'store-1',
-        'now-playing',
-        expect.objectContaining({ trackId: 'track-9' }),
-      );
-    });
-
-    it('clears any leftover local queue when rejoining by hand', async () => {
-      redis.getGroupState.mockResolvedValue(groupPlaying);
-
-      await service.rejoin('store-1', storeAdminUser);
-
-      expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-1');
-    });
-  });
-
-  describe('rejoin', () => {
-    it('should clear store override and return current group state', async () => {
-      redis.getGroupState.mockResolvedValue({
-        groupId: 'group-1',
-        playlistId: 'playlist-1',
-        trackId: 'track-1',
-        trackIndex: 0,
-        positionMs: 5000,
-        startedAtServerTs: Date.now() - 5000,
-        isPlaying: true,
-        mode: 'LOOSE',
-        status: 'PLAYING',
-      });
-
-      prisma.store.findFirst.mockResolvedValue({
-        id: 'store-1',
-        syncGroupId: 'group-1',
-      } as any);
-
-      await service.rejoin('store-1', storeAdminUser);
-
-      expect(redis.clearStoreOverride).toHaveBeenCalledWith('store-1');
+      await expect(service.onModuleInit()).resolves.toBeUndefined();
     });
   });
 });

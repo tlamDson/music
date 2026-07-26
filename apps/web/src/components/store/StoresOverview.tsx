@@ -1,26 +1,25 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import Link from 'next/link';
 import { api } from '../../lib/api-client';
 import CoverArt from '../media/CoverArt';
 
 interface StorePlaybackRow {
   storeId: string;
   name: string;
-  syncGroupId: string | null;
-  syncGroupName: string | null;
-  isOverridden: boolean;
+  status: 'PLAYING' | 'PAUSED' | 'STOPPED';
   trackId: string | null;
   isPlaying: boolean;
   queueRemaining: number | null;
+  connectedScreens: number;
 }
 
 const REFRESH_MS = 15_000;
 
 /**
- * "Đang phát tại các quán" — admin nhìn một hàng là biết quán nào theo nhóm,
- * quán nào tách ra phát riêng và còn mấy bài nữa thì tự quay lại.
+ * "Đang phát tại các quán" — admin nhìn một hàng là biết quán nào đang có nhạc,
+ * còn mấy bài trong hàng chờ và có màn hình nào đang nghe không.
  */
 export default function StoresOverview() {
   const [rows, setRows] = useState<StorePlaybackRow[]>([]);
@@ -40,20 +39,10 @@ export default function StoresOverview() {
   useEffect(() => {
     void fetchOverview();
 
-    // Trạng thái quán đổi do WS của chính quán, dashboard không nghe kênh đó
+    // Trạng thái đổi do server hẹn giờ chuyển bài, trang này không nghe WS
     const timer = setInterval(() => void fetchOverview(), REFRESH_MS);
     return () => clearInterval(timer);
   }, [fetchOverview]);
-
-  const handleRejoin = async (row: StorePlaybackRow) => {
-    try {
-      await api.post(`/sync/stores/${row.storeId}/rejoin`);
-      toast.success(`${row.name} đã quay lại nhóm sync`);
-      await fetchOverview();
-    } catch {
-      toast.error('Kéo quán về nhóm thất bại');
-    }
-  };
 
   if (loading) {
     return (
@@ -74,9 +63,10 @@ export default function StoresOverview() {
   return (
     <div className="flex gap-4 overflow-x-auto pb-2">
       {rows.map((row) => (
-        <div
+        <Link
           key={row.storeId}
-          className="w-64 flex-shrink-0 p-4 rounded-xl flex flex-col gap-3"
+          href={`/dashboard/stores/${row.storeId}`}
+          className="w-64 flex-shrink-0 p-4 rounded-xl flex flex-col gap-3 cursor-pointer transition-all duration-150 hover:brightness-125 focus-visible:outline-none focus-visible:brightness-125"
           style={{ backgroundColor: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
         >
           <div className="flex items-center gap-3 min-w-0">
@@ -89,7 +79,9 @@ export default function StoresOverview() {
                 {row.name}
               </p>
               <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
-                {row.syncGroupName ?? 'Chưa gán nhóm'}
+                {row.connectedScreens > 0
+                  ? `${row.connectedScreens} màn hình đang kết nối`
+                  : 'Chưa có màn hình nào'}
               </p>
             </div>
           </div>
@@ -103,10 +95,10 @@ export default function StoresOverview() {
               aria-hidden="true"
             />
             <span className="text-xs" style={{ color: 'rgba(248,250,252,0.6)' }}>
-              {row.isOverridden
-                ? 'Đang phát nhạc riêng'
-                : row.isPlaying
-                  ? 'Đang phát theo nhóm'
+              {row.isPlaying
+                ? 'Đang phát'
+                : row.status === 'PAUSED'
+                  ? 'Tạm dừng'
                   : 'Đang im lặng'}
             </span>
           </div>
@@ -116,21 +108,10 @@ export default function StoresOverview() {
               className="text-xs px-2 py-1 rounded-full self-start"
               style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: 'var(--color-accent)' }}
             >
-              Còn {row.queueRemaining} bài · rồi quay lại nhóm
+              Còn {row.queueRemaining} bài trong hàng chờ
             </span>
           )}
-
-          {row.isOverridden && (
-            <button
-              onClick={() => void handleRejoin(row)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
-              style={{ backgroundColor: 'var(--color-secondary)', color: 'white' }}
-              aria-label={`Kéo ${row.name} về nhóm sync`}
-            >
-              Kéo về nhóm sync
-            </button>
-          )}
-        </div>
+        </Link>
       ))}
     </div>
   );

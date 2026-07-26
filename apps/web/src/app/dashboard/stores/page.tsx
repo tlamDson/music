@@ -1,27 +1,38 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { toast } from 'sonner';
 import { api } from '../../../lib/api-client';
+import CoverArt from '../../../components/media/CoverArt';
 
-interface Store {
+interface StoreRow {
   id: string;
   name: string;
-  syncGroupId: string | null;
-  storeOverride?: {
-    isOverridden: boolean;
-    overriddenAt: string | null;
-  } | null;
+  status: 'PLAYING' | 'PAUSED' | 'STOPPED';
 }
 
+const STATUS_LABEL: Record<StoreRow['status'], string> = {
+  PLAYING: 'Đang phát',
+  PAUSED: 'Tạm dừng',
+  STOPPED: 'Đang im lặng',
+};
+
+const STATUS_COLOR: Record<StoreRow['status'], string> = {
+  PLAYING: 'var(--color-accent)',
+  PAUSED: '#EAB308',
+  STOPPED: 'rgba(248,250,252,0.25)',
+};
+
 export default function StoresPage() {
-  const [stores, setStores] = useState<Store[]>([]);
+  const [stores, setStores] = useState<StoreRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
 
   const fetchStores = () => {
     api
-      .get<{ data: Store[] }>('/stores')
+      .get<{ data: StoreRow[] }>('/stores')
       .then((res) => setStores(res.data))
       .catch(() => setStores([]))
       .finally(() => setLoading(false));
@@ -41,14 +52,12 @@ export default function StoresPage() {
       await api.post('/stores', { name: newStoreName });
       setNewStoreName('');
       fetchStores();
+      toast.success(`Đã tạo quán "${newStoreName}"`);
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Tạo quán thất bại');
     } finally {
       setCreating(false);
     }
-  };
-
-  const handleRejoin = async (storeId: string) => {
-    await api.post(`/sync/stores/${storeId}/rejoin`);
-    fetchStores();
   };
 
   return (
@@ -58,126 +67,95 @@ export default function StoresPage() {
           className="text-2xl font-bold"
           style={{ fontFamily: 'Fira Code, monospace', color: 'var(--color-foreground)' }}
         >
-          Stores
+          Quán
         </h1>
         <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
-          Manage stores and monitor playback status
+          Bấm vào một quán để chọn nhạc và điều khiển phát cho quán đó
         </p>
       </div>
 
-      {/* Create store */}
-      <form onSubmit={(e) => void handleCreate(e)} className="flex gap-3" aria-label="Create store">
+      <form
+        onSubmit={(e) => void handleCreate(e)}
+        className="flex flex-col sm:flex-row gap-3"
+        aria-label="Tạo quán"
+      >
         <input
           type="text"
           value={newStoreName}
           onChange={(e) => setNewStoreName(e.target.value)}
-          placeholder="New store name..."
+          placeholder="Tên quán mới..."
           className="flex-1 px-4 py-2 rounded-lg text-sm outline-none"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-foreground)',
             border: '1px solid var(--color-border)',
           }}
-          aria-label="Store name"
+          aria-label="Tên quán"
         />
         <button
           type="submit"
           disabled={creating}
-          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:opacity-90"
+          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
           style={{
             backgroundColor: 'var(--color-accent)',
             color: 'white',
             opacity: creating ? 0.7 : 1,
           }}
         >
-          {creating ? 'Creating...' : 'Add Store'}
+          {creating ? 'Đang tạo...' : 'Thêm quán'}
         </button>
       </form>
 
-      {/* Stores list */}
       {loading ? (
         <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-          Loading stores...
+          Đang tải danh sách quán...
         </p>
       ) : stores.length === 0 ? (
         <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-          No stores yet.
+          Chưa có quán nào.
         </p>
       ) : (
         <div className="grid gap-3">
           {stores.map((store) => (
-            <div
+            <Link
               key={store.id}
-              className="p-4 rounded-xl flex items-center justify-between"
+              href={`/dashboard/stores/${store.id}`}
+              className="p-4 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-all duration-150 hover:brightness-125 focus-visible:outline-none focus-visible:brightness-125"
               style={{
                 backgroundColor: 'var(--color-muted)',
                 border: '1px solid var(--color-border)',
               }}
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{
-                    backgroundColor: store.storeOverride?.isOverridden
-                      ? 'var(--color-destructive)'
-                      : store.syncGroupId
-                        ? 'var(--color-accent)'
-                        : 'rgba(248,250,252,0.2)',
-                  }}
-                />
-                <div>
-                  <p className="font-medium" style={{ color: 'var(--color-foreground)' }}>
+              <div className="flex items-center gap-3 min-w-0">
+                <CoverArt seed={store.id} label={store.name} size={44} />
+                <div className="min-w-0">
+                  <p className="font-medium truncate" style={{ color: 'var(--color-foreground)' }}>
                     {store.name}
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: 'rgba(248,250,252,0.5)' }}>
-                    {store.storeOverride?.isOverridden
-                      ? 'Overriding'
-                      : store.syncGroupId
-                        ? 'In sync group'
-                        : 'No group assigned'}
-                  </p>
+                  <span className="flex items-center gap-2 mt-0.5">
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: STATUS_COLOR[store.status] }}
+                      aria-hidden="true"
+                    />
+                    <span className="text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                      {STATUS_LABEL[store.status]}
+                    </span>
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {store.storeOverride?.isOverridden && (
-                  <button
-                    onClick={() => void handleRejoin(store.id)}
-                    className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-all duration-150 hover:opacity-80"
-                    style={{ backgroundColor: 'var(--color-secondary)', color: 'white' }}
-                  >
-                    Rejoin Group
-                  </button>
-                )}
-                <a
-                  href={`/player/${store.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-all duration-150 hover:brightness-110"
-                  style={{
-                    backgroundColor: 'var(--color-primary)',
-                    color: 'var(--color-foreground)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                >
-                  Mở màn hình quán
-                </a>
-                {/* Bản chỉ hiển thị để treo TV trong quán */}
-                <a
-                  href={`/player/${store.id}?kiosk=1`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-all duration-150 hover:brightness-110"
-                  style={{
-                    backgroundColor: 'transparent',
-                    color: 'var(--color-secondary)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                >
-                  Màn chiếu
-                </a>
-              </div>
-            </div>
+              <span
+                className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0"
+                style={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-foreground)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                Chọn nhạc →
+              </span>
+            </Link>
           ))}
         </div>
       )}

@@ -47,27 +47,35 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 | ---------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `Track`    | `organizationId` + `storeId?` | `storeId = null` → kho chung của chuỗi; có giá trị → nhạc riêng của quán đó. `STORE_ADMIN` upload thì track tự gắn quán của họ |
 | `Playlist` | `organizationId` + `scope`    | `scope = ORG` chỉ `ORG_ADMIN` sửa/xoá; `scope = STORE` gắn `storeId`                                                           |
-| Sync       | `syncGroup.organizationId`    | Lịch phát (`PlaylistSchedule`) không có org riêng — luôn lọc qua sync group                                                    |
+| Lịch phát  | `store.organizationId`        | `PlaylistSchedule` không có org riêng — luôn lọc qua quán (`store: { organizationId }`)                                        |
 
 `STORE_ADMIN` **được** upload và xoá track của quán mình, **không** xoá được track chung (`TracksService.scopeFor` + check trong `remove`). `SyncService.assertStoreAccess` chặn store admin thao tác quán khác.
 
-## Sync engine — hai luồng nhạc song song
+## Sync engine — một luồng nhạc theo quán
 
-| Luồng               | Ai điều khiển                                                         | Room WS           | State                         |
-| ------------------- | --------------------------------------------------------------------- | ----------------- | ----------------------------- |
-| Nhóm sync           | ORG_ADMIN (`/sync/groups/:id/play\|pause\|skip`)                      | `sync-group:<id>` | Redis `sync-group:<id>:state` |
-| Nhạc riêng của quán | Quán đó hoặc ORG_ADMIN (`/sync/stores/:id/play\|pause\|resume\|next`) | `store:<id>`      | Redis `store:<id>:playback`   |
+**Quán (`Store`) là đơn vị phát.** Tầng `SyncGroup` đã bị bỏ (PR #54) vì trùng chức năng với quán — cùng với nó là toàn bộ khái niệm override / rejoin / `returnToGroupOnFinish`: không còn nhóm thì không có gì để tách ra hay quay về.
 
-- Quán bấm phát = **tự override** (tách khỏi nhóm). Hết hàng chờ riêng, mặc định `returnToGroupOnFinish` đưa quán về nhóm và **bắt kịp đúng vị trí giây** của bài nhóm đang phát (`positionMs` bù theo `startedAtServerTs`).
-- Backend **tự chuyển bài** cho nhóm bằng `setTimeout` theo `track.durationMs`; hết playlist thì dừng hẳn (không loop). `onModuleInit` dựng lại timer sau restart.
+| Thành phần | Vị trí |
+| ---------- | ------ |
+| Điều khiển | `POST /sync/stores/:id/play\|pause\|resume\|next\|stop` (ORG_ADMIN + STORE_ADMIN của chính quán) |
+| Room WS    | `store:<id>` |
+| State      | Redis `store:<id>:playback` (TTL 24h) + cột `status`/`currentTrackId`/`trackIndex`/`startedAtTs` trên `Store` |
+
+- **Chuyển bài do server lái**, không phải client. `startStoreTrack` hẹn `setTimeout` theo `track.durationMs`; hết playlist thì dừng hẳn (không loop). `onModuleInit` dựng lại timer sau restart theo thời lượng còn lại. Trước đây client bắt sự kiện `ended` rồi gọi `/next` — quán mở hai màn hình thì mỗi màn bắn một lệnh và nhạc nhảy cóc, còn không màn nào mở thì nhạc đứng im.
 - **Giới hạn: timer nằm trong bộ nhớ process** → chỉ đúng khi chạy 1 instance backend. Scale nhiều instance phải chuyển sang khoá phân tán trên Redis.
+- `pauseStore` huỷ timer (nếu không nhạc đang dừng vẫn tự nhảy bài) và gộp thời gian đã trôi vào `positionMs` để hydrate lúc đang dừng đọc đúng vị trí.
 - Track có `durationMs = 0` (upload trước khi web biết đo thời lượng) → không auto-next được, UI hiện `--:--`.
-- WS event: `now-playing` / `paused` / `stopped` (nhóm) · `store-now-playing` / `store-paused` / `store-stopped` (quán). Client join `join-group` + `join-store`.
-- Payload `now-playing` / `store-now-playing` **kèm `track: WsTrackMeta` ({id,title,artist,durationMs})** để client dựng thanh phát mà không phải gọi thêm API — đừng chỉ gửi `trackId`.
-- **Broadcast WS không replay khi join room.** Client mở trang sau lúc admin bấm phát phải gọi `GET /sync/stores/:id/now-playing` (hoặc `/sync/groups/:id/now-playing`) để hydrate — trả `NowPlayingSnapshot` với `positionMs` đã bù thời gian trôi. Thiếu bước này thì trang trắng tới lần chuyển bài kế.
-- Frontend: `hooks/useSync.ts` **không tự lái audio**, nó đẩy vào `PlayerProvider` (`playTrack`/`pause`/`stop`); thanh phát dùng chung tự hiện. Dashboard admin mount `components/sync/DashboardSyncBridge.tsx`, mở **một socket con cho mỗi sync group** của tổ chức (không chỉ nhóm đầu tiên) — nếu không, bấm Play cho nhóm khác nhóm đầu vẫn trả 200 nhưng tab admin không nghe được gì.
-- **`SyncService.play()`/`skip()`/`advance()` tự xoá override + hàng chờ riêng của mọi quán trong nhóm** (`clearGroupStoreOverrides`) trước khi broadcast — nếu không, quán từng tách ra (hoặc còn state rác TTL 24h) sẽ mãi hiện "Overriding" ở `/dashboard/stores` dù đang nghe đúng nhạc nhóm. Group `pause()` cũng gộp elapsed vào `positionMs` (null `startedAtServerTs`) giống `pauseStore()`, để hydrate lúc đang dừng đọc đúng vị trí.
-- **Client tự bắt kịp nhóm sau khi dừng/rejoin**: `PlayerProvider` giữ một "neo đồng bộ" (`positionMs` + `atLocalTs`) — so track theo id để rejoin (URL presign lại mỗi lần) không reload audio nếu cùng bài, seek sau khi media sẵn sàng thay vì ngay lúc gán `src`, và tự chỉnh trôi trên `timeupdate` nếu lệch > 750ms. Quán bấm dừng cục bộ (qua `toggle()` ở `PlayerBar`, không gọi server) rồi phát lại sẽ tự nhảy tới vị trí sống của nhóm thay vì tiếp tục từ chỗ cũ. `/player/[storeId]` nút "Tạm dừng" chỉ gọi `POST /sync/stores/:id/pause` khi quán có hàng chờ riêng (mode `local`) — quán đang theo nhóm thì dừng cục bộ, tránh 404 "Store is not playing locally".
+- WS event: `store-now-playing` / `store-paused` / `store-stopped`. Client join `join-store`.
+- Payload `store-now-playing` **kèm `track: WsTrackMeta` ({id,title,artist,durationMs})** để client dựng thanh phát mà không phải gọi thêm API — đừng chỉ gửi `trackId`.
+- **Broadcast WS không replay khi join room.** Client mở trang sau lúc admin bấm phát phải gọi `GET /sync/stores/:id/now-playing` để hydrate — trả `NowPlayingSnapshot` với `positionMs` đã bù thời gian trôi. Thiếu bước này thì trang trắng tới lần chuyển bài kế.
+- `SyncGateway.countStoreClients(storeId)` đếm client trong room `store:<id>` = số màn hình đang thực sự nghe. Trang chi tiết quán và `/sync/overview` hiện con số này để admin biết bấm phát xong có ai nghe không.
+
+### Frontend
+
+- `hooks/useSync.ts` **không tự lái audio**, nó đẩy vào `PlayerProvider` (`playTrack`/`pause`/`stop`); thanh phát dùng chung tự hiện. `PlayerMode` chỉ còn `'store'` (nhạc thật của quán) và `'preview'` (nghe thử tại chỗ).
+- **Socket phải sống ở layout, không phải ở page.** `/store/**` dùng `components/sync/StoreSyncProvider.tsx` (mount ở `app/store/layout.tsx`), `/dashboard/**` dùng `components/sync/StoresSyncBridge.tsx` — mở **một socket con cho mỗi quán** của tổ chức. Đặt `useSync` bên trong một page thì rời page là socket chết, bấm phát vẫn trả 201 nhưng không có nhạc (bug PR #53).
+- **Ai bấm phát ở đâu:** `/dashboard/stores/[id]` là chỗ **duy nhất** phát nhạc ra loa quán. `/dashboard/playlists` chỉ **nghe thử tại chỗ** (`mode: 'preview'`, chỉ tab đang bấm nghe). Console quán `/store/**` bấm phát = phát thật cho quán của chính họ.
+- `PlayerProvider` giữ một "neo đồng bộ" (`positionMs` + `atLocalTs`): so track theo id để không reload audio khi cùng bài (URL presign lại mỗi lần), seek sau khi media sẵn sàng thay vì ngay lúc gán `src`, và tự chỉnh trôi trên `timeupdate` nếu lệch > 750ms — quán bấm dừng cục bộ rồi phát lại sẽ nhảy tới vị trí sống thay vì tiếp tục từ chỗ cũ.
 
 ## Auth — vô hiệu hoá tài khoản (`User.isActive`)
 
@@ -78,8 +86,7 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 | Nhóm       | Endpoint chính                                                                                                                                                                             |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Auth       | `POST /auth/login`, `/auth/refresh`                                                                                                                                                        |
-| Sync group | `GET                                                                                                                                                                                       | POST /sync/groups`·`POST /sync/groups/:id/play\|pause\|skip`·`GET /sync/groups/:id/state`    |
-| Quán       | `POST /sync/stores/:id/play\|pause\|resume\|next\|override\|rejoin` · `GET /sync/stores/:id/playback\|now-playing` · `GET /sync/groups/:id/now-playing` · `GET /sync/overview` (ORG_ADMIN) |
+| Quán       | `POST /sync/stores/:id/play\|pause\|resume\|next\|stop` · `GET /sync/stores/:id/playback\|now-playing` · `GET /sync/overview` (ORG_ADMIN) · `GET /stores/:id` (chi tiết + đang phát + số màn hình) |
 | Playlist   | `GET /playlists?scope=&q=&sort=` (trả kèm `totalDurationMs`) · CRUD `/playlists/:id` · `/playlists/:id/tracks[/reorder]`                                                                   |
 | Folder     | `GET                                                                                                                                                                                       | POST                                                                                         | DELETE /folders`— **không phải**`/playlists/folders`, tách controller riêng để `@Get(':id')` không nuốt route |
 | Track      | `GET                                                                                                                                                                                       | POST /tracks`(multipart kèm`durationMs`) · `GET /tracks/:id/stream-url`·`DELETE /tracks/:id` |

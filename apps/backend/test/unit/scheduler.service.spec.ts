@@ -16,10 +16,10 @@ describe('SchedulerService', () => {
     id: 'schedule-1',
     cronExpression: '30 10 * * *',
     playlistId: 'playlist-1',
-    syncGroupId: 'group-1',
+    storeId: 'store-1',
     active: true,
     playlist: { id: 'playlist-1', name: 'Morning Chill' },
-    syncGroup: { id: 'group-1', name: 'Group A', organizationId: 'org-1' },
+    store: { id: 'store-1', name: 'Quán Nguyễn Huệ', organizationId: 'org-1' },
     ...overrides,
   });
 
@@ -31,7 +31,7 @@ describe('SchedulerService', () => {
 
     const prismaMock = mockDeep<PrismaClient>();
     const syncMock = {
-      play: jest.fn().mockResolvedValue(undefined),
+      playStore: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<SyncService>;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -59,9 +59,9 @@ describe('SchedulerService', () => {
 
     expect(prisma.playlistSchedule.findMany).toHaveBeenCalledWith({
       where: { active: true },
-      include: { syncGroup: true, playlist: true },
+      include: { store: true, playlist: true },
     });
-    expect(syncService.play).not.toHaveBeenCalled();
+    expect(syncService.playStore).not.toHaveBeenCalled();
   });
 
   it('should play the schedule when cron minute and hour match now', async () => {
@@ -71,7 +71,7 @@ describe('SchedulerService', () => {
 
     await service.checkSchedules();
 
-    expect(syncService.play).toHaveBeenCalledTimes(1);
+    expect(syncService.playStore).toHaveBeenCalledTimes(1);
   });
 
   it('should play when cron is a full wildcard', async () => {
@@ -81,7 +81,7 @@ describe('SchedulerService', () => {
 
     await service.checkSchedules();
 
-    expect(syncService.play).toHaveBeenCalledTimes(1);
+    expect(syncService.playStore).toHaveBeenCalledTimes(1);
   });
 
   it('should not play when cron hour does not match', async () => {
@@ -91,25 +91,25 @@ describe('SchedulerService', () => {
 
     await service.checkSchedules();
 
-    expect(syncService.play).not.toHaveBeenCalled();
+    expect(syncService.playStore).not.toHaveBeenCalled();
   });
 
-  it('should pass playlist, track index, mode and system payload to sync play', async () => {
+  it('should pass playlist, track index and system payload to store playback', async () => {
     prisma.playlistSchedule.findMany.mockResolvedValue([
       buildSchedule(),
     ] as any);
 
     await service.checkSchedules();
 
-    expect(syncService.play).toHaveBeenCalledWith(
-      'group-1',
-      { playlistId: 'playlist-1', trackIndex: 0, mode: 'LOOSE' },
+    expect(syncService.playStore).toHaveBeenCalledWith(
+      'store-1',
+      { playlistId: 'playlist-1', trackIndex: 0 },
       {
         sub: 'system',
         email: 'system@cafe-music',
         role: 'ORG_ADMIN',
         organizationId: 'org-1',
-        storeId: null,
+        storeId: 'store-1',
       },
     );
   });
@@ -120,26 +120,26 @@ describe('SchedulerService', () => {
     ] as any);
 
     await expect(service.checkSchedules()).resolves.toBeUndefined();
-    expect(syncService.play).not.toHaveBeenCalled();
+    expect(syncService.playStore).not.toHaveBeenCalled();
   });
 
   it('should log the error and continue with remaining schedules when play fails', async () => {
     const failing = buildSchedule({ id: 'schedule-1' });
     const succeeding = buildSchedule({
       id: 'schedule-2',
-      syncGroupId: 'group-2',
+      storeId: 'store-2',
     });
     prisma.playlistSchedule.findMany.mockResolvedValue([
       failing,
       succeeding,
     ] as any);
-    syncService.play
+    syncService.playStore
       .mockRejectedValueOnce(new Error('redis down'))
       .mockResolvedValueOnce(undefined as never);
 
     await expect(service.checkSchedules()).resolves.toBeUndefined();
 
-    expect(syncService.play).toHaveBeenCalledTimes(2);
+    expect(syncService.playStore).toHaveBeenCalledTimes(2);
     expect(Logger.prototype.error).toHaveBeenCalledWith(
       expect.stringContaining('schedule-1'),
       expect.any(Error),
@@ -159,7 +159,7 @@ describe('SchedulerService', () => {
     };
 
     const createDto = {
-      syncGroupId: 'group-1',
+      storeId: 'store-1',
       playlistId: 'playlist-1',
       cronExpression: '30 10 * * *',
       active: true,
@@ -171,14 +171,14 @@ describe('SchedulerService', () => {
       await service.findAll(user);
 
       expect(prisma.playlistSchedule.findMany).toHaveBeenCalledWith({
-        where: { syncGroup: { organizationId: 'org-1' } },
-        include: { syncGroup: true, playlist: true },
+        where: { store: { organizationId: 'org-1' } },
+        include: { store: true, playlist: true },
         orderBy: { createdAt: 'desc' },
       });
     });
 
     it('creates a schedule when group and playlist belong to the organization', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue({ id: 'group-1' } as never);
+      prisma.store.findFirst.mockResolvedValue({ id: 'store-1' } as never);
       prisma.playlist.findFirst.mockResolvedValue({
         id: 'playlist-1',
       } as never);
@@ -190,12 +190,12 @@ describe('SchedulerService', () => {
 
       expect(prisma.playlistSchedule.create).toHaveBeenCalledWith({
         data: createDto,
-        include: { syncGroup: true, playlist: true },
+        include: { store: true, playlist: true },
       });
     });
 
     it('refuses to create a schedule for a sync group outside the organization', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue(null);
+      prisma.store.findFirst.mockResolvedValue(null);
 
       await expect(service.create(createDto, user)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -204,7 +204,7 @@ describe('SchedulerService', () => {
     });
 
     it('refuses to create a schedule for a playlist outside the organization', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue({ id: 'group-1' } as never);
+      prisma.store.findFirst.mockResolvedValue({ id: 'store-1' } as never);
       prisma.playlist.findFirst.mockResolvedValue(null);
 
       await expect(service.create(createDto, user)).rejects.toBeInstanceOf(
@@ -226,7 +226,7 @@ describe('SchedulerService', () => {
       expect(prisma.playlistSchedule.update).toHaveBeenCalledWith({
         where: { id: 'schedule-1' },
         data: { active: false },
-        include: { syncGroup: true, playlist: true },
+        include: { store: true, playlist: true },
       });
     });
 
@@ -256,7 +256,7 @@ describe('SchedulerService', () => {
       await service.toggle('schedule-1', user);
 
       expect(prisma.playlistSchedule.findFirst).toHaveBeenCalledWith({
-        where: { id: 'schedule-1', syncGroup: { organizationId: 'org-1' } },
+        where: { id: 'schedule-1', store: { organizationId: 'org-1' } },
       });
     });
 

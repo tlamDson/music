@@ -37,17 +37,6 @@ async function main() {
 
   console.log('Org Admin:', orgAdmin.email);
 
-  const syncGroup = await prisma.syncGroup.upsert({
-    where: { id: 'sync-group-main' },
-    update: {},
-    create: {
-      id: 'sync-group-main',
-      name: 'Main Sync Group',
-      organizationId: org.id,
-      mode: 'LOOSE',
-    },
-  });
-
   const storeData = [
     { name: 'Store 1 - Downtown', email: 'store1@cafe.com' },
     { name: 'Store 2 - Uptown', email: 'store2@cafe.com' },
@@ -62,7 +51,6 @@ async function main() {
         id: `store-${storeData.indexOf(s) + 1}`,
         name: s.name,
         organizationId: org.id,
-        syncGroupId: syncGroup.id,
       },
     });
 

@@ -30,15 +30,45 @@ const storePlaylist = {
   totalDurationMs: 2_700_000,
 };
 
+// PlayerProvider dựng `new Audio()` — jsdom không implement play(), mock tối thiểu.
+class MockAudio {
+  src = '';
+  currentTime = 0;
+  duration = 180;
+  volume = 1;
+  paused = true;
+  addEventListener() {}
+  removeEventListener() {}
+  play = jest.fn(async () => {
+    this.paused = false;
+  });
+  pause = jest.fn(() => {
+    this.paused = true;
+  });
+}
+Object.defineProperty(global, 'Audio', { writable: true, value: MockAudio });
+
 describe('PlaylistBrowse', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     window.localStorage.clear();
     mockApi.get.mockImplementation((path: string) => {
-      if (path.startsWith('/sync/groups')) {
+      if (path === '/playlists/playlist-1') {
         return Promise.resolve({
-          data: [{ id: 'group-1', name: 'Nhóm chính', mode: 'LOOSE', status: 'STOPPED' }],
+          playlistTracks: [
+            {
+              track: {
+                id: 'track-1',
+                title: 'Hẹn Em Ở Lần Yêu Thứ 2',
+                artist: 'Nguyenn',
+                durationMs: 366_000,
+              },
+            },
+          ],
         });
+      }
+      if (path.includes('/stream-url')) {
+        return Promise.resolve({ url: 'https://s3/preview.mp3' });
       }
       return Promise.resolve({ data: [orgPlaylist, storePlaylist] });
     });
@@ -90,7 +120,8 @@ describe('PlaylistBrowse', () => {
     );
   });
 
-  it('plays on the sync group for an org admin', async () => {
+  // Admin chuỗi chỉ nghe thử tại chỗ — phát ra loa quán phải vào trang quán
+  it('chỉ nghe thử tại chỗ cho admin chuỗi, không phát ra quán nào', async () => {
     mockApi.post.mockResolvedValue({});
     renderBrowse('ORG_ADMIN');
     await screen.findByText('Nhạc Lofi Chill Việt Nam');
@@ -98,15 +129,13 @@ describe('PlaylistBrowse', () => {
     await userEvent.click(screen.getByRole('button', { name: /phát nhạc lofi chill việt nam/i }));
 
     await waitFor(() =>
-      expect(mockApi.post).toHaveBeenCalledWith(
-        '/sync/groups/group-1/play',
-        expect.objectContaining({ playlistId: 'playlist-1' }),
-      ),
+      expect(mockApi.get).toHaveBeenCalledWith('/tracks/track-1/stream-url'),
     );
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
-  // Quán bấm phát là tự tách khỏi nhóm sync, không đụng vào nhóm của cả chuỗi
-  it('plays locally for a store admin instead of touching the group', async () => {
+  // Quán bấm phát là phát thật ra loa quán mình
+  it('plays at the store for a store admin', async () => {
     mockApi.post.mockResolvedValue({});
     renderBrowse('STORE_ADMIN');
     await screen.findByText('Nhạc Lofi Chill Việt Nam');

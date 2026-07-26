@@ -5,24 +5,16 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import {
-  PlayGroupSchema,
-  OverrideSchema,
-  StorePlaySchema,
-  CreateSyncGroupSchema,
-  JwtPayload,
-} from '@cafe-music/shared';
+import { StorePlaySchema, JwtPayload } from '@cafe-music/shared';
 import { z } from 'zod';
 
+/**
+ * Chỉ còn luồng phát theo quán — tầng `/sync/groups/*` đã bị bỏ cùng SyncGroup.
+ */
 @Controller('sync')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SyncController {
   constructor(private syncService: SyncService) {}
-
-  @Get('groups')
-  listGroups(@CurrentUser() user: JwtPayload) {
-    return this.syncService.listGroups(user);
-  }
 
   @Get('overview')
   @Roles('ORG_ADMIN')
@@ -30,52 +22,6 @@ export class SyncController {
     return this.syncService.overview(user);
   }
 
-  @Post('groups')
-  @Roles('ORG_ADMIN')
-  createGroup(
-    @Body(new ZodValidationPipe(CreateSyncGroupSchema))
-    dto: z.infer<typeof CreateSyncGroupSchema>,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.syncService.createGroup(dto, user);
-  }
-
-  @Post('groups/:id/play')
-  @Roles('ORG_ADMIN')
-  play(
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(PlayGroupSchema))
-    dto: z.infer<typeof PlayGroupSchema>,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.syncService.play(id, dto, user);
-  }
-
-  @Post('groups/:id/pause')
-  @Roles('ORG_ADMIN')
-  pause(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.syncService.pause(id, user);
-  }
-
-  @Post('groups/:id/skip')
-  @Roles('ORG_ADMIN')
-  skip(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.syncService.skip(id, user);
-  }
-
-  @Get('groups/:id/state')
-  getState(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.syncService.getGroupState(id, user);
-  }
-
-  // Dashboard mở giữa chừng vẫn dựng được thanh phát: state thô ở trên không có
-  // url lẫn tên bài, mà broadcast thì không replay cho người vào sau.
-  @Get('groups/:id/now-playing')
-  groupNowPlaying(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.syncService.nowPlayingForGroup(id, user);
-  }
-
-  // Phát nhạc riêng của quán — quán tự tách khỏi nhóm sync khi bấm phát
   @Post('stores/:id/play')
   @Roles('ORG_ADMIN', 'STORE_ADMIN')
   playStore(
@@ -105,35 +51,24 @@ export class SyncController {
     return this.syncService.nextStore(id, user);
   }
 
+  @Post('stores/:id/stop')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
+  stopStore(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.syncService.stopStoreFor(id, user);
+  }
+
   @Get('stores/:id/playback')
   @Roles('ORG_ADMIN', 'STORE_ADMIN')
   storePlayback(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.syncService.getStorePlayback(id, user);
   }
 
-  // Console của quán hỏi cái này lúc mở trang: đang phát nhạc riêng hay đang
-  // theo nhóm, bài nào, tới giây thứ mấy.
+  // Client mở trang giữa chừng vẫn dựng được thanh phát: broadcast WS không
+  // replay khi join room, thiếu cái này thì trang trắng tới lần chuyển bài kế.
   @Get('stores/:id/now-playing')
   @Roles('ORG_ADMIN', 'STORE_ADMIN')
   storeNowPlaying(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.syncService.nowPlayingForStore(id, user);
-  }
-
-  @Post('stores/:id/override')
-  @Roles('ORG_ADMIN', 'STORE_ADMIN')
-  override(
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(OverrideSchema))
-    dto: z.infer<typeof OverrideSchema>,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.syncService.override(id, dto, user);
-  }
-
-  @Post('stores/:id/rejoin')
-  @Roles('ORG_ADMIN', 'STORE_ADMIN')
-  rejoin(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.syncService.rejoin(id, user);
   }
 
   @Post('clock')

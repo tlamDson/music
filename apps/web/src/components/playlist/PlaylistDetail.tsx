@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
 import { formatDuration, formatTotalDuration } from '../../lib/format';
-import { useSyncGroups } from '../../hooks/useSyncGroups';
 import { usePlayer } from '../player/PlayerProvider';
 import CoverArt from '../media/CoverArt';
 import AddTrackDialog from './AddTrackDialog';
@@ -42,8 +41,7 @@ export default function PlaylistDetail({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const { defaultGroupId } = useSyncGroups();
-  const { current, isPlaying, queue } = usePlayer();
+  const { current, isPlaying, queue, playTrack } = usePlayer();
 
   const isStore = role === 'STORE_ADMIN';
 
@@ -64,6 +62,11 @@ export default function PlaylistDetail({
   const rows = playlist?.playlistTracks ?? [];
   const totalDurationMs = rows.reduce((sum, row) => sum + (row.track.durationMs ?? 0), 0);
 
+  /**
+   * Quán bấm phát = phát thật ra loa quán. Admin chuỗi bấm phát = **nghe thử
+   * tại chỗ**, chỉ tab đang bấm nghe được — muốn phát ra quán thì vào
+   * `/dashboard/stores/[id]`, nơi chọn đúng quán để phát.
+   */
   const playFrom = async (trackIndex: number) => {
     try {
       if (isStore) {
@@ -71,27 +74,31 @@ export default function PlaylistDetail({
           toast.error('Tài khoản chưa gắn với quán nào');
           return;
         }
-        await api.post(`/sync/stores/${storeId}/play`, {
-          playlistId,
-          trackIndex,
-          returnToGroupOnFinish: true,
-        });
+        await api.post(`/sync/stores/${storeId}/play`, { playlistId, trackIndex });
         toast.success('Đang phát tại quán');
         return;
       }
 
-      if (!defaultGroupId) {
-        toast.error('Chưa có sync group nào — tạo nhóm ở trang Sync Control trước');
+      const track = rows[trackIndex]?.track;
+      if (!track) {
+        toast.error('Playlist chưa có bài nào');
         return;
       }
-      await api.post(`/sync/groups/${defaultGroupId}/play`, {
-        playlistId,
-        trackIndex,
-        mode: 'LOOSE',
-      });
-      toast.success('Đang phát trên hệ thống');
-    } catch {
-      toast.error('Phát thất bại — kiểm tra lại playlist');
+
+      const { url } = await api.get<{ url: string }>(`/tracks/${track.id}/stream-url`);
+      playTrack(
+        {
+          id: track.id,
+          title: track.title,
+          artist: track.artist,
+          url,
+          durationMs: track.durationMs,
+        },
+        { mode: 'preview' },
+      );
+      toast.success(`Nghe thử "${track.title}"`);
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Phát thất bại');
     }
   };
 
@@ -432,7 +439,7 @@ export default function PlaylistDetail({
             </div>
             {queue && (
               <p className="text-xs" style={{ color: 'var(--color-accent)' }}>
-                Còn {queue.remaining} bài · sau đó quay lại nhóm sync
+                Còn {queue.remaining} bài trong hàng chờ
               </p>
             )}
           </>

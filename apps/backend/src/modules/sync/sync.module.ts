@@ -10,6 +10,8 @@ import { TracksModule } from '../tracks/tracks.module';
   imports: [JwtModule.register({}), TracksModule],
   providers: [SyncService, SyncGateway, RedisService],
   controllers: [SyncController],
-  exports: [SyncService, RedisService],
+  // StoresModule cần cả hai: SyncService cho "đang phát gì", SyncGateway để
+  // đếm số màn hình đang kết nối của quán.
+  exports: [SyncService, RedisService, SyncGateway],
 })
 export class SyncModule {}
