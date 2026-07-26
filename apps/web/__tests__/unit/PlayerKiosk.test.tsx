@@ -2,13 +2,16 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PlayerPage from '../../src/app/player/[storeId]/page';
 import { useSync } from '../../src/hooks/useSync';
-import { usePlayer } from '../../src/components/player/PlayerProvider';
+import { usePlayer, usePlayerPosition } from '../../src/components/player/PlayerProvider';
 import { api } from '../../src/lib/api-client';
 
 jest.mock('../../src/lib/api-client', () => ({ api: { get: jest.fn(), post: jest.fn() } }));
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
 jest.mock('../../src/hooks/useSync', () => ({ useSync: jest.fn() }));
-jest.mock('../../src/components/player/PlayerProvider', () => ({ usePlayer: jest.fn() }));
+jest.mock('../../src/components/player/PlayerProvider', () => ({
+  usePlayer: jest.fn(),
+  usePlayerPosition: jest.fn(),
+}));
 
 const mockSearchParams = { get: jest.fn() };
 jest.mock('next/navigation', () => ({
@@ -18,6 +21,7 @@ jest.mock('next/navigation', () => ({
 
 const mockUseSync = useSync as jest.MockedFunction<typeof useSync>;
 const mockUsePlayer = usePlayer as jest.MockedFunction<typeof usePlayer>;
+const mockUsePlayerPosition = usePlayerPosition as jest.MockedFunction<typeof usePlayerPosition>;
 const mockApi = api as jest.Mocked<typeof api>;
 
 describe('player screen', () => {
@@ -31,11 +35,11 @@ describe('player screen', () => {
     mockUsePlayer.mockReturnValue({
       current: { id: 'track-1', title: 'Cà phê sáng', url: 'https://s3/1.mp3' },
       isPlaying: true,
-      positionMs: 0,
       durationMs: 180_000,
       mode: 'local',
       pause: jest.fn(),
     } as unknown as ReturnType<typeof usePlayer>);
+    mockUsePlayerPosition.mockReturnValue(0);
   });
 
   // Màn chiếu treo trong quán: chỉ để nhìn, nhân viên không bấm nhầm được
@@ -72,7 +76,6 @@ describe('player screen', () => {
     mockUsePlayer.mockReturnValue({
       current: { id: 'track-1', title: 'Cà phê sáng', url: 'https://s3/1.mp3' },
       isPlaying: true,
-      positionMs: 0,
       durationMs: 180_000,
       mode: 'preview',
       pause: pauseFn,
@@ -94,7 +97,6 @@ describe('player screen', () => {
     mockUsePlayer.mockReturnValue({
       current: { id: 'track-1', title: 'Cà phê sáng', url: 'https://s3/1.mp3' },
       isPlaying: true,
-      positionMs: 0,
       durationMs: 180_000,
       mode: 'store',
       pause: pauseFn,

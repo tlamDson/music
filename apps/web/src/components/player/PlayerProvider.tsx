@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 
 export type PlayerMode = 'store' | 'preview';
@@ -40,7 +41,6 @@ interface PlayOptions {
 interface PlayerContextValue {
   current: PlayerTrack | null;
   isPlaying: boolean;
-  positionMs: number;
   durationMs: number;
   volume: number;
   mode: PlayerMode;
@@ -62,6 +62,76 @@ export function usePlayer() {
     throw new Error('usePlayer must be used inside a PlayerProvider');
   }
   return context;
+}
+
+/**
+ * Vị trí phát tách khỏi context ổn định ở trên. `timeupdate`/rAF bắn nhiều
+ * lần mỗi giây — nếu đi qua context như trước, MỌI consumer của `usePlayer()`
+ * re-render theo nhịp nhạc kể cả khi chỉ đọc `current`/`isPlaying`/`queue`
+ * (bảng track, nút play, `useSync`,...). Store nhỏ ngoài React + hook riêng
+ * qua `useSyncExternalStore` để chỉ nơi thật sự cần vị trí (PlayerBar,
+ * `/player/[storeId]`) mới re-render.
+ */
+// `useSyncExternalStore` re-render mỗi lần store đổi giá trị — nếu vòng lặp
+// rAF ghi mỗi khung hình (~60 lần/giây) thì PlayerBar và màn kiosk (2 nơi
+// DUY NHẤT gọi usePlayerPosition()) lại re-render nhiều hơn hẳn so với hồi
+// còn đi qua `timeupdate` (~4 lần/giây) — thắng ở 6 consumer kia nhưng thua
+// đậm ở đúng 2 nơi luôn hiện trên màn hình, kể cả màn kiosk chạy 24/7 trong
+// quán. `tick()` gộp các lần ghi từ rAF xuống còn ~1 lần mỗi khoảng này.
+const POSITION_TICK_INTERVAL_MS = 250;
+
+interface PositionStore {
+  subscribe: (listener: () => void) => () => void;
+  getSnapshot: () => number;
+  getServerSnapshot: () => number;
+  /** Ghi ngay lập tức, không tiết lưu — dùng cho play/seek/stop (cần đúng số). */
+  set: (nextPositionMs: number) => void;
+  /** Ghi có tiết lưu theo `POSITION_TICK_INTERVAL_MS` — dùng cho vòng lặp rAF. */
+  tick: (nextPositionMs: number) => void;
+}
+
+function createPositionStore(): PositionStore {
+  let value = 0;
+  let lastWriteAtMs = 0;
+  const listeners = new Set<() => void>();
+
+  const set = (nextPositionMs: number) => {
+    lastWriteAtMs = Date.now();
+    if (value === nextPositionMs) return;
+    value = nextPositionMs;
+    listeners.forEach((listener) => listener());
+  };
+
+  return {
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    getSnapshot() {
+      return value;
+    },
+    getServerSnapshot() {
+      return 0;
+    },
+    set,
+    tick(nextPositionMs) {
+      if (Date.now() - lastWriteAtMs < POSITION_TICK_INTERVAL_MS) return;
+      set(nextPositionMs);
+    },
+  };
+}
+
+const PlayerPositionContext = createContext<PositionStore | null>(null);
+
+/** Đọc vị trí phát hiện tại (ms) — chỉ re-render component gọi hook này. */
+export function usePlayerPosition() {
+  const store = useContext(PlayerPositionContext);
+  if (!store) {
+    throw new Error('usePlayerPosition must be used inside a PlayerProvider');
+  }
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
 }
 
 /**
@@ -90,10 +160,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const currentTrackIdRef = useRef<string | null>(null);
   const anchorRef = useRef<SyncAnchor | null>(null);
   const pendingSeekMsRef = useRef<number | null>(null);
+  const positionStoreRef = useRef<PositionStore | null>(null);
+  if (!positionStoreRef.current) positionStoreRef.current = createPositionStore();
+  const positionStore = positionStoreRef.current;
 
   const [current, setCurrent] = useState<PlayerTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [positionMs, setPositionMs] = useState(0);
   const [durationMs, setDurationMs] = useState(0);
   const [volume, setVolume] = useState(1);
   const [mode, setMode] = useState<PlayerMode>('preview');
@@ -116,8 +188,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = ensureAudio();
 
     const handleTimeUpdate = () => {
-      setPositionMs(audio.currentTime * 1000);
-
       // Tự chỉnh trôi: quán bấm dừng cục bộ rồi phát lại (hoặc mạng chậm) sẽ
       // tụt dần so với đồng hồ server — kéo về đúng giây mà không cần gọi API.
       if (modeRef.current !== 'store') return;
@@ -159,6 +229,63 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, [ensureAudio, liveTargetMs]);
 
+  // Đẩy vị trí phát vào store ngoài React bằng vòng lặp rAF (thay cho việc
+  // setState ở mỗi `timeupdate`, ~4 lần/giây nhưng vẫn re-render mọi consumer
+  // của usePlayer() nếu đi qua context). Vòng lặp chỉ chạy khi audio thực sự
+  // đang phát — dừng theo sự kiện `pause`/`ended` để không tốn CPU vô ích lúc
+  // đứng yên (đặc biệt quan trọng cho màn kiosk chạy 24/7). Đọc `audio.currentTime`
+  // mỗi khung hình để mượt, nhưng chỉ GHI vào store qua `positionStore.tick()`
+  // (đã tự tiết lưu ~4 lần/giây) — nếu không, PlayerBar/kiosk (2 nơi duy nhất
+  // đọc usePlayerPosition()) sẽ re-render ~60 lần/giây thay vì ~4.
+  useEffect(() => {
+    const audio = ensureAudio();
+    const hasRaf =
+      typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function';
+
+    let frameId: number | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const cancelScheduled = () => {
+      if (frameId !== null && hasRaf) window.cancelAnimationFrame(frameId);
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      frameId = null;
+      timeoutId = null;
+    };
+
+    const stepFrame = () => {
+      positionStore.tick(audio.currentTime * 1000);
+      if (hasRaf) {
+        frameId = window.requestAnimationFrame(stepFrame);
+      } else {
+        timeoutId = setTimeout(stepFrame, 16);
+      }
+    };
+
+    const handlePlay = () => {
+      cancelScheduled();
+      stepFrame();
+    };
+    const handleStop = () => {
+      cancelScheduled();
+      // Đồng bộ giá trị cuối cùng khi dừng/hết bài, tránh kẹt ở khung hình dở.
+      // Dùng `set` (không tiết lưu) vì đây là điểm dừng thật, cần đúng số ngay.
+      positionStore.set(audio.currentTime * 1000);
+    };
+
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handleStop);
+    audio.addEventListener('ended', handleStop);
+
+    if (!audio.paused) stepFrame();
+
+    return () => {
+      cancelScheduled();
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handleStop);
+      audio.removeEventListener('ended', handleStop);
+    };
+  }, [ensureAudio, positionStore]);
+
   const playTrack = useCallback(
     (track: PlayerTrack, options: PlayOptions = {}) => {
       const audio = ensureAudio();
@@ -173,7 +300,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setQueue(options.queue ?? null);
       setCurrent(track);
       setDurationMs(track.durationMs ?? 0);
-      setPositionMs(startPositionMs);
+      positionStore.set(startPositionMs);
 
       // Neo lại đồng hồ đồng bộ ở mọi lần nhận vị trí từ server (play mới,
       // chuyển bài, resume) — điểm tham chiếu để tự bắt kịp quán sau này.
@@ -204,7 +331,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         // player là chỗ người dùng bấm để mở khoá.
         .catch(() => setIsPlaying(false));
     },
-    [ensureAudio],
+    [ensureAudio, positionStore],
   );
 
   const toggle = useCallback(() => {
@@ -240,7 +367,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     (nextPositionMs: number) => {
       const audio = ensureAudio();
       audio.currentTime = nextPositionMs / 1000;
-      setPositionMs(nextPositionMs);
+      positionStore.set(nextPositionMs);
 
       // Seek tay cũng phải dời neo, nếu không lần timeupdate kế tự kéo ngược
       // về vị trí cũ vì lệch quá ngưỡng.
@@ -248,7 +375,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         anchorRef.current = { positionMs: nextPositionMs, atLocalTs: Date.now() };
       }
     },
-    [ensureAudio],
+    [ensureAudio, positionStore],
   );
 
   const changeVolume = useCallback(
@@ -272,14 +399,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setIsPlaying(false);
     setCurrent(null);
     setQueue(null);
-    setPositionMs(0);
-  }, [ensureAudio]);
+    positionStore.set(0);
+  }, [ensureAudio, positionStore]);
 
   const value = useMemo(
     () => ({
       current,
       isPlaying,
-      positionMs,
       durationMs,
       volume,
       mode,
@@ -295,7 +421,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [
       current,
       isPlaying,
-      positionMs,
       durationMs,
       volume,
       mode,
@@ -310,5 +435,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     ],
   );
 
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
+  return (
+    <PlayerContext.Provider value={value}>
+      <PlayerPositionContext.Provider value={positionStore}>
+        {children}
+      </PlayerPositionContext.Provider>
+    </PlayerContext.Provider>
+  );
 }

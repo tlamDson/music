@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useSync } from '../../../hooks/useSync';
 import { useClockOffset } from '../../../hooks/useClockOffset';
-import { usePlayer } from '../../../components/player/PlayerProvider';
+import { usePlayer, usePlayerPosition } from '../../../components/player/PlayerProvider';
 import { api } from '../../../lib/api-client';
 import { formatPosition } from '../../../lib/format';
 import CoverArt from '../../../components/media/CoverArt';
@@ -27,7 +27,10 @@ export default function PlayerPage() {
 
   const { offset, measureOffset } = useClockOffset();
   const { isConnected, storeQueue } = useSync({ storeId, token, clockOffset: offset });
-  const { current, isPlaying, positionMs, durationMs, mode, pause } = usePlayer();
+  const { current, isPlaying, durationMs, mode, pause } = usePlayer();
+  // Vị trí phát đọc riêng qua usePlayerPosition() — cập nhật bằng rAF nhiều
+  // lần/giây nhưng chỉ re-render đúng màn hình này, không kéo theo usePlayer().
+  const positionMs = usePlayerPosition();
 
   useEffect(() => {
     setToken(localStorage.getItem('accessToken'));
@@ -107,10 +110,23 @@ export default function PlayerPage() {
           >
             <div
               style={{
-                width: `${progressPct}%`,
+                width: '100%',
                 height: '100%',
                 backgroundColor: 'var(--color-accent)',
-                transition: 'width 1s linear',
+                // scaleX thay vì animate `width`: `width` là layout property,
+                // đổi mỗi frame rAF sẽ gây reflow liên tục. transform không
+                // kéo theo layout, chỉ composite — mượt hơn nhiều ở tần suất
+                // cập nhật cao.
+                transform: `scaleX(${progressPct / 100})`,
+                transformOrigin: 'left',
+                // 250ms linear khớp đúng chu kỳ ghi của usePlayerPosition()
+                // (PlayerProvider tiết lưu rAF xuống ~4 lần/giây, xem
+                // POSITION_TICK_INTERVAL_MS) — đây là nội suy giữa hai mốc dữ
+                // liệu rời rạc, không phải transition phản hồi tương tác nên
+                // không dùng token `--duration-base`/`--ease-standard`
+                // (150–300ms, easing) của design system: `ease` sẽ làm thanh
+                // chạy nhanh-chậm-nhanh giữa các bước thay vì trôi đều.
+                transition: 'transform 250ms linear',
               }}
             />
           </div>
