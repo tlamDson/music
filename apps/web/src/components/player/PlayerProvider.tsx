@@ -72,16 +72,35 @@ export function usePlayer() {
  * qua `useSyncExternalStore` để chỉ nơi thật sự cần vị trí (PlayerBar,
  * `/player/[storeId]`) mới re-render.
  */
+// `useSyncExternalStore` re-render mỗi lần store đổi giá trị — nếu vòng lặp
+// rAF ghi mỗi khung hình (~60 lần/giây) thì PlayerBar và màn kiosk (2 nơi
+// DUY NHẤT gọi usePlayerPosition()) lại re-render nhiều hơn hẳn so với hồi
+// còn đi qua `timeupdate` (~4 lần/giây) — thắng ở 6 consumer kia nhưng thua
+// đậm ở đúng 2 nơi luôn hiện trên màn hình, kể cả màn kiosk chạy 24/7 trong
+// quán. `tick()` gộp các lần ghi từ rAF xuống còn ~1 lần mỗi khoảng này.
+const POSITION_TICK_INTERVAL_MS = 250;
+
 interface PositionStore {
   subscribe: (listener: () => void) => () => void;
   getSnapshot: () => number;
   getServerSnapshot: () => number;
+  /** Ghi ngay lập tức, không tiết lưu — dùng cho play/seek/stop (cần đúng số). */
   set: (nextPositionMs: number) => void;
+  /** Ghi có tiết lưu theo `POSITION_TICK_INTERVAL_MS` — dùng cho vòng lặp rAF. */
+  tick: (nextPositionMs: number) => void;
 }
 
 function createPositionStore(): PositionStore {
   let value = 0;
+  let lastWriteAtMs = 0;
   const listeners = new Set<() => void>();
+
+  const set = (nextPositionMs: number) => {
+    lastWriteAtMs = Date.now();
+    if (value === nextPositionMs) return;
+    value = nextPositionMs;
+    listeners.forEach((listener) => listener());
+  };
 
   return {
     subscribe(listener) {
@@ -96,10 +115,10 @@ function createPositionStore(): PositionStore {
     getServerSnapshot() {
       return 0;
     },
-    set(nextPositionMs) {
-      if (value === nextPositionMs) return;
-      value = nextPositionMs;
-      listeners.forEach((listener) => listener());
+    set,
+    tick(nextPositionMs) {
+      if (Date.now() - lastWriteAtMs < POSITION_TICK_INTERVAL_MS) return;
+      set(nextPositionMs);
     },
   };
 }
@@ -214,7 +233,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // setState ở mỗi `timeupdate`, ~4 lần/giây nhưng vẫn re-render mọi consumer
   // của usePlayer() nếu đi qua context). Vòng lặp chỉ chạy khi audio thực sự
   // đang phát — dừng theo sự kiện `pause`/`ended` để không tốn CPU vô ích lúc
-  // đứng yên (đặc biệt quan trọng cho màn kiosk chạy 24/7).
+  // đứng yên (đặc biệt quan trọng cho màn kiosk chạy 24/7). Đọc `audio.currentTime`
+  // mỗi khung hình để mượt, nhưng chỉ GHI vào store qua `positionStore.tick()`
+  // (đã tự tiết lưu ~4 lần/giây) — nếu không, PlayerBar/kiosk (2 nơi duy nhất
+  // đọc usePlayerPosition()) sẽ re-render ~60 lần/giây thay vì ~4.
   useEffect(() => {
     const audio = ensureAudio();
     const hasRaf =
@@ -230,22 +252,23 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       timeoutId = null;
     };
 
-    const tick = () => {
-      positionStore.set(audio.currentTime * 1000);
+    const stepFrame = () => {
+      positionStore.tick(audio.currentTime * 1000);
       if (hasRaf) {
-        frameId = window.requestAnimationFrame(tick);
+        frameId = window.requestAnimationFrame(stepFrame);
       } else {
-        timeoutId = setTimeout(tick, 16);
+        timeoutId = setTimeout(stepFrame, 16);
       }
     };
 
     const handlePlay = () => {
       cancelScheduled();
-      tick();
+      stepFrame();
     };
     const handleStop = () => {
       cancelScheduled();
       // Đồng bộ giá trị cuối cùng khi dừng/hết bài, tránh kẹt ở khung hình dở.
+      // Dùng `set` (không tiết lưu) vì đây là điểm dừng thật, cần đúng số ngay.
       positionStore.set(audio.currentTime * 1000);
     };
 
@@ -253,7 +276,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.addEventListener('pause', handleStop);
     audio.addEventListener('ended', handleStop);
 
-    if (!audio.paused) tick();
+    if (!audio.paused) stepFrame();
 
     return () => {
       cancelScheduled();

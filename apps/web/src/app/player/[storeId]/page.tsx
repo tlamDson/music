@@ -116,10 +116,17 @@ export default function PlayerPage() {
                 // scaleX thay vì animate `width`: `width` là layout property,
                 // đổi mỗi frame rAF sẽ gây reflow liên tục. transform không
                 // kéo theo layout, chỉ composite — mượt hơn nhiều ở tần suất
-                // cập nhật cao. Token động từ globals.css thay vì số rời.
+                // cập nhật cao.
                 transform: `scaleX(${progressPct / 100})`,
                 transformOrigin: 'left',
-                transition: 'transform var(--duration-base) var(--ease-standard)',
+                // 250ms linear khớp đúng chu kỳ ghi của usePlayerPosition()
+                // (PlayerProvider tiết lưu rAF xuống ~4 lần/giây, xem
+                // POSITION_TICK_INTERVAL_MS) — đây là nội suy giữa hai mốc dữ
+                // liệu rời rạc, không phải transition phản hồi tương tác nên
+                // không dùng token `--duration-base`/`--ease-standard`
+                // (150–300ms, easing) của design system: `ease` sẽ làm thanh
+                // chạy nhanh-chậm-nhanh giữa các bước thay vì trôi đều.
+                transition: 'transform 250ms linear',
               }}
             />
           </div>
