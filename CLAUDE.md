@@ -22,6 +22,8 @@ Chi tiết merge policy: [.claude/rules/workflow.md](.claude/rules/workflow.md).
 
 Đang chuẩn bị release production đầu tiên (`v0.1.0`). **Phase 0 (code readiness) và Phase 1 (staging) đã xong** — staging đang chạy live trên Railway (backend + Postgres + Redis) + Vercel (web, nhánh `develop`) + Cloudflare R2 (track), đã verify end-to-end (login → dashboard). Xem [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) để biết chi tiết domain/trạng thái, đã làm gì, còn nợ gì (kể cả nợ đang mở: rate limit login không nhất quán trên Railway, cần điều tra trước khi có user thật) và bước tiếp theo (Phase 2 — production). Đọc file đó trước khi bắt tay vào việc liên quan deploy/staging/release.
 
+**Deploy staging là tự động, kể cả migration.** Merge vào `develop` → Railway build lại → `apps/backend/docker-entrypoint.sh` chạy `prisma migrate deploy` rồi mới khởi động app. **Đừng báo với người dùng là họ phải chạy `migrate deploy` tay** — chỉ cần khi migration lỗi làm container crash-loop; cách chạy tay ở [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) cạm bẫy #15.
+
 **Đợt store console + redesign UI (PR #20–#35) đã merge vào `develop`:**
 
 - Sync engine đủ vòng. Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _Sync engine_.
