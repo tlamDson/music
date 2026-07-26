@@ -94,6 +94,8 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
         positionMs: snapshot.positionMs,
         serverTs: snapshot.serverTs,
         queue: snapshot.queue ?? { index: 0, total: 1, remaining: 0 },
+        repeat: snapshot.repeat,
+        shuffle: snapshot.shuffle,
       });
     } catch {
       // Chưa phát gì hoặc API lỗi — vẫn connected, chờ broadcast lần sau
