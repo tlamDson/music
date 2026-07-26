@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
 import { formatDuration, formatPosition } from '../../lib/format';
-import { usePlayer } from './PlayerProvider';
+import { usePlayer, usePlayerPosition } from './PlayerProvider';
 
 const MUTED_TEXT = 'rgba(248,250,252,0.6)';
 
@@ -60,7 +60,6 @@ export default function PlayerBar() {
   const {
     current,
     isPlaying,
-    positionMs,
     durationMs,
     volume,
     mode,
@@ -70,6 +69,10 @@ export default function PlayerBar() {
     seek,
     changeVolume,
   } = usePlayer();
+  // Vị trí phát đọc riêng qua usePlayerPosition() — tách khỏi usePlayer() để
+  // rAF cập nhật vài chục lần/giây không kéo theo re-render của mọi consumer
+  // khác của usePlayer() (bảng track, nút play,...).
+  const positionMs = usePlayerPosition();
 
   const pathname = usePathname();
 

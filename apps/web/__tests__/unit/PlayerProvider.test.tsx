@@ -207,4 +207,42 @@ describe('PlayerProvider', () => {
 
     jest.restoreAllMocks();
   });
+
+  // Trước đây `timeupdate` gọi setPositionMs trong context ổn định nên MỌI
+  // consumer của usePlayer() re-render vài lần mỗi giây, kể cả những nơi chỉ
+  // đọc current/isPlaying/queue (bảng track, nút play,...). Vị trí phát giờ
+  // chỉ lộ qua usePlayerPosition() (useSyncExternalStore riêng) — context ổn
+  // định không còn thay đổi theo nhịp nhạc.
+  it('does not re-render consumers that only read usePlayer() on every timeupdate', async () => {
+    let renderCount = 0;
+
+    function CountingConsumer() {
+      renderCount += 1;
+      const { current } = usePlayer();
+      return <span data-testid="consumer-current">{current?.title ?? 'idle'}</span>;
+    }
+
+    render(
+      <PlayerProvider>
+        <Harness />
+        <CountingConsumer />
+      </PlayerProvider>,
+    );
+
+    await userEvent.click(screen.getByText('start'));
+    await waitFor(() => expect(screen.getByTestId('playing')).toHaveTextContent('true'));
+
+    const renderCountAfterPlay = renderCount;
+
+    await act(async () => {
+      for (let i = 0; i < 20; i += 1) {
+        // currentTime phải đổi giá trị thật mỗi lần — nếu không thay đổi thì
+        // React tự bail-out state update giống giá trị cũ, che mất bug.
+        currentAudio().currentTime = i + 1;
+        currentAudio().emit('timeupdate');
+      }
+    });
+
+    expect(renderCount).toBe(renderCountAfterPlay);
+  });
 });

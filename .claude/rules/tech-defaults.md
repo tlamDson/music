@@ -55,10 +55,10 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 
 **Quán (`Store`) là đơn vị phát.** Tầng `SyncGroup` đã bị bỏ (PR #54) vì trùng chức năng với quán — cùng với nó là toàn bộ khái niệm override / rejoin / `returnToGroupOnFinish`: không còn nhóm thì không có gì để tách ra hay quay về.
 
-| Thành phần | Vị trí |
-| ---------- | ------ |
-| Điều khiển | `POST /sync/stores/:id/play\|pause\|resume\|next\|stop` (ORG_ADMIN + STORE_ADMIN của chính quán) |
-| Room WS    | `store:<id>` |
+| Thành phần | Vị trí                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------- |
+| Điều khiển | `POST /sync/stores/:id/play\|pause\|resume\|next\|stop` (ORG_ADMIN + STORE_ADMIN của chính quán)              |
+| Room WS    | `store:<id>`                                                                                                  |
 | State      | Redis `store:<id>:playback` (TTL 24h) + cột `status`/`currentTrackId`/`trackIndex`/`startedAtTs` trên `Store` |
 
 - **Chuyển bài do server lái**, không phải client. `startStoreTrack` hẹn `setTimeout` theo `track.durationMs`; hết playlist thì dừng hẳn (không loop). `onModuleInit` dựng lại timer sau restart theo thời lượng còn lại. Trước đây client bắt sự kiện `ended` rồi gọi `/next` — quán mở hai màn hình thì mỗi màn bắn một lệnh và nhạc nhảy cóc, còn không màn nào mở thì nhạc đứng im.
@@ -83,18 +83,19 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 
 ## Bản đồ API (`/api/v1`)
 
-| Nhóm       | Endpoint chính                                                                                                                                                                             |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Auth       | `POST /auth/login`, `/auth/refresh`                                                                                                                                                        |
-| Quán       | `POST /sync/stores/:id/play\|pause\|resume\|next\|stop` · `GET /sync/stores/:id/playback\|now-playing` · `GET /sync/overview` (ORG_ADMIN) · `GET /stores/:id` (chi tiết + đang phát + số màn hình) |
-| Playlist   | `GET /playlists?scope=&q=&sort=` (trả kèm `totalDurationMs`) · CRUD `/playlists/:id` · `/playlists/:id/tracks[/reorder]`                                                                   |
-| Folder     | `GET                                                                                                                                                                                       | POST                                                                                         | DELETE /folders`— **không phải**`/playlists/folders`, tách controller riêng để `@Get(':id')` không nuốt route |
-| Track      | `GET                                                                                                                                                                                       | POST /tracks`(multipart kèm`durationMs`) · `GET /tracks/:id/stream-url`·`DELETE /tracks/:id` |
-| Khác       | `/stores`, `/users`, `/schedules`, `/health`, `/health/ready`                                                                                                                              |
+| Nhóm     | Endpoint chính                                                                                                                                                                                     |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Auth     | `POST /auth/login`, `/auth/refresh`                                                                                                                                                                |
+| Quán     | `POST /sync/stores/:id/play\|pause\|resume\|next\|stop` · `GET /sync/stores/:id/playback\|now-playing` · `GET /sync/overview` (ORG_ADMIN) · `GET /stores/:id` (chi tiết + đang phát + số màn hình) |
+| Playlist | `GET /playlists?scope=&q=&sort=` (trả kèm `totalDurationMs`) · CRUD `/playlists/:id` · `/playlists/:id/tracks[/reorder]`                                                                           |
+| Folder   | `GET                                                                                                                                                                                               | POST                                                                                         | DELETE /folders`— **không phải**`/playlists/folders`, tách controller riêng để `@Get(':id')` không nuốt route |
+| Track    | `GET                                                                                                                                                                                               | POST /tracks`(multipart kèm`durationMs`) · `GET /tracks/:id/stream-url`·`DELETE /tracks/:id` |
+| Khác     | `/stores`, `/users`, `/schedules`, `/health`, `/health/ready`                                                                                                                                      |
 
 ## Frontend — quy ước dùng chung
 
 - **Một thẻ audio duy nhất** cho cả app: `components/player/PlayerProvider.tsx`, thanh phát `PlayerBar` gắn ở layout gốc. Đừng tạo `new Audio()` trong trang.
+- **`usePlayer()` (state ổn định) vs `usePlayerPosition()` (vị trí phát) — không gộp lại.** `usePlayer()` trả `current`/`isPlaying`/`durationMs`/`volume`/`mode`/`storeId`/`queue` + action, đổi vài lần mỗi phút; `usePlayerPosition()` trả riêng `positionMs`, cập nhật bằng vòng lặp `requestAnimationFrame` (không phải mỗi `timeupdate`) qua một store nhỏ ngoài React (`useSyncExternalStore`). Trước đây `positionMs` nằm chung context với phần còn lại — mỗi `timeupdate` (vài lần/giây) làm object context đổi identity, kéo theo **mọi** consumer của `usePlayer()` re-render kể cả nơi chỉ đọc `current`/`queue` (bảng track, nút play, `useSync`,...), gây lag khi đang phát nhạc trên trang có bảng dài. Chỉ `PlayerBar` và `/player/[storeId]` cần vị trí thật — gọi `usePlayerPosition()`; 6 nơi còn lại giữ nguyên `usePlayer()`, không cần sửa gì để hết bị kéo theo.
 - Menu theo vai trò lấy từ `lib/nav.ts` (`dashboardNavItems` / `storeNavItems` / `homePathFor`) — không viết tay danh sách nav trong layout.
 - Thời lượng: `formatDuration` (0 = chưa biết → `--:--`), `formatPosition` (0 = `0:00`), `formatTotalDuration` ("khoảng 7 giờ").
 - DB chưa có ảnh bìa → `components/media/CoverArt.tsx` sinh bìa từ id bằng palette design system.
