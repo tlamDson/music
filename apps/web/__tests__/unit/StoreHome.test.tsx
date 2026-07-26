@@ -4,7 +4,7 @@ import StoreHome from '../../src/components/store/StoreHome';
 import { renderWithPlayer } from '../utils/renderWithPlayer';
 import { PlayerProvider, usePlayer } from '../../src/components/player/PlayerProvider';
 import { api } from '../../src/lib/api-client';
-import { useSync } from '../../src/hooks/useSync';
+import { useStoreSync } from '../../src/components/sync/StoreSyncProvider';
 
 jest.mock('../../src/lib/api-client', () => ({
   api: { get: jest.fn(), post: jest.fn() },
@@ -12,10 +12,13 @@ jest.mock('../../src/lib/api-client', () => ({
 
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
 
-jest.mock('../../src/hooks/useSync', () => ({ useSync: jest.fn() }));
+// Socket sync giờ nằm ở `StoreSyncProvider` (layout) — StoreHome chỉ đọc context.
+jest.mock('../../src/components/sync/StoreSyncProvider', () => ({
+  useStoreSync: jest.fn(),
+}));
 
 const mockApi = api as jest.Mocked<typeof api>;
-const mockUseSync = useSync as jest.MockedFunction<typeof useSync>;
+const mockUseStoreSync = useStoreSync as jest.MockedFunction<typeof useStoreSync>;
 
 // PlayerProvider dựng `new Audio()` — jsdom không có, mock tối thiểu.
 class MockAudio {
@@ -52,20 +55,17 @@ function SeedPlaying() {
   );
 }
 
-const syncState = (overrides: Partial<ReturnType<typeof useSync>> = {}) =>
+const syncState = (overrides: Partial<ReturnType<typeof useStoreSync>> = {}) =>
   ({
     isConnected: true,
-    nowPlaying: null,
-    groupState: null,
-    isPlaying: false,
     storeQueue: null,
     ...overrides,
-  }) as ReturnType<typeof useSync>;
+  }) as ReturnType<typeof useStoreSync>;
 
 describe('StoreHome', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseSync.mockReturnValue(syncState());
+    mockUseStoreSync.mockReturnValue(syncState());
     mockApi.get.mockImplementation((path: string) => {
       if (path.includes('/status')) {
         return Promise.resolve({
@@ -99,7 +99,7 @@ describe('StoreHome', () => {
   });
 
   it('warns when the socket is disconnected', async () => {
-    mockUseSync.mockReturnValue(syncState({ isConnected: false }));
+    mockUseStoreSync.mockReturnValue(syncState({ isConnected: false }));
     renderHome();
 
     expect(await screen.findByText(/mất kết nối/i)).toBeInTheDocument();
@@ -107,7 +107,7 @@ describe('StoreHome', () => {
 
   // Đây là thứ nhân viên quán cần thấy: còn mấy bài nữa thì nhạc quay về dòng chung
   it('shows how many tracks remain before returning to the group', async () => {
-    mockUseSync.mockReturnValue(syncState({ storeQueue: { index: 0, total: 3, remaining: 2 } }));
+    mockUseStoreSync.mockReturnValue(syncState({ storeQueue: { index: 0, total: 3, remaining: 2 } }));
     renderHome();
 
     expect(await screen.findByText(/còn 2 bài/i)).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe('StoreHome', () => {
 
   it('rejoins the sync group on demand', async () => {
     mockApi.post.mockResolvedValue({ rejoined: true });
-    mockUseSync.mockReturnValue(syncState({ storeQueue: { index: 0, total: 3, remaining: 2 } }));
+    mockUseStoreSync.mockReturnValue(syncState({ storeQueue: { index: 0, total: 3, remaining: 2 } }));
     renderHome();
 
     await userEvent.click(await screen.findByRole('button', { name: /quay lại nhóm sync ngay/i }));

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
-import { useSync } from '../../hooks/useSync';
+import { useStoreSync } from '../sync/StoreSyncProvider';
 import { useClockOffset } from '../../hooks/useClockOffset';
 import { usePlayer } from '../player/PlayerProvider';
 import CoverArt from '../media/CoverArt';
@@ -30,12 +30,12 @@ interface SuggestedPlaylist {
  * nhạc riêng, còn mấy bài nữa thì tự quay lại, và danh sách playlist bấm phát.
  */
 export default function StoreHome({ storeId }: { storeId: string }) {
-  const [token, setToken] = useState<string | null>(null);
   const [status, setStatus] = useState<StoreStatus | null>(null);
   const [playlists, setPlaylists] = useState<SuggestedPlaylist[]>([]);
 
   const { offset, measureOffset } = useClockOffset();
-  const { isConnected, storeQueue } = useSync({ storeId, token, clockOffset: offset });
+  // Socket do `StoreSyncProvider` ở layout giữ — trang này chỉ đọc trạng thái.
+  const { isConnected, storeQueue } = useStoreSync();
   const { current, isPlaying } = usePlayer();
 
   const refreshStatus = useCallback(async () => {
@@ -47,7 +47,6 @@ export default function StoreHome({ storeId }: { storeId: string }) {
   }, [storeId]);
 
   useEffect(() => {
-    setToken(localStorage.getItem('accessToken'));
     void measureOffset();
   }, [measureOffset]);
 

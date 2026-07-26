@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
 import AppShell from '../../components/layout/AppShell';
+import StoreSyncProvider from '../../components/sync/StoreSyncProvider';
 import { storeNavItems } from '../../lib/nav';
 
 /**
@@ -44,7 +45,9 @@ export default function StoreLayout({ children }: { children: React.ReactNode })
         router.push('/login');
       }}
     >
-      {children}
+      {/* Socket sync phải sống ở layout: mọi trang con của /store đều bấm phát
+          được, không chỉ trang chủ. */}
+      <StoreSyncProvider storeId={user.storeId}>{children}</StoreSyncProvider>
     </AppShell>
   );
 }
