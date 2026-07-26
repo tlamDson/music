@@ -62,7 +62,7 @@ function StartButton() {
             url: 'https://s3/1.mp3',
             durationMs: 366_000,
           },
-          { mode: 'local', storeId: 'store-1', queue: { index: 0, total: 3, remaining: 2 } },
+          { mode: 'store', storeId: 'store-1', queue: { index: 0, total: 3, remaining: 2 } },
         )
       }
     >
@@ -134,12 +134,11 @@ describe('PlayerBar', () => {
     expect(screen.queryByText('Hẹn Em Ở Lần Yêu Thứ 2')).not.toBeInTheDocument();
   });
 
-  // Quán tách khỏi nhóm cần biết còn bao nhiêu bài trước khi tự quay lại
-  it('shows how many tracks are left before returning to the sync group', async () => {
+  // Nhân viên quán cần biết còn bao nhiêu bài nữa trong hàng chờ
+  it('shows how many tracks are left in the store queue', async () => {
     renderBar();
     await userEvent.click(screen.getByText('start'));
 
     expect(await screen.findByText(/còn 2 bài/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /quay lại nhóm sync/i })).toBeInTheDocument();
   });
 });

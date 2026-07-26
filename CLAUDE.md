@@ -24,19 +24,13 @@ Chi tiết merge policy: [.claude/rules/workflow.md](.claude/rules/workflow.md).
 
 **Đợt store console + redesign UI (PR #20–#35) đã merge vào `develop`:**
 
-- Sync engine đủ vòng: nhóm tự chuyển bài → quán tách ra phát playlist riêng → hết hàng chờ tự quay lại đúng bài, đúng giây. Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _Sync engine_.
-- Quán có console riêng ở `/store` (không có Sync Control); `/dashboard` dành cho ORG_ADMIN; `/player/[storeId]?kiosk=1` là màn chiếu TV.
+- Sync engine đủ vòng. Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _Sync engine_.
+- Quán có console riêng ở `/store`; `/dashboard` dành cho ORG_ADMIN; `/player/[storeId]?kiosk=1` là màn chiếu TV.
 - UI dựng lại quanh sidebar thư viện, card playlist, bảng track và thanh phát cố định dùng chung.
 
-**PR #39 — thanh nhạc hiện trên console quán + dashboard:** `ORG_ADMIN` bấm phát thì cả `/store` lẫn `/dashboard` đều hiện thanh nhạc đang chạy (đúng bài, đúng giây, tự cập nhật). `useSync` đẩy nhạc vào `PlayerProvider` thay vì tự lái thẻ audio; broadcast WS kèm `track: WsTrackMeta`; thêm `GET /sync/{stores|groups}/:id/now-playing` để hydrate khi mở trang sau lúc admin đã phát; dashboard mount `components/sync/DashboardSyncBridge.tsx`. Chi tiết mục Sync engine trong [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md).
+**PR #39 — thanh nhạc hiện trên console quán + dashboard:** `ORG_ADMIN` bấm phát thì cả `/store` lẫn `/dashboard` đều hiện thanh nhạc đang chạy (đúng bài, đúng giây, tự cập nhật). `useSync` đẩy nhạc vào `PlayerProvider` thay vì tự lái thẻ audio; broadcast WS kèm `track: WsTrackMeta`; thêm `GET /sync/stores/:id/now-playing` để hydrate khi mở trang sau lúc admin đã phát.
 
-Nợ đã biết: chưa có bảng `Artist`; track upload trước đợt này còn `durationMs = 0` nên không auto-next (nhóm phát quá thời lượng thật → thanh phát của quán khớp trạng thái nhưng progress lệch); timer auto-next chỉ đúng khi backend chạy 1 instance; `SchedulerService.matchesCron` vẫn bỏ qua ngày/tháng/thứ.
-
-**PR #42 (fix 3 bug QC luồng sync playback) đã merge vào `develop`:**
-
-- Play nhóm giờ báo đúng lỗi thật (không đoán bừa "playlist có track chưa"); dashboard admin nghe được mọi sync group thay vì chỉ nhóm đầu tiên.
-- Bấm Play/Skip cho nhóm tự kéo mọi quán trong nhóm về "in sync" (xoá override cũ) — quán từng tách ra không còn mãi hiện "Overriding".
-- Quán dừng cục bộ rồi phát lại (hoặc rejoin) tự bắt kịp đúng giây của nhóm nhờ "neo đồng bộ" + tự chỉnh trôi ở `PlayerProvider`, thay vì tiếp tục từ chỗ đã dừng. Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _Sync engine_.
+Nợ đã biết: chưa có bảng `Artist`; track upload trước đợt này còn `durationMs = 0` nên không auto-next; timer auto-next chỉ đúng khi backend chạy 1 instance; `SchedulerService.matchesCron` vẫn bỏ qua ngày/tháng/thứ.
 
 **PR #48–#51 (QC quản lý người dùng + cải tiến UI/UX dashboard) đã merge vào `develop`:**
 
@@ -44,6 +38,15 @@ Nợ đã biết: chưa có bảng `Artist`; track upload trước đợt này c
 - `User.isActive` (mặc định `true`) được `AuthService` check ở cả 3 điểm: `login`, `refreshTokens`, và `validateJwtPayload` (chạy mỗi request có JWT) — access token còn hạn của tài khoản vừa bị vô hiệu hoá cũng bị từ chối ngay, không cần token blocklist. Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _Auth — vô hiệu hoá tài khoản_.
 - Sidebar `dashboard`/`store` giờ `sticky` full-height + có mobile drawer (trước đó cuộn mất theo trang, tràn ngang trên mobile). Modal dùng chung qua `components/ui/Dialog.tsx` (enter/exit animation 180ms) thay vì mỗi nơi tự viết overlay riêng — chi tiết ở [.claude/rules/design.md](.claude/rules/design.md).
 - `apps/web/src/lib/api-client.ts` tự đăng xuất (xoá token + redirect `/login`) khi nhận `401` ngoài `/auth/login` — tài khoản bị vô hiệu hoá giữa phiên không còn thấy lỗi rải rác trên UI mà được đưa thẳng về màn login.
+
+**PR #53–#54 (QC luồng phát nhạc + bỏ tầng SyncGroup) đã merge vào `develop`:**
+
+- **#53 — fix bug quán bấm phát trong trang playlist không ra tiếng.** `useSync` từng được mount bên trong `StoreHome` nên socket chỉ sống ở đúng `/store`; rời sang `/store/playlists/[id]` là cleanup `socket.disconnect()` chạy, browser rời room `store:<id>`, `POST .../play` vẫn 201 nhưng `store-now-playing` không còn ai nhận. Socket giờ nằm ở layout qua `components/sync/StoreSyncProvider.tsx`. **Bài học: socket sync phải mount ở layout, không phải ở page.**
+- **#54 — bỏ hẳn `SyncGroup`, quán là đơn vị phát.** Nhóm sync trùng chức năng với quán nên bị xoá khỏi cả DB lẫn UI, kéo theo `StoreOverride` và toàn bộ khái niệm override / rejoin / `returnToGroupOnFinish`. `PlaylistSchedule` chuyển từ `syncGroupId` sang `storeId`.
+  - `/dashboard/stores/[id]` (mới) là chỗ **duy nhất** phát nhạc ra loa quán: đang phát gì, tạm dừng/bài sau/dừng hẳn, danh sách playlist để phát, số màn hình đang kết nối.
+  - `/dashboard/playlists` giờ chỉ **nghe thử tại chỗ** — ai bấm người đó nghe, không broadcast. Console quán `/store/**` vẫn phát thật cho quán của chính họ.
+  - **Auto-next chuyển sang server** (`setTimeout` theo `durationMs`, keyed theo storeId). Trước đây client bắt `ended` rồi gọi `/next`: quán mở hai màn hình thì mỗi màn bắn một lệnh làm nhạc nhảy cóc, không màn nào mở thì nhạc đứng im.
+  - Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _Sync engine_.
 
 ## MCP Servers
 

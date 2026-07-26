@@ -7,7 +7,7 @@ import type { WsStoreNowPlayingPayload } from '@cafe-music/shared';
 
 interface StoreSyncValue {
   isConnected: boolean;
-  /** Hàng chờ riêng khi quán tách khỏi nhóm sync; null = đang theo nhóm. */
+  /** Hàng chờ đang phát của quán; null = quán chưa phát gì. */
   storeQueue: WsStoreNowPlayingPayload['queue'] | null;
 }
 

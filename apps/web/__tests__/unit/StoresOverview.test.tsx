@@ -1,5 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { screen } from '@testing-library/react';
 import StoresOverview from '../../src/components/store/StoresOverview';
 import { renderWithPlayer } from '../utils/renderWithPlayer';
 import { api } from '../../src/lib/api-client';
@@ -13,22 +12,20 @@ const overview = [
   {
     storeId: 'store-1',
     name: 'Quán Nguyễn Huệ',
-    syncGroupId: 'group-1',
-    syncGroupName: 'Nhóm chính',
-    isOverridden: false,
+    status: 'PLAYING',
     trackId: 'track-9',
     isPlaying: true,
-    queueRemaining: null,
+    queueRemaining: 3,
+    connectedScreens: 2,
   },
   {
     storeId: 'store-2',
     name: 'Quán Lê Lợi',
-    syncGroupId: 'group-1',
-    syncGroupName: 'Nhóm chính',
-    isOverridden: true,
-    trackId: 'track-2',
-    isPlaying: true,
-    queueRemaining: 1,
+    status: 'STOPPED',
+    trackId: null,
+    isPlaying: false,
+    queueRemaining: null,
+    connectedScreens: 0,
   },
 ];
 
@@ -38,36 +35,33 @@ describe('StoresOverview', () => {
     mockApi.get.mockResolvedValue({ data: overview });
   });
 
-  it('shows which group each store follows', async () => {
+  it('cho biết quán nào đang phát, quán nào im lặng', async () => {
     renderWithPlayer(<StoresOverview />);
 
     expect(await screen.findByText('Quán Nguyễn Huệ')).toBeInTheDocument();
-    expect(screen.getAllByText(/nhóm chính/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/đang phát/i)).toBeInTheDocument();
+    expect(screen.getByText(/đang im lặng/i)).toBeInTheDocument();
   });
 
-  // Đây là câu hỏi admin hay hỏi nhất: quán nào đang tự phát nhạc riêng?
-  it('flags the store that detached and how many tracks are left', async () => {
+  // Admin bấm phát xong cần biết có màn hình nào thật sự nghe được không
+  it('hiện số màn hình đang kết nối của từng quán', async () => {
     renderWithPlayer(<StoresOverview />);
 
-    expect(await screen.findByText(/đang phát nhạc riêng/i)).toBeInTheDocument();
-    expect(screen.getByText(/còn 1 bài/i)).toBeInTheDocument();
+    expect(await screen.findByText(/2 màn hình đang kết nối/i)).toBeInTheDocument();
+    expect(screen.getByText(/chưa có màn hình nào/i)).toBeInTheDocument();
   });
 
-  it('pulls a detached store back into the group', async () => {
-    mockApi.post.mockResolvedValue({ rejoined: true });
+  it('hiện số bài còn lại trong hàng chờ', async () => {
     renderWithPlayer(<StoresOverview />);
 
-    await userEvent.click(await screen.findByRole('button', { name: /kéo quán lê lợi về nhóm/i }));
-
-    await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-2/rejoin'));
+    expect(await screen.findByText(/còn 3 bài trong hàng chờ/i)).toBeInTheDocument();
   });
 
-  it('offers no rejoin button for stores already following the group', async () => {
+  // Phát nhạc chỉ làm được ở trang chi tiết quán, nên mỗi thẻ phải dẫn tới đó
+  it('mỗi quán là một link vào trang chi tiết để chọn nhạc', async () => {
     renderWithPlayer(<StoresOverview />);
-    await screen.findByText('Quán Nguyễn Huệ');
 
-    expect(
-      screen.queryByRole('button', { name: /kéo quán nguyễn huệ về nhóm/i }),
-    ).not.toBeInTheDocument();
+    const link = await screen.findByRole('link', { name: /quán nguyễn huệ/i });
+    expect(link).toHaveAttribute('href', '/dashboard/stores/store-1');
   });
 });

@@ -15,12 +15,7 @@ enum UserRole {
   STORE_ADMIN
 }
 
-enum SyncMode {
-  TIGHT
-  LOOSE
-}
-
-enum SyncGroupStatus {
+enum PlaybackStatus {
   PLAYING
   PAUSED
   STOPPED
@@ -51,12 +46,11 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users      User[]
-  stores     Store[]
-  syncGroups SyncGroup[]
-  folders    Folder[]
-  playlists  Playlist[]
-  tracks     Track[]
+  users     User[]
+  stores    Store[]
+  folders   Folder[]
+  playlists Playlist[]
+  tracks    Track[]
 }
 
 model User {
@@ -76,48 +70,24 @@ model User {
   auditLogs    AuditLog[]
 }
 
+/// Quán là đơn vị phát nhạc. Trước đây trạng thái phát nằm ở `SyncGroup` và
+/// quán chỉ là thành viên của nhóm — nhưng nhóm và quán trùng chức năng nên
+/// tầng nhóm đã bị bỏ, các cột trạng thái dời thẳng về đây.
 model Store {
-  id             String   @id @default(cuid())
+  id             String         @id @default(cuid())
   name           String
   organizationId String
-  syncGroupId    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization  Organization   @relation(fields: [organizationId], references: [id])
-  syncGroup     SyncGroup?     @relation(fields: [syncGroupId], references: [id])
-  users         User[]
-  tracks        Track[]
-  storeOverride StoreOverride?
-}
-
-model SyncGroup {
-  id             String          @id @default(cuid())
-  name           String
-  organizationId String
-  mode           SyncMode        @default(LOOSE)
-  status         SyncGroupStatus @default(STOPPED)
+  status         PlaybackStatus @default(STOPPED)
   currentTrackId String?
-  trackIndex     Int             @default(0)
+  trackIndex     Int            @default(0)
   startedAtTs    BigInt?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  stores       Store[]
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  users        User[]
+  tracks       Track[]
   schedules    PlaylistSchedule[]
-}
-
-model StoreOverride {
-  id                String    @id @default(cuid())
-  storeId           String    @unique
-  isOverridden      Boolean   @default(false)
-  overrideTrackId   String?
-  overridePlaylistId String?
-  overriddenAt      DateTime?
-  rejoinedAt        DateTime?
-
-  store Store @relation(fields: [storeId], references: [id])
 }
 
 model Folder {
@@ -201,15 +171,15 @@ model AuditLog {
 
 model PlaylistSchedule {
   id             String   @id @default(cuid())
-  syncGroupId    String
+  storeId        String
   playlistId     String
   cronExpression String
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  syncGroup SyncGroup @relation(fields: [syncGroupId], references: [id])
-  playlist  Playlist  @relation(fields: [playlistId], references: [id])
+  store    Store    @relation(fields: [storeId], references: [id])
+  playlist Playlist @relation(fields: [playlistId], references: [id])
 
-  @@index([syncGroupId])
+  @@index([storeId])
 }

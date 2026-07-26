@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
 import AppShell from '../../components/layout/AppShell';
-import DashboardSyncBridge from '../../components/sync/DashboardSyncBridge';
+import StoresSyncBridge from '../../components/sync/StoresSyncBridge';
 import { dashboardNavItems } from '../../lib/nav';
 import type { UserRole } from '@cafe-music/shared';
 
@@ -51,7 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         router.push('/login');
       }}
     >
-      <DashboardSyncBridge />
+      <StoresSyncBridge />
       {children}
     </AppShell>
   );

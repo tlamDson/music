@@ -6,7 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SyncService } from '../sync/sync.service';
 
 export const CreateScheduleSchema = z.object({
-  syncGroupId: z.string().min(1),
+  storeId: z.string().min(1),
   playlistId: z.string().min(1),
   cronExpression: z.string().min(1),
   active: z.boolean().default(true),
@@ -14,7 +14,7 @@ export const CreateScheduleSchema = z.object({
 
 export type CreateScheduleDto = z.infer<typeof CreateScheduleSchema>;
 
-const SCHEDULE_INCLUDE = { syncGroup: true, playlist: true } as const;
+const SCHEDULE_INCLUDE = { store: true, playlist: true } as const;
 
 @Injectable()
 export class SchedulerService {
@@ -26,22 +26,22 @@ export class SchedulerService {
   ) {}
 
   // ── CRUD ────────────────────────────────────────────────────────────────
-  // Lịch không có organizationId riêng, org của nó nằm ở syncGroup — mọi truy
-  // vấn phải lọc qua đó, nếu không org khác sửa/xoá được lịch của nhau.
+  // Lịch không có organizationId riêng, org của nó nằm ở quán — mọi truy vấn
+  // phải lọc qua đó, nếu không org khác sửa/xoá được lịch của nhau.
 
   findAll(user: JwtPayload) {
     return this.prisma.playlistSchedule.findMany({
-      where: { syncGroup: { organizationId: user.organizationId! } },
+      where: { store: { organizationId: user.organizationId! } },
       include: SCHEDULE_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async create(dto: CreateScheduleDto, user: JwtPayload) {
-    const group = await this.prisma.syncGroup.findFirst({
-      where: { id: dto.syncGroupId, organizationId: user.organizationId! },
+    const store = await this.prisma.store.findFirst({
+      where: { id: dto.storeId, organizationId: user.organizationId! },
     });
-    if (!group) throw new NotFoundException('Sync group not found');
+    if (!store) throw new NotFoundException('Store not found');
 
     const playlist = await this.prisma.playlist.findFirst({
       where: { id: dto.playlistId, organizationId: user.organizationId! },
@@ -73,7 +73,7 @@ export class SchedulerService {
 
   private async findOwned(id: string, user: JwtPayload) {
     const schedule = await this.prisma.playlistSchedule.findFirst({
-      where: { id, syncGroup: { organizationId: user.organizationId! } },
+      where: { id, store: { organizationId: user.organizationId! } },
     });
 
     if (!schedule) throw new NotFoundException('Schedule not found');
@@ -85,13 +85,13 @@ export class SchedulerService {
     const now = new Date();
     const schedules = await this.prisma.playlistSchedule.findMany({
       where: { active: true },
-      include: { syncGroup: true, playlist: true },
+      include: { store: true, playlist: true },
     });
 
     for (const schedule of schedules) {
       if (this.matchesCron(schedule.cronExpression, now)) {
         this.logger.log(
-          `Auto-playing playlist "${schedule.playlist.name}" in group "${schedule.syncGroup.name}"`,
+          `Auto-playing playlist "${schedule.playlist.name}" at store "${schedule.store.name}"`,
         );
 
         try {
@@ -99,13 +99,13 @@ export class SchedulerService {
             sub: 'system',
             email: 'system@cafe-music',
             role: 'ORG_ADMIN' as const,
-            organizationId: schedule.syncGroup.organizationId,
-            storeId: null,
+            organizationId: schedule.store.organizationId,
+            storeId: schedule.storeId,
           };
 
-          await this.syncService.play(
-            schedule.syncGroupId,
-            { playlistId: schedule.playlistId, trackIndex: 0, mode: 'LOOSE' },
+          await this.syncService.playStore(
+            schedule.storeId,
+            { playlistId: schedule.playlistId, trackIndex: 0 },
             systemPayload,
           );
         } catch (err) {

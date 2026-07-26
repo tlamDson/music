@@ -79,7 +79,7 @@ export default function PlayerBar() {
   if (!current) return null;
 
   const progressPct = durationMs > 0 ? Math.min(100, (positionMs / durationMs) * 100) : 0;
-  const isStoreQueue = mode === 'local' && storeId !== null;
+  const isStoreQueue = mode === 'store' && storeId !== null;
 
   const handleNext = async () => {
     if (!storeId) return;
@@ -87,16 +87,6 @@ export default function PlayerBar() {
       await api.post(`/sync/stores/${storeId}/next`);
     } catch {
       toast.error('Không chuyển được bài');
-    }
-  };
-
-  const handleRejoin = async () => {
-    if (!storeId) return;
-    try {
-      await api.post(`/sync/stores/${storeId}/rejoin`);
-      toast.success('Đã quay lại nhóm sync');
-    } catch {
-      toast.error('Quay lại nhóm sync thất bại');
     }
   };
 
@@ -179,25 +169,15 @@ export default function PlayerBar() {
         </div>
       </div>
 
-      {/* Hàng chờ riêng của quán + âm lượng */}
+      {/* Hàng chờ của quán + âm lượng */}
       <div className="flex items-center justify-between gap-4 md:w-72 md:justify-end">
         {isStoreQueue && queue && (
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="text-xs px-2 py-1 rounded-full whitespace-nowrap"
-              style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: 'var(--color-accent)' }}
-            >
-              Còn {queue.remaining} bài
-            </span>
-            <button
-              onClick={() => void handleRejoin()}
-              className="text-xs underline cursor-pointer transition-all duration-150 hover:opacity-80 focus-visible:outline-none whitespace-nowrap"
-              style={{ color: 'var(--color-secondary)' }}
-              aria-label="Quay lại nhóm sync"
-            >
-              Quay lại nhóm sync
-            </button>
-          </div>
+          <span
+            className="text-xs px-2 py-1 rounded-full whitespace-nowrap"
+            style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: 'var(--color-accent)' }}
+          >
+            Còn {queue.remaining} bài
+          </span>
         )}
 
         <div className="flex items-center gap-2" style={{ color: MUTED_TEXT }}>

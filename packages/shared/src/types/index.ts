@@ -33,40 +33,21 @@ export interface Store {
   id: string;
   name: string;
   organizationId: string;
-  syncGroupId: string | null;
+  status: PlaybackStatus;
+  currentTrackId: string | null;
+  trackIndex: number;
   createdAt: string;
   updatedAt: string;
 }
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
-export type SyncMode = 'TIGHT' | 'LOOSE';
-
-export type SyncGroupStatus = 'PLAYING' | 'PAUSED' | 'STOPPED';
-
-export interface SyncGroupState {
-  groupId: string;
-  playlistId: string | null;
-  trackId: string | null;
-  trackIndex: number;
-  positionMs: number;
-  startedAtServerTs: number | null;
-  isPlaying: boolean;
-  mode: SyncMode;
-  status: SyncGroupStatus;
-}
-
-export interface StoreOverride {
-  storeId: string;
-  isOverridden: boolean;
-  overrideTrackId: string | null;
-  overridePlaylistId: string | null;
-  overriddenAt: string | null;
-}
+export type PlaybackStatus = 'PLAYING' | 'PAUSED' | 'STOPPED';
 
 /**
- * Hàng chờ khi một quán tách khỏi nhóm sync để phát nhạc riêng.
- * `returnToGroupOnFinish` = hết hàng chờ thì tự quay lại dòng sync của admin.
+ * Trạng thái phát của một quán. Quán là đơn vị phát duy nhất — tầng
+ * `SyncGroup` đã bị bỏ vì trùng chức năng, nên cũng không còn khái niệm
+ * "tách khỏi nhóm" hay "quay lại nhóm".
  */
 export interface StorePlaybackState {
   storeId: string;
@@ -76,7 +57,6 @@ export interface StorePlaybackState {
   positionMs: number;
   startedAtServerTs: number;
   isPlaying: boolean;
-  returnToGroupOnFinish: boolean;
 }
 
 // ─── Playlist / Track ─────────────────────────────────────────────────────────
@@ -121,14 +101,9 @@ export interface Track {
 // ─── WebSocket Events ─────────────────────────────────────────────────────────
 
 export type WsEventName =
-  | 'now-playing'
-  | 'paused'
-  | 'stopped'
   | 'store-now-playing'
   | 'store-paused'
   | 'store-stopped'
-  | 'override'
-  | 'rejoin'
   | 'clock-sync'
   | 'error';
 
@@ -149,16 +124,6 @@ export interface WsQueueInfo {
   remaining: number;
 }
 
-export interface WsNowPlayingPayload {
-  groupId: string;
-  trackId: string;
-  track: WsTrackMeta;
-  trackUrl: string | null;
-  positionMs: number;
-  serverTs: number;
-  mode: SyncMode;
-}
-
 export interface WsStoreNowPlayingPayload {
   storeId: string;
   trackId: string;
@@ -175,9 +140,7 @@ export interface WsStoreNowPlayingPayload {
  * lúc admin bấm phát sẽ trắng cho tới lần chuyển bài kế tiếp.
  */
 export interface NowPlayingSnapshot {
-  source: 'GROUP' | 'STORE';
-  groupId: string | null;
-  storeId: string | null;
+  storeId: string;
   track: WsTrackMeta;
   trackUrl: string | null;
   /** Đã cộng thời gian đã trôi kể từ `startedAtServerTs`. */

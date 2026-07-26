@@ -52,7 +52,7 @@ class MockAudio {
 Object.defineProperty(global, 'Audio', { writable: true, value: MockAudio });
 
 function Harness({
-  mode = 'local',
+  mode = 'store',
   storeId = 'store-1',
   startPositionMs = 0,
 }: {
@@ -142,8 +142,9 @@ describe('PlayerProvider', () => {
     await waitFor(() => expect(screen.getByTestId('remaining')).toHaveTextContent('2'));
   });
 
-  // Server là nơi quyết định bài kế hay quay lại nhóm sync, client chỉ báo "hết bài"
-  it('asks the server for the next track when a store queue track ends', async () => {
+  // Chuyển bài do server hẹn giờ và broadcast — client tự gọi /next thì quán
+  // mở hai màn hình sẽ bắn hai lệnh và nhạc nhảy cóc.
+  it('never asks the server for the next track when a store track ends', async () => {
     mockApi.post.mockResolvedValue({});
     renderHarness();
     await userEvent.click(screen.getByText('start'));
@@ -152,7 +153,8 @@ describe('PlayerProvider', () => {
       currentAudio().emit('ended');
     });
 
-    await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/next'));
+    expect(mockApi.post).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId('playing')).toHaveTextContent('false'));
   });
 
   it('does not touch the server when a preview ends', async () => {
@@ -167,21 +169,10 @@ describe('PlayerProvider', () => {
     await waitFor(() => expect(screen.getByTestId('playing')).toHaveTextContent('false'));
   });
 
-  it('does not drive the queue while following the sync group', async () => {
-    renderHarness({ mode: 'group', storeId: 'store-1' });
-    await userEvent.click(screen.getByText('start'));
-
-    await act(async () => {
-      currentAudio().emit('ended');
-    });
-
-    expect(mockApi.post).not.toHaveBeenCalled();
-  });
-
-  // rejoin() luôn presign lại nên URL đổi dù cùng bài — reload từ đầu làm mất
-  // buffer và trễ đúng bằng thời gian tải, khiến quán tụt lại sau nhóm vĩnh viễn.
-  it('does not reload the audio element when rejoining the same track, only reseeks', async () => {
-    renderHarness({ mode: 'group', startPositionMs: 10_000 });
+  // Server presign lại URL mỗi lần broadcast nên URL đổi dù cùng bài — reload
+  // từ đầu làm mất buffer và trễ đúng bằng thời gian tải lại.
+  it('does not reload the audio element on the same track, only reseeks', async () => {
+    renderHarness({ mode: 'store', startPositionMs: 10_000 });
     await userEvent.click(screen.getByText('start'));
     await waitFor(() => expect(screen.getByTestId('playing')).toHaveTextContent('true'));
 
@@ -195,12 +186,12 @@ describe('PlayerProvider', () => {
   });
 
   // Quán bấm dừng (toggle client-side, không qua server) rồi bấm phát lại phải
-  // nhảy bắt kịp giây hiện tại của nhóm — không phải tiếp tục từ chỗ đã dừng.
-  it('catches up to the live group position when resuming after a local pause', async () => {
+  // nhảy bắt kịp giây hiện tại của quán — không tiếp tục từ chỗ đã dừng.
+  it('catches up to the live store position when resuming after a local pause', async () => {
     let now = 1_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => now);
 
-    renderHarness({ mode: 'group', startPositionMs: 10_000 });
+    renderHarness({ mode: 'store', startPositionMs: 10_000 });
     await userEvent.click(screen.getByText('start'));
     await waitFor(() => expect(screen.getByTestId('playing')).toHaveTextContent('true'));
 

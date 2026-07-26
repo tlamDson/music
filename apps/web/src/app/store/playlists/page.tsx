@@ -19,7 +19,7 @@ export default function StorePlaylistsPage() {
           Playlists
         </h1>
         <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
-          Bấm phát để quán tách khỏi nhóm sync và phát playlist này
+          Bấm phát để phát playlist này tại quán
         </p>
       </div>
 

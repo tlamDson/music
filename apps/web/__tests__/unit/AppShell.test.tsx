@@ -37,14 +37,14 @@ describe('AppShell', () => {
   it('renders the chain-wide sections for an org admin', () => {
     renderShell('ORG_ADMIN');
 
-    expect(screen.getByRole('link', { name: 'Sync Control' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Quán' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Người dùng' })).toBeInTheDocument();
   });
 
-  it('never offers sync control to a store console', () => {
+  it('never offers chain-wide sections to a store console', () => {
     renderShell('STORE_ADMIN');
 
-    expect(screen.queryByRole('link', { name: 'Sync Control' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Quán' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Người dùng' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Playlists' })).toBeInTheDocument();
   });

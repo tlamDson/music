@@ -5,15 +5,14 @@ describe('nav items by role', () => {
 
   it('gives an org admin the chain-wide sections', () => {
     expect(labels(dashboardNavItems('ORG_ADMIN'))).toEqual(
-      expect.arrayContaining(['Sync Control', 'Quán', 'Người dùng']),
+      expect.arrayContaining(['Quán', 'Người dùng']),
     );
   });
 
-  // Yêu cầu chính: quán không được đụng vào điều khiển sync của cả chuỗi
-  it('hides sync control, stores and users from a store admin', () => {
+  // Yêu cầu chính: quán không được đụng vào quán khác của cả chuỗi
+  it('hides stores and users from a store admin', () => {
     const items = labels(dashboardNavItems('STORE_ADMIN'));
 
-    expect(items).not.toContain('Sync Control');
     expect(items).not.toContain('Quán');
     expect(items).not.toContain('Người dùng');
   });

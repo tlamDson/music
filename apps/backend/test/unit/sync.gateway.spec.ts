@@ -96,76 +96,7 @@ describe('SyncGateway', () => {
     });
   });
 
-  describe('handleJoinGroup', () => {
-    it('joins the room when the group belongs to the user organization', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue({
-        id: 'group-1',
-        organizationId: 'org-1',
-      } as never);
-      const client = buildClient();
-      client.data = { user };
-
-      const result = await gateway.handleJoinGroup(client, {
-        groupId: 'group-1',
-      });
-
-      expect(client.join).toHaveBeenCalledWith('sync-group:group-1');
-      expect(result).toEqual({
-        event: 'joined',
-        data: { groupId: 'group-1' },
-      });
-    });
-
-    it('scopes the lookup to the user organization', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue({
-        id: 'group-1',
-        organizationId: 'org-1',
-      } as never);
-      const client = buildClient();
-      client.data = { user };
-
-      await gateway.handleJoinGroup(client, { groupId: 'group-1' });
-
-      expect(prisma.syncGroup.findFirst).toHaveBeenCalledWith({
-        where: { id: 'group-1', organizationId: 'org-1' },
-      });
-    });
-
-    it('refuses to join a group from another organization', async () => {
-      prisma.syncGroup.findFirst.mockResolvedValue(null);
-      const client = buildClient();
-      client.data = { user };
-
-      const result = await gateway.handleJoinGroup(client, {
-        groupId: 'group-of-other-org',
-      });
-
-      expect(client.join).not.toHaveBeenCalled();
-      expect(result).toEqual({
-        event: 'error',
-        data: { message: 'Sync group not found' },
-      });
-    });
-
-    it('refuses to join when the socket carries no authenticated user', async () => {
-      const client = buildClient();
-      client.data = {};
-
-      const result = await gateway.handleJoinGroup(client, {
-        groupId: 'group-1',
-      });
-
-      expect(client.join).not.toHaveBeenCalled();
-      expect(prisma.syncGroup.findFirst).not.toHaveBeenCalled();
-      expect(result).toEqual({
-        event: 'error',
-        data: { message: 'Unauthorized' },
-      });
-    });
-  });
-
-  // Nhạc riêng của một quán không thể đi qua room của sync group — cần kênh
-  // riêng cho từng store.
+  // Kênh phát duy nhất còn lại sau khi bỏ tầng sync group: room của từng quán.
   describe('handleJoinStore', () => {
     const storeAdmin = {
       sub: 'user-2',
@@ -252,17 +183,6 @@ describe('SyncGateway', () => {
     });
   });
 
-  describe('handleLeaveGroup', () => {
-    it('leaves the requested room', () => {
-      const client = buildClient();
-
-      const result = gateway.handleLeaveGroup(client, { groupId: 'group-1' });
-
-      expect(client.leave).toHaveBeenCalledWith('sync-group:group-1');
-      expect(result).toEqual({ event: 'left', data: { groupId: 'group-1' } });
-    });
-  });
-
   describe('handleLeaveStore', () => {
     it('leaves the store room', () => {
       const client = buildClient();
@@ -271,6 +191,25 @@ describe('SyncGateway', () => {
 
       expect(client.leave).toHaveBeenCalledWith('store:store-1');
       expect(result).toEqual({ event: 'left', data: { storeId: 'store-1' } });
+    });
+  });
+
+  // Admin cần biết nhạc mình bấm có màn hình nào đang nghe không, thay vì đoán.
+  describe('countStoreClients', () => {
+    it('đếm số client đang ở trong room của quán', () => {
+      gateway.server = {
+        adapter: { rooms: new Map([['store:store-1', new Set(['a', 'b'])]]) },
+      } as never;
+
+      expect(gateway.countStoreClients('store-1')).toBe(2);
+    });
+
+    it('trả 0 khi chưa ai kết nối hoặc server chưa sẵn sàng', () => {
+      gateway.server = { adapter: { rooms: new Map() } } as never;
+      expect(gateway.countStoreClients('store-1')).toBe(0);
+
+      gateway.server = undefined as never;
+      expect(gateway.countStoreClients('store-1')).toBe(0);
     });
   });
 });

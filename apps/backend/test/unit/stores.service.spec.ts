@@ -4,10 +4,14 @@ import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { PrismaClient } from '@prisma/client';
 import { StoresService } from '../../src/modules/stores/stores.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { SyncService } from '../../src/modules/sync/sync.service';
+import { SyncGateway } from '../../src/modules/sync/sync.gateway';
 
 describe('StoresService', () => {
   let service: StoresService;
   let prisma: DeepMockProxy<PrismaClient>;
+  let syncService: jest.Mocked<SyncService>;
+  let gateway: jest.Mocked<SyncGateway>;
 
   const orgAdminUser = {
     sub: 'user-1',
@@ -21,23 +25,36 @@ describe('StoresService', () => {
     id: 'store-1',
     name: 'Cafe Central',
     organizationId: 'org-1',
-    syncGroupId: null,
+    status: 'STOPPED' as const,
+    currentTrackId: null,
+    trackIndex: 0,
+    startedAtTs: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
   beforeEach(async () => {
     const prismaMock = mockDeep<PrismaClient>();
+    const syncMock = {
+      nowPlayingForStore: jest.fn().mockResolvedValue(null),
+    } as unknown as jest.Mocked<SyncService>;
+    const gatewayMock = {
+      countStoreClients: jest.fn().mockReturnValue(0),
+    } as unknown as jest.Mocked<SyncGateway>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StoresService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: SyncService, useValue: syncMock },
+        { provide: SyncGateway, useValue: gatewayMock },
       ],
     }).compile();
 
     service = module.get(StoresService);
     prisma = module.get(PrismaService);
+    syncService = module.get(SyncService);
+    gateway = module.get(SyncGateway);
   });
 
   describe('findAll', () => {
@@ -49,22 +66,42 @@ describe('StoresService', () => {
       expect(result).toEqual({ data: [mockStore] });
       expect(prisma.store.findMany).toHaveBeenCalledWith({
         where: { organizationId: 'org-1' },
-        include: { storeOverride: true },
         orderBy: { name: 'asc' },
       });
     });
   });
 
   describe('findOne', () => {
-    it('should return the store when found in the organization', async () => {
+    // Trang chi tiết quán là chỗ admin bấm phát — phải biết đang phát gì và có
+    // màn hình nào đang nghe không, nếu không admin bấm xong chỉ biết đoán.
+    it('trả kèm bài đang phát và số màn hình đang kết nối', async () => {
       prisma.store.findFirst.mockResolvedValue(mockStore as any);
+      const nowPlaying = {
+        storeId: 'store-1',
+        track: {
+          id: 'track-1',
+          title: 'Cà phê sáng',
+          artist: 'Vũ',
+          durationMs: 180_000,
+        },
+        trackUrl: 'https://s3/a.mp3',
+        positionMs: 1_000,
+        serverTs: Date.now(),
+        isPlaying: true,
+        queue: { index: 0, total: 2, remaining: 1 },
+      };
+      (syncService.nowPlayingForStore as jest.Mock).mockResolvedValue(
+        nowPlaying,
+      );
+      (gateway.countStoreClients as jest.Mock).mockReturnValue(3);
 
       const result = await service.findOne('store-1', orgAdminUser);
 
-      expect(result).toEqual(mockStore);
-      expect(prisma.store.findFirst).toHaveBeenCalledWith({
-        where: { id: 'store-1', organizationId: 'org-1' },
-        include: { storeOverride: true, syncGroup: true },
+      expect(result).toMatchObject({
+        id: 'store-1',
+        name: 'Cafe Central',
+        nowPlaying,
+        connectedScreens: 3,
       });
     });
 
@@ -91,27 +128,6 @@ describe('StoresService', () => {
         data: {
           name: 'Cafe Central',
           organizationId: 'org-1',
-          syncGroupId: null,
-        },
-      });
-    });
-
-    it('should pass syncGroupId through when provided', async () => {
-      prisma.store.create.mockResolvedValue({
-        ...mockStore,
-        syncGroupId: 'group-1',
-      } as any);
-
-      await service.create(
-        { name: 'Cafe Central', syncGroupId: 'group-1' },
-        orgAdminUser,
-      );
-
-      expect(prisma.store.create).toHaveBeenCalledWith({
-        data: {
-          name: 'Cafe Central',
-          organizationId: 'org-1',
-          syncGroupId: 'group-1',
         },
       });
     });
@@ -148,76 +164,23 @@ describe('StoresService', () => {
     });
   });
 
-  describe('assignGroup', () => {
-    const mockGroup = {
-      id: 'group-1',
-      name: 'Group A',
-      organizationId: 'org-1',
-    };
-
-    it('should assign the sync group when store and group are in the organization', async () => {
-      prisma.store.findFirst.mockResolvedValue(mockStore as any);
-      prisma.syncGroup.findFirst.mockResolvedValue(mockGroup as any);
-      prisma.store.update.mockResolvedValue({
-        ...mockStore,
-        syncGroupId: 'group-1',
-      } as any);
-
-      const result = await service.assignGroup(
-        'store-1',
-        'group-1',
-        orgAdminUser,
-      );
-
-      expect(result).toMatchObject({ syncGroupId: 'group-1' });
-      expect(prisma.syncGroup.findFirst).toHaveBeenCalledWith({
-        where: { id: 'group-1', organizationId: 'org-1' },
-      });
-      expect(prisma.store.update).toHaveBeenCalledWith({
-        where: { id: 'store-1' },
-        data: { syncGroupId: 'group-1' },
-      });
-    });
-
-    it('should throw NotFoundException when store is missing', async () => {
-      prisma.store.findFirst.mockResolvedValue(null);
-
-      await expect(
-        service.assignGroup('store-x', 'group-1', orgAdminUser),
-      ).rejects.toThrow('Store not found');
-      expect(prisma.store.update).not.toHaveBeenCalled();
-    });
-
-    it('should throw NotFoundException when sync group is missing', async () => {
-      prisma.store.findFirst.mockResolvedValue(mockStore as any);
-      prisma.syncGroup.findFirst.mockResolvedValue(null);
-
-      await expect(
-        service.assignGroup('store-1', 'group-x', orgAdminUser),
-      ).rejects.toThrow('Sync group not found');
-      expect(prisma.store.update).not.toHaveBeenCalled();
-    });
-  });
-
   describe('getStatus', () => {
     it('should return the projected status shape', async () => {
-      const override = { id: 'override-1', storeId: 'store-1' };
-      const group = { id: 'group-1', name: 'Group A' };
       prisma.store.findFirst.mockResolvedValue({
         ...mockStore,
-        syncGroupId: 'group-1',
-        syncGroup: group,
-        storeOverride: override,
+        status: 'PLAYING',
+        currentTrackId: 'track-1',
       } as any);
+      (gateway.countStoreClients as jest.Mock).mockReturnValue(1);
 
       const result = await service.getStatus('store-1', orgAdminUser);
 
       expect(result).toEqual({
         storeId: 'store-1',
         name: 'Cafe Central',
-        syncGroupId: 'group-1',
-        syncGroup: group,
-        override,
+        status: 'PLAYING',
+        currentTrackId: 'track-1',
+        connectedScreens: 1,
       });
     });
 

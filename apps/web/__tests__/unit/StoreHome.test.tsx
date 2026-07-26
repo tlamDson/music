@@ -46,7 +46,7 @@ function SeedPlaying() {
       onClick={() =>
         playTrack(
           { id: 'track-1', title: 'Hạ trắng', artist: 'Khánh Ly', url: 'https://s3/1.mp3' },
-          { mode: 'group', storeId: 'store-1' },
+          { mode: 'store', storeId: 'store-1' },
         )
       }
     >
@@ -71,8 +71,8 @@ describe('StoreHome', () => {
         return Promise.resolve({
           storeId: 'store-1',
           name: 'Quán Nguyễn Huệ',
-          syncGroupId: 'group-1',
-          override: { isOverridden: false, overriddenAt: null },
+          status: 'STOPPED',
+          connectedScreens: 1,
         });
       }
       return Promise.resolve({
@@ -91,11 +91,11 @@ describe('StoreHome', () => {
 
   const renderHome = () => renderWithPlayer(<StoreHome storeId="store-1" />);
 
-  it('shows the store name and that it follows the sync group', async () => {
+  it('shows the store name and that it is idle', async () => {
     renderHome();
 
     expect(await screen.findByText('Quán Nguyễn Huệ')).toBeInTheDocument();
-    expect(screen.getByText(/đang theo nhóm sync/i)).toBeInTheDocument();
+    expect(screen.getByText(/quán đang im lặng/i)).toBeInTheDocument();
   });
 
   it('warns when the socket is disconnected', async () => {
@@ -105,22 +105,12 @@ describe('StoreHome', () => {
     expect(await screen.findByText(/mất kết nối/i)).toBeInTheDocument();
   });
 
-  // Đây là thứ nhân viên quán cần thấy: còn mấy bài nữa thì nhạc quay về dòng chung
-  it('shows how many tracks remain before returning to the group', async () => {
+  // Nhân viên quán cần thấy còn mấy bài nữa trong hàng chờ
+  it('shows how many tracks remain in the queue', async () => {
     mockUseStoreSync.mockReturnValue(syncState({ storeQueue: { index: 0, total: 3, remaining: 2 } }));
     renderHome();
 
     expect(await screen.findByText(/còn 2 bài/i)).toBeInTheDocument();
-  });
-
-  it('rejoins the sync group on demand', async () => {
-    mockApi.post.mockResolvedValue({ rejoined: true });
-    mockUseStoreSync.mockReturnValue(syncState({ storeQueue: { index: 0, total: 3, remaining: 2 } }));
-    renderHome();
-
-    await userEvent.click(await screen.findByRole('button', { name: /quay lại nhóm sync ngay/i }));
-
-    await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/rejoin'));
   });
 
   // Điều QC báo thiếu: bấm phát ở dashboard xong quán phải thấy bài đang chạy
@@ -136,7 +126,7 @@ describe('StoreHome', () => {
     await userEvent.click(screen.getByText('seed'));
 
     expect(await screen.findByText('Hạ trắng')).toBeInTheDocument();
-    expect(screen.getByText(/đang phát · theo nhóm sync/i)).toBeInTheDocument();
+    expect(screen.getByText(/đang phát tại quán/i)).toBeInTheDocument();
   });
 
   it('plays a suggested playlist through the store endpoint', async () => {
@@ -149,7 +139,6 @@ describe('StoreHome', () => {
       expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/play', {
         playlistId: 'playlist-1',
         trackIndex: 0,
-        returnToGroupOnFinish: true,
       }),
     );
   });

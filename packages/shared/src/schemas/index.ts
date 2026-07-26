@@ -31,7 +31,6 @@ export type CreateOrganizationDto = z.infer<typeof CreateOrganizationSchema>;
 
 export const CreateStoreSchema = z.object({
   name: z.string().min(2).max(100),
-  syncGroupId: z.string().min(1).optional(),
 });
 
 export const UpdateStoreSchema = CreateStoreSchema.partial();
@@ -69,37 +68,11 @@ export type CreateTrackMetaDto = z.infer<typeof CreateTrackMetaSchema>;
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
-export const PlayGroupSchema = z.object({
-  playlistId: z.string().min(1),
-  trackIndex: z.number().int().min(0).default(0),
-  mode: z.enum(['TIGHT', 'LOOSE']).default('LOOSE'),
-});
-
-export const SetSyncModeSchema = z.object({
-  mode: z.enum(['TIGHT', 'LOOSE']),
-});
-
-export const CreateSyncGroupSchema = z.object({
-  name: z.string().min(2).max(100),
-  mode: z.enum(['TIGHT', 'LOOSE']).optional(),
-});
-
-export const OverrideSchema = z.object({
-  trackId: z.string().min(1).optional(),
-  playlistId: z.string().min(1).optional(),
-});
-
 export const StorePlaySchema = z.object({
   playlistId: z.string().min(1),
   trackIndex: z.number().int().min(0).default(0),
-  // Mặc định phát xong hàng chờ là quay lại dòng sync của admin
-  returnToGroupOnFinish: z.boolean().default(true),
 });
 
-export type PlayGroupDto = z.infer<typeof PlayGroupSchema>;
-export type SetSyncModeDto = z.infer<typeof SetSyncModeSchema>;
-export type CreateSyncGroupDto = z.infer<typeof CreateSyncGroupSchema>;
-export type OverrideDto = z.infer<typeof OverrideSchema>;
 export type StorePlayDto = z.infer<typeof StorePlaySchema>;
 
 // ─── Pagination ───────────────────────────────────────────────────────────────

@@ -67,45 +67,11 @@ export class SyncGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // cleanup if needed
   }
 
-  @SubscribeMessage('join-group')
-  async handleJoinGroup(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { groupId: string },
-  ) {
-    // Xác thực ở handleConnection mới chỉ chứng minh "là user hợp lệ" — chưa nói
-    // gì về quyền với group này, nếu không check thì bất kỳ ai đăng nhập được
-    // cũng nghe lén được sync group của tổ chức khác.
-    const user = (client.data as { user?: JwtPayload }).user;
-    if (!user?.organizationId) {
-      return { event: 'error', data: { message: 'Unauthorized' } };
-    }
-
-    const group = await this.prisma.syncGroup.findFirst({
-      where: { id: data.groupId, organizationId: user.organizationId },
-    });
-    if (!group) {
-      this.logger.warn(
-        `User ${user.sub} denied join for sync group ${data.groupId}`,
-      );
-      return { event: 'error', data: { message: 'Sync group not found' } };
-    }
-
-    void client.join(`sync-group:${data.groupId}`);
-    return { event: 'joined', data: { groupId: data.groupId } };
-  }
-
-  @SubscribeMessage('leave-group')
-  handleLeaveGroup(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { groupId: string },
-  ) {
-    void client.leave(`sync-group:${data.groupId}`);
-    return { event: 'left', data: { groupId: data.groupId } };
-  }
-
   /**
-   * Kênh riêng của một quán: dùng khi quán tách khỏi nhóm sync để phát nhạc
-   * của mình. Store admin chỉ nghe được quán của chính họ.
+   * Kênh phát của một quán — kênh duy nhất còn lại sau khi bỏ tầng sync group.
+   * Xác thực ở `handleConnection` mới chỉ chứng minh "là user hợp lệ", chưa nói
+   * gì về quyền với quán này: thiếu check dưới đây thì bất kỳ ai đăng nhập được
+   * cũng nghe lén được nhạc của tổ chức khác.
    */
   @SubscribeMessage('join-store')
   async handleJoinStore(
@@ -144,12 +110,24 @@ export class SyncGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { event: 'left', data: { storeId: data.storeId } };
   }
 
-  broadcastToGroup(groupId: string, event: string, payload: unknown) {
-    this.server.to(`sync-group:${groupId}`).emit(event, payload);
-  }
-
   broadcastToStore(storeId: string, event: string, payload: unknown) {
     this.server.to(`store:${storeId}`).emit(event, payload);
+  }
+
+  /**
+   * Số client đang nghe kênh của quán — mỗi màn hình `/player/[storeId]` và mỗi
+   * tab console đang mở là một client. Đọc thẳng từ adapter (đồng bộ, không cần
+   * `await fetchSockets()`) để `overview` không phải chờ từng quán một.
+   *
+   * Phải ép kiểu: gateway có `namespace: '/sync'` nên Nest gán Namespace vào
+   * `@WebSocketServer()` dù kiểu khai báo là `Server`, mà trên `Server` thì
+   * `adapter` lại là overload setter chứ không phải property đọc được.
+   */
+  countStoreClients(storeId: string): number {
+    const ns = this.server as unknown as {
+      adapter?: { rooms?: Map<string, Set<string>> };
+    };
+    return ns?.adapter?.rooms?.get(`store:${storeId}`)?.size ?? 0;
   }
 
   @SubscribeMessage('clock-sync')

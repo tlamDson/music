@@ -96,7 +96,7 @@ describe('StoreSyncProvider', () => {
 
     expect(playTrack).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'track-1', title: 'LoveMeNot' }),
-      expect.objectContaining({ mode: 'local', storeId: 'store-1' }),
+      expect.objectContaining({ mode: 'store', storeId: 'store-1' }),
     );
   });
 

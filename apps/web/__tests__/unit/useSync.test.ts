@@ -66,25 +66,25 @@ describe('useSync hook', () => {
     const listeners = connectWith();
 
     await act(async () => {
-      listeners['now-playing']?.({
-        groupId: 'group-1',
+      listeners['store-now-playing']?.({
+        storeId: 'store-1',
         trackId: 'track-1',
         track: { id: 'track-1', title: 'Cà phê sáng', artist: 'Vũ', durationMs: 180_000 },
         trackUrl: 'https://s3/song.mp3',
         positionMs: 0,
         serverTs: Date.now(),
-        mode: 'LOOSE',
+        queue: { index: 0, total: 2, remaining: 1 },
       });
       await Promise.resolve();
     });
 
     expect(playTrack).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'track-1', title: 'Cà phê sáng', url: 'https://s3/song.mp3' }),
-      expect.objectContaining({ mode: 'group', storeId: 'store-1' }),
+      expect.objectContaining({ mode: 'store', storeId: 'store-1' }),
     );
   });
 
-  it('should join the sync group room after connect', async () => {
+  it('should join the store room after connect', async () => {
     const listeners = connectWith();
 
     await act(async () => {
@@ -92,44 +92,29 @@ describe('useSync hook', () => {
       await Promise.resolve();
     });
 
-    expect(mockApiGet).toHaveBeenCalledWith('/stores/store-1/status');
-    expect(mockSocket.emit).toHaveBeenCalledWith('join-group', { groupId: 'group-1' });
+    expect(mockSocket.emit).toHaveBeenCalledWith('join-store', { storeId: 'store-1' });
   });
 
-  it('should not join any room when store has no sync group', async () => {
-    mockApiGet.mockImplementation((path: string) =>
-      path.includes('/status')
-        ? Promise.resolve({ storeId: 'store-1', syncGroupId: null })
-        : Promise.resolve(null),
-    );
-    const listeners = connectWith();
+  it('should not open a socket without a store', () => {
+    const { io } = require('socket.io-client') as { io: jest.Mock };
+    io.mockClear();
 
-    await act(async () => {
-      listeners['connect']?.();
-      await Promise.resolve();
-    });
+    renderHook(() => useSync({ token: 'test-token' }));
 
-    expect(mockSocket.emit).not.toHaveBeenCalledWith('join-group', expect.anything());
+    expect(io).not.toHaveBeenCalled();
   });
 
   // Broadcast không replay khi join room — trang mở sau lúc admin bấm phát phải
   // tự hỏi "đang phát gì" chứ không ngồi đợi bài kế.
   it('hydrates the player from the now-playing snapshot on connect', async () => {
-    mockApiGet.mockImplementation((path: string) => {
-      if (path.includes('/status')) {
-        return Promise.resolve({ storeId: 'store-1', syncGroupId: 'group-1' });
-      }
-      return Promise.resolve({
-        source: 'GROUP',
-        groupId: 'group-1',
-        storeId: 'store-1',
-        track: { id: 'track-7', title: 'Hạ trắng', artist: null, durationMs: 240_000 },
-        trackUrl: 'https://s3/ha-trang.mp3',
-        positionMs: 34_000,
-        serverTs: Date.now(),
-        isPlaying: true,
-        queue: null,
-      });
+    mockApiGet.mockResolvedValue({
+      storeId: 'store-1',
+      track: { id: 'track-7', title: 'Hạ trắng', artist: null, durationMs: 240_000 },
+      trackUrl: 'https://s3/ha-trang.mp3',
+      positionMs: 34_000,
+      serverTs: Date.now(),
+      isPlaying: true,
+      queue: { index: 1, total: 3, remaining: 1 },
     });
     const listeners = connectWith();
 
@@ -142,25 +127,25 @@ describe('useSync hook', () => {
     expect(mockApiGet).toHaveBeenCalledWith('/sync/stores/store-1/now-playing');
     expect(playTrack).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'track-7', title: 'Hạ trắng' }),
-      expect.objectContaining({ mode: 'group', positionMs: expect.any(Number) }),
+      expect.objectContaining({ mode: 'store', positionMs: expect.any(Number) }),
     );
   });
 
-  it('pauses the player when a paused event arrives', async () => {
+  it('pauses the player when a store-paused event arrives', async () => {
     const listeners = connectWith();
 
     await act(async () => {
-      listeners['paused']?.({ groupId: 'group-1', serverTs: Date.now() });
+      listeners['store-paused']?.({ storeId: 'store-1', serverTs: Date.now() });
     });
 
     expect(pause).toHaveBeenCalled();
   });
 
-  it('stops the player when a stopped event arrives', async () => {
+  it('stops the player when a store-stopped event arrives', async () => {
     const listeners = connectWith();
 
     await act(async () => {
-      listeners['stopped']?.({ groupId: 'group-1', serverTs: Date.now() });
+      listeners['store-stopped']?.({ storeId: 'store-1', serverTs: Date.now() });
     });
 
     expect(stop).toHaveBeenCalled();

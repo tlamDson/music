@@ -48,12 +48,11 @@ describe('player screen', () => {
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
   });
 
-  it('offers rejoin and pause controls outside kiosk mode', () => {
+  it('offers a pause control outside kiosk mode', () => {
     mockSearchParams.get.mockReturnValue(null);
 
     render(<PlayerPage />);
 
-    expect(screen.getByRole('button', { name: /quay lại nhóm sync/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /tạm dừng/i })).toBeInTheDocument();
   });
 
@@ -65,10 +64,9 @@ describe('player screen', () => {
     expect(screen.getByText(/đã kết nối/i)).toBeInTheDocument();
   });
 
-  // Quán đang theo nhóm không có StorePlaybackState riêng — gọi
-  // /sync/stores/:id/pause sẽ 404 (backend: "Store is not playing locally"),
-  // nên nút Tạm dừng luôn báo lỗi dù bấm đúng. Theo nhóm thì chỉ cần dừng cục bộ.
-  it('pauses locally without hitting the API when following the sync group', async () => {
+  // Đang nghe thử thì quán không có state trên server — gọi
+  // /sync/stores/:id/pause sẽ 404, nên nút Tạm dừng luôn báo lỗi dù bấm đúng.
+  it('pauses locally without hitting the API when only previewing', async () => {
     mockSearchParams.get.mockReturnValue(null);
     const pauseFn = jest.fn();
     mockUsePlayer.mockReturnValue({
@@ -76,7 +74,7 @@ describe('player screen', () => {
       isPlaying: true,
       positionMs: 0,
       durationMs: 180_000,
-      mode: 'group',
+      mode: 'preview',
       pause: pauseFn,
     } as unknown as ReturnType<typeof usePlayer>);
 
@@ -87,9 +85,9 @@ describe('player screen', () => {
     expect(mockApi.post).not.toHaveBeenCalledWith('/sync/stores/store-1/pause');
   });
 
-  // Quán đang phát hàng chờ riêng thì pause phải qua server để broadcast
-  // `store-paused` cho các tab khác của chính quán đó (kiosk, tab admin xem).
-  it('asks the server to pause when the store has its own local queue', async () => {
+  // Quán đang thực sự phát thì pause phải qua server để broadcast
+  // `store-paused` cho các màn hình khác của chính quán đó.
+  it('asks the server to pause when the store is actually playing', async () => {
     mockSearchParams.get.mockReturnValue(null);
     const pauseFn = jest.fn();
     mockApi.post.mockResolvedValue(undefined);
@@ -98,7 +96,7 @@ describe('player screen', () => {
       isPlaying: true,
       positionMs: 0,
       durationMs: 180_000,
-      mode: 'local',
+      mode: 'store',
       pause: pauseFn,
     } as unknown as ReturnType<typeof usePlayer>);
 
