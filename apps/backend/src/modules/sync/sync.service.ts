@@ -13,9 +13,24 @@ import {
   JwtPayload,
   StorePlayDto,
   StorePlaybackState,
+  StoreRepeatMode,
+  PlaybackModeDto,
   NowPlayingSnapshot,
   WsTrackMeta,
 } from '@cafe-music/shared';
+
+/** Tua về đầu bài thay vì lùi một bậc nếu đã phát quá mốc này — giống Spotify. */
+const PREVIOUS_RESTART_THRESHOLD_MS = 3_000;
+
+/** Fisher-Yates — dùng cho cả bật shuffle giữa chừng và xáo lại khi lặp ALL hết vòng. */
+function shuffleIndices(order: number[]): number[] {
+  const result = [...order];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 
 /** Chỉ phần client cần để dựng thanh phát — không đẩy cả bản ghi Track ra WS. */
 type TrackRow = {
@@ -72,7 +87,7 @@ export class SyncService implements OnModuleInit {
       const playback = await this.redis.getStorePlayback(store.id);
       if (!playback?.isPlaying) continue;
 
-      const trackId = playback.trackIds[playback.trackIndex];
+      const trackId = this.trackIdAt(playback, playback.trackIndex);
       if (!trackId) continue;
 
       const track = await this.prisma.track.findFirst({
@@ -116,7 +131,8 @@ export class SyncService implements OnModuleInit {
   }
 
   /**
-   * Hết bài → bài kế, hết hàng chờ → dừng hẳn (không lặp lại playlist).
+   * Hết bài → bài kế theo `repeat`/`shuffle`, hết hàng chờ → dừng hẳn trừ khi
+   * `repeat: 'ALL'` (quay về đầu, xáo lại `order` nếu đang shuffle).
    *
    * Chuyển bài do **server** quyết định chứ không phải client bắt sự kiện
    * `ended` rồi gọi lên: một quán mở nhiều màn hình thì mỗi màn sẽ bắn một lệnh
@@ -126,15 +142,41 @@ export class SyncService implements OnModuleInit {
     const playback = await this.redis.getStorePlayback(storeId);
     if (!playback?.isPlaying) return;
 
-    const nextIndex = playback.trackIndex + 1;
-    if (nextIndex >= playback.trackIds.length) {
-      await this.stopStore(storeId);
+    // ONE: phát lại đúng bài đang phát, không sang bài kế.
+    if (playback.repeat === 'ONE') {
+      const trackId = this.trackIdAt(playback, playback.trackIndex);
+      const track = trackId
+        ? await this.prisma.track.findFirst({ where: { id: trackId } })
+        : null;
+      if (!track) {
+        await this.stopStore(storeId);
+        return;
+      }
+
+      await this.startStoreTrack({ ...playback, positionMs: 0, track });
       return;
     }
 
-    const track = await this.prisma.track.findFirst({
-      where: { id: playback.trackIds[nextIndex] },
-    });
+    let nextIndex = playback.trackIndex + 1;
+    let order = playback.order;
+
+    if (nextIndex >= playback.trackIds.length) {
+      if (playback.repeat !== 'ALL') {
+        await this.stopStore(storeId);
+        return;
+      }
+
+      // Hết vòng playlist mà lặp ALL → quay về đầu; đang shuffle thì xáo bài mới.
+      nextIndex = 0;
+      if (playback.shuffle) {
+        order = shuffleIndices(playback.trackIds.map((_, i) => i));
+      }
+    }
+
+    const trackId = playback.trackIds[order[nextIndex]];
+    const track = trackId
+      ? await this.prisma.track.findFirst({ where: { id: trackId } })
+      : null;
     if (!track) {
       await this.stopStore(storeId);
       return;
@@ -142,10 +184,19 @@ export class SyncService implements OnModuleInit {
 
     await this.startStoreTrack({
       ...playback,
+      order,
       trackIndex: nextIndex,
       positionMs: 0,
       track,
     });
+  }
+
+  /** Chỉ số vào `trackIds` của vị trí `pos` trong `order`. */
+  private trackIdAt(
+    playback: StorePlaybackState,
+    pos: number,
+  ): string | undefined {
+    return playback.trackIds[playback.order[pos]];
   }
 
   /**
@@ -166,7 +217,7 @@ export class SyncService implements OnModuleInit {
           name: store.name,
           status: store.status,
           trackId: playback
-            ? (playback.trackIds[playback.trackIndex] ?? null)
+            ? (this.trackIdAt(playback, playback.trackIndex) ?? null)
             : null,
           isPlaying: playback?.isPlaying ?? false,
           queueRemaining: playback
@@ -222,12 +273,17 @@ export class SyncService implements OnModuleInit {
     const entry = playlist.playlistTracks[trackIndex];
     if (!entry) throw new NotFoundException('Track not found at given index');
 
+    // Chọn playlist mới → bắt đầu lại từ mặc định (không lặp, không xáo), thứ
+    // tự luôn theo đúng playlist.
     return this.startStoreTrack({
       storeId,
       playlistId: dto.playlistId,
       trackIds,
+      order: trackIds.map((_, i) => i),
       trackIndex,
       positionMs: 0,
+      repeat: 'OFF',
+      shuffle: false,
       track: entry.track,
     });
   }
@@ -269,14 +325,19 @@ export class SyncService implements OnModuleInit {
     if (!playback) throw new NotFoundException('Store is not playing');
 
     const track = await this.prisma.track.findFirst({
-      where: { id: playback.trackIds[playback.trackIndex] },
+      where: { id: this.trackIdAt(playback, playback.trackIndex) },
     });
     if (!track) throw new NotFoundException('Track not found');
 
     return this.startStoreTrack({ ...playback, track });
   }
 
-  /** Bỏ qua bài đang phát — cùng đường đi với auto-next của server. */
+  /**
+   * Bỏ qua bài đang phát — cùng đường đi với auto-next của server. Đây là
+   * lệnh thủ công nên luôn đi tới bài kế thật (không phát lại theo `repeat:
+   * 'ONE'`) và dừng hẳn ở cuối hàng chờ bất kể `repeat` — hành vi lặp ALL chỉ
+   * áp dụng cho auto-next trong `advance()`.
+   */
   async nextStore(storeId: string, user: JwtPayload) {
     await this.assertStoreAccess(storeId, user);
 
@@ -290,7 +351,7 @@ export class SyncService implements OnModuleInit {
     }
 
     const track = await this.prisma.track.findFirst({
-      where: { id: playback.trackIds[nextIndex] },
+      where: { id: this.trackIdAt(playback, nextIndex) },
     });
     if (!track) throw new NotFoundException('Track not found');
 
@@ -302,6 +363,94 @@ export class SyncService implements OnModuleInit {
     });
 
     return { finished: false, playback: next };
+  }
+
+  /**
+   * Lùi một bài — giống Spotify: đã phát quá
+   * `PREVIOUS_RESTART_THRESHOLD_MS` thì tua về đầu bài hiện tại thay vì lùi
+   * thật. Ở bài đầu mà lùi thật (chưa qua ngưỡng) thì theo `repeat`: `ALL`
+   * nhảy về bài cuối, còn lại tua về đầu bài hiện tại.
+   */
+  async previousStore(storeId: string, user: JwtPayload) {
+    await this.assertStoreAccess(storeId, user);
+
+    const playback = await this.redis.getStorePlayback(storeId);
+    if (!playback) throw new NotFoundException('Store is not playing');
+
+    let targetIndex = playback.trackIndex;
+    if (elapsedPositionMs(playback) <= PREVIOUS_RESTART_THRESHOLD_MS) {
+      if (playback.trackIndex > 0) {
+        targetIndex = playback.trackIndex - 1;
+      } else if (playback.repeat === 'ALL') {
+        targetIndex = playback.trackIds.length - 1;
+      } else {
+        targetIndex = 0;
+      }
+    }
+
+    const track = await this.prisma.track.findFirst({
+      where: { id: this.trackIdAt(playback, targetIndex) },
+    });
+    if (!track) throw new NotFoundException('Track not found');
+
+    return this.startStoreTrack({
+      ...playback,
+      trackIndex: targetIndex,
+      positionMs: 0,
+      track,
+    });
+  }
+
+  /**
+   * Đổi repeat/shuffle không làm gián đoạn nhạc đang phát — chỉ cập nhật state
+   * + broadcast `store-mode-changed`, không gọi `startStoreTrack`.
+   */
+  async setPlaybackMode(
+    storeId: string,
+    dto: PlaybackModeDto,
+    user: JwtPayload,
+  ) {
+    await this.assertStoreAccess(storeId, user);
+
+    const playback = await this.redis.getStorePlayback(storeId);
+    if (!playback) throw new NotFoundException('Store is not playing');
+
+    const repeat: StoreRepeatMode = dto.repeat ?? playback.repeat;
+    const shuffle = dto.shuffle ?? playback.shuffle;
+
+    let order = playback.order;
+    let trackIndex = playback.trackIndex;
+
+    if (shuffle && !playback.shuffle) {
+      // Bật shuffle giữa chừng: xáo lại order nhưng đặt bài đang phát lên đầu
+      // để nhạc đang chạy không bị nhảy ngang.
+      const currentTrackIdx = playback.order[playback.trackIndex];
+      const rest = playback.order.filter((idx) => idx !== currentTrackIdx);
+      order = [currentTrackIdx, ...shuffleIndices(rest)];
+      trackIndex = 0;
+    } else if (!shuffle && playback.shuffle) {
+      // Tắt shuffle: quay lại đúng thứ tự playlist gốc, vẫn giữ đúng bài đang phát.
+      const currentTrackIdx = playback.order[playback.trackIndex];
+      order = playback.trackIds.map((_, i) => i);
+      trackIndex = currentTrackIdx;
+    }
+
+    const updated: StorePlaybackState = {
+      ...playback,
+      order,
+      trackIndex,
+      repeat,
+      shuffle,
+    };
+    await this.redis.setStorePlayback(storeId, updated);
+
+    this.gateway.broadcastToStore(storeId, 'store-mode-changed', {
+      storeId,
+      repeat,
+      shuffle,
+    });
+
+    return updated;
   }
 
   async stopStoreFor(storeId: string, user: JwtPayload) {
@@ -321,8 +470,11 @@ export class SyncService implements OnModuleInit {
     storeId: string;
     playlistId: string;
     trackIds: string[];
+    order: number[];
     trackIndex: number;
     positionMs: number;
+    repeat: StoreRepeatMode;
+    shuffle: boolean;
     track: TrackRow;
   }): Promise<StorePlaybackState> {
     const serverTs = Date.now();
@@ -330,10 +482,13 @@ export class SyncService implements OnModuleInit {
       storeId: params.storeId,
       playlistId: params.playlistId,
       trackIds: params.trackIds,
+      order: params.order,
       trackIndex: params.trackIndex,
       positionMs: params.positionMs,
       startedAtServerTs: serverTs,
       isPlaying: true,
+      repeat: params.repeat,
+      shuffle: params.shuffle,
     };
 
     await this.redis.setStorePlayback(params.storeId, playback);
@@ -362,6 +517,8 @@ export class SyncService implements OnModuleInit {
         total: params.trackIds.length,
         remaining: params.trackIds.length - params.trackIndex - 1,
       },
+      repeat: params.repeat,
+      shuffle: params.shuffle,
     });
 
     // Track upload trước khi web biết đo thời lượng có durationMs = 0 → không
@@ -410,12 +567,13 @@ export class SyncService implements OnModuleInit {
     if (!playback) return null;
 
     const track = await this.prisma.track.findFirst({
-      where: { id: playback.trackIds[playback.trackIndex] },
+      where: { id: this.trackIdAt(playback, playback.trackIndex) },
     });
     if (!track) return null;
 
     return {
       storeId,
+      playlistId: playback.playlistId,
       track: toTrackMeta(track),
       trackUrl: await this.presign(track.s3Key),
       positionMs: elapsedPositionMs(playback),
@@ -426,6 +584,8 @@ export class SyncService implements OnModuleInit {
         total: playback.trackIds.length,
         remaining: playback.trackIds.length - playback.trackIndex - 1,
       },
+      repeat: playback.repeat,
+      shuffle: playback.shuffle,
     };
   }
 

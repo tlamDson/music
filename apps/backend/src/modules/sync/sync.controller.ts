@@ -1,11 +1,23 @@
-import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Patch,
+  Get,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { SyncService } from './sync.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { StorePlaySchema, JwtPayload } from '@cafe-music/shared';
+import {
+  StorePlaySchema,
+  PlaybackModeSchema,
+  JwtPayload,
+} from '@cafe-music/shared';
 import { z } from 'zod';
 
 /**
@@ -49,6 +61,23 @@ export class SyncController {
   @Roles('ORG_ADMIN', 'STORE_ADMIN')
   nextStore(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.syncService.nextStore(id, user);
+  }
+
+  @Post('stores/:id/previous')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
+  previousStore(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.syncService.previousStore(id, user);
+  }
+
+  @Patch('stores/:id/playback-mode')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
+  setPlaybackMode(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(PlaybackModeSchema))
+    dto: z.infer<typeof PlaybackModeSchema>,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.syncService.setPlaybackMode(id, dto, user);
   }
 
   @Post('stores/:id/stop')

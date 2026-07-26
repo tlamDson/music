@@ -75,6 +75,16 @@ export const StorePlaySchema = z.object({
 
 export type StorePlayDto = z.infer<typeof StorePlaySchema>;
 
+// `.default()` biến field thành bắt buộc trong type sau `z.infer` — dùng
+// `.optional()` + fallback trong service để client cũ chỉ gửi một trong hai
+// field (repeat hoặc shuffle) vẫn hợp lệ.
+export const PlaybackModeSchema = z.object({
+  repeat: z.enum(['OFF', 'ALL', 'ONE']).optional(),
+  shuffle: z.boolean().optional(),
+});
+
+export type PlaybackModeDto = z.infer<typeof PlaybackModeSchema>;
+
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
 export const PaginationSchema = z.object({

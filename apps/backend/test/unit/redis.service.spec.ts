@@ -62,10 +62,13 @@ describe('RedisService', () => {
       storeId: 'store-1',
       playlistId: 'playlist-1',
       trackIds: ['track-1', 'track-2'],
+      order: [0, 1],
       trackIndex: 0,
       positionMs: 0,
       startedAtServerTs: 1_700_000_000_000,
       isPlaying: true,
+      repeat: 'OFF' as const,
+      shuffle: false,
     };
 
     it('caches playback under a key of its own', async () => {
@@ -100,6 +103,31 @@ describe('RedisService', () => {
       client.get.mockResolvedValue(null);
 
       await expect(service.getStorePlayback('store-1')).resolves.toBeNull();
+    });
+
+    // State cũ ghi trước khi thêm repeat/shuffle/order thiếu cả ba field —
+    // chuẩn hoá phải nằm đúng một chỗ ở đây, không rải `??` khắp SyncService.
+    it('normalizes legacy JSON missing order/repeat/shuffle', async () => {
+      const service = buildService({ REDIS_URL: 'redis://localhost:6379' });
+      const client = (service as unknown as { client: { get: jest.Mock } })
+        .client;
+      const legacy = {
+        storeId: 'store-1',
+        playlistId: 'playlist-1',
+        trackIds: ['track-1', 'track-2'],
+        trackIndex: 1,
+        positionMs: 5_000,
+        startedAtServerTs: 1_700_000_000_000,
+        isPlaying: true,
+      };
+      client.get.mockResolvedValue(JSON.stringify(legacy));
+
+      await expect(service.getStorePlayback('store-1')).resolves.toEqual({
+        ...legacy,
+        order: [0, 1],
+        repeat: 'OFF',
+        shuffle: false,
+      });
     });
 
     it('clears playback', async () => {
