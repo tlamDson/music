@@ -41,6 +41,8 @@ pnpm --filter @cafe-music/backend exec prisma migrate dev --name <mo-ta>  # đ�
 
 DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate resolve --applied 20260722000000_init`.
 
+**Trên Railway migration chạy TỰ ĐỘNG — không phải làm tay.** `apps/backend/docker-entrypoint.sh` chạy `prisma migrate deploy` rồi mới `exec node dist/main`, nên mỗi lần container khởi động (deploy mới, restart, scale) schema tự được áp trước khi app mở cổng. Merge vào `develop` là staging tự migrate. Chi tiết + cách chạy tay khi cần: [docs/PRODUCTION_READINESS.md](../../docs/PRODUCTION_READINESS.md) cạm bẫy #15.
+
 ## Phạm vi dữ liệu theo vai trò
 
 | Bảng       | Cột phạm vi                   | Ý nghĩa                                                                                                                        |
@@ -112,6 +114,7 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 
 Vercel (web) · Railway (backend + Postgres + Redis) · Cloudflare R2 (track). Trạng thái, biến môi trường và checklist đầy đủ: **[docs/PRODUCTION_READINESS.md](../../docs/PRODUCTION_READINESS.md)**.
 
+- **Migration tự chạy lúc container khởi động** qua `docker-entrypoint.sh` — deploy xong không cần chạy `migrate deploy` tay (xem mục _Database_).
 - Health: `/api/v1/health` (liveness — Railway probe cái này) và `/api/v1/health/ready` (DB + Redis, để chẩn đoán).
 - Log: pino — JSON ở production, pretty ở dev, có request id, tự redact credential. Chỉnh mức log bằng `LOG_LEVEL`.
 

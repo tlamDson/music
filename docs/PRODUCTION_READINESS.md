@@ -80,6 +80,31 @@ Hạ tầng đích: **Vercel** (web) · **Railway** (backend + Postgres + Redis)
     - `railway ssh -- sh -c "VAR=a VAR2=b cmd"` (3 tham số riêng: `sh`, `-c`, chuỗi lệnh) bị Railway CLI nối lại bằng dấu cách trước khi gửi remote, xoá mất ranh giới của `-c` — remote shell chỉ chạy đúng từ đầu tiên (`VAR=a`) rồi thoát, **exit code 0, không output, không chạy lệnh thật**. Luôn gộp toàn bộ remote command thành **một chuỗi duy nhất** sau `--` (không tự thêm `sh -c`), và tránh khoảng trắng trong giá trị biến để không dính lại vấn đề tương tự.
     - CLI cũng hay mất link project/environment/service giữa các lần gọi riêng biệt (mỗi lệnh terminal mới) — báo `No linked project found`. Chạy lại `railway link --project <id> --environment <env> --service <name>` (dùng flag, không chọn tương tác) trước khi chạy lệnh phụ thuộc link.
 
+15. **Migration trên Railway chạy TỰ ĐỘNG — đừng tưởng phải làm tay.** `apps/backend/docker-entrypoint.sh` chạy `prisma migrate deploy` **trước** khi `exec node dist/main`, nên mọi lần container khởi động (deploy mới, restart, scale) schema tự được áp rồi app mới mở cổng. Merge vào `develop` là staging tự migrate xong. Lệnh idempotent nên deploy lại nhiều lần vô hại.
+    - Đã tự dẫm phải: sau khi merge PR #54 (bỏ `SyncGroup`) tôi báo "staging sẽ hỏng tới khi chạy `migrate deploy` tay" — sai, kiểm tra `_prisma_migrations` thì migration đã `finished` từ lúc redeploy.
+    - **Khi nào mới cần chạy tay:** migration lỗi khiến entrypoint chết → container crash-loop → không bao giờ tới bước migrate. Lúc đó dùng một trong hai cách dưới.
+    - Chạy tay trong container (gộp **một chuỗi** sau `--` và `MSYS_NO_PATHCONV=1` vì path bắt đầu bằng `/`, xem cạm bẫy #14):
+
+      ```bash
+      railway link --project <project-id> --environment staging --service backend
+      MSYS_NO_PATHCONV=1 railway ssh -- "cd /app/apps/backend && node node_modules/prisma/build/index.js migrate deploy"
+      ```
+
+    - Chạy tay từ máy mình, qua `DATABASE_PUBLIC_URL` (dùng được cả khi container đang chết):
+
+      ```bash
+      DB_URL=$(railway variables --service Postgres --kv | grep '^DATABASE_PUBLIC_URL=' | cut -d= -f2-)
+      DATABASE_URL="$DB_URL" pnpm --filter @cafe-music/backend exec prisma migrate deploy
+      ```
+
+    - ⚠️ **`railway run` không dùng được cho lệnh chạm DB**: `DATABASE_URL` nó inject trỏ `*.railway.internal`, chỉ resolve được bên trong mạng Railway. Phải là `DATABASE_PUBLIC_URL`.
+    - Cách kiểm tra schema staging thật sự đang ở đâu (chỉ đọc):
+
+      ```bash
+      DB_URL=$(railway variables --service Postgres --kv | grep '^DATABASE_PUBLIC_URL=' | cut -d= -f2-)
+      docker exec -i cafe_music_postgres psql "$DB_URL" -t -A -c "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY started_at;"
+      ```
+
 ---
 
 ## Phase 1 — Staging
