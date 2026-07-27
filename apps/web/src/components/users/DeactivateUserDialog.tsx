@@ -88,7 +88,7 @@ export default function DeactivateUserDialog({
         <button
           type="button"
           onClick={handleClose}
-          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:opacity-80"
+          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
           style={{ color: 'var(--color-foreground)' }}
         >
           Huỷ
@@ -97,7 +97,7 @@ export default function DeactivateUserDialog({
           type="button"
           disabled={!matches}
           onClick={() => onConfirmed(user.id)}
-          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           style={{ backgroundColor: 'var(--color-destructive)', color: 'white' }}
         >
           Vô hiệu hoá

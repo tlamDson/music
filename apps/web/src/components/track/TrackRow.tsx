@@ -51,13 +51,14 @@ export default function TrackRow({
             }
           : undefined
       }
-      className={`group transition-all duration-150 hover:brightness-125 ${
+      className={`group transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 ${
         draggable ? 'cursor-grab active:cursor-grabbing' : ''
-      }`}
+      } ${index < 8 ? 'animate-stagger-item' : ''}`}
       style={{
         borderBottom: '1px solid var(--color-border)',
         opacity: isDragging ? 0.5 : 1,
         backgroundColor: isCurrent ? 'rgba(34,197,94,0.08)' : 'transparent',
+        ...(index < 8 ? ({ '--i': index } as React.CSSProperties) : {}),
       }}
     >
       <td className="w-12 px-4 py-3 text-sm">
@@ -65,7 +66,7 @@ export default function TrackRow({
           {isCurrent ? (
             <>
               <span
-                className="flex h-3.5 items-end gap-[2px] transition-opacity duration-150 group-hover:opacity-0 group-focus-within:opacity-0"
+                className="flex h-3.5 items-end gap-[2px] transition-opacity duration-[var(--duration-fast)] group-hover:opacity-0 group-focus-within:opacity-0"
                 aria-hidden="true"
               >
                 {/* Chiều cao dùng px cố định (không phải %) — cha là flex item
@@ -93,7 +94,7 @@ export default function TrackRow({
               </span>
               <button
                 onClick={() => onPlay(row, index)}
-                className="absolute inset-0 flex items-center justify-center rounded opacity-0 transition-all duration-150 hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100 group-focus-within:opacity-100"
+                className="absolute inset-0 flex items-center justify-center rounded opacity-0 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100 group-focus-within:opacity-100"
                 style={{ color: 'var(--color-accent)' }}
                 aria-label={`Tạm dừng ${track.title}`}
               >
@@ -106,14 +107,14 @@ export default function TrackRow({
           ) : (
             <>
               <span
-                className="tabular-nums transition-opacity duration-150 group-hover:opacity-0 group-focus-within:opacity-0"
+                className="tabular-nums transition-opacity duration-[var(--duration-fast)] group-hover:opacity-0 group-focus-within:opacity-0"
                 style={{ color: 'rgba(248,250,252,0.5)' }}
               >
                 {index + 1}
               </span>
               <button
                 onClick={() => onPlay(row, index)}
-                className="absolute inset-0 flex items-center justify-center rounded opacity-0 transition-all duration-150 hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100 group-focus-within:opacity-100"
+                className="absolute inset-0 flex items-center justify-center rounded opacity-0 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100 group-focus-within:opacity-100"
                 style={{ color: 'var(--color-accent)' }}
                 aria-label={`Phát ${track.title}`}
               >
@@ -176,7 +177,7 @@ export default function TrackRow({
           {showRemove && (
             <button
               onClick={() => onRemove?.(row, index)}
-              className="rounded p-2 opacity-0 transition-all duration-150 hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100"
+              className="rounded p-2 opacity-0 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100"
               style={{ color: 'var(--color-destructive)' }}
               aria-label={`Xóa ${track.title}`}
             >

@@ -58,13 +58,19 @@ body {
   outline-offset: 2px;
 }
 
-/* Reduced motion */
+/* Reduced motion — tắt cả duration lẫn delay. `.animate-stagger-item` bắt đầu
+   ở opacity:0 rồi chờ `animation-delay: calc(var(--i) * 40ms)` mới chạy; nếu
+   chỉ ép duration về gần 0 mà bỏ quên delay, item index lớn (tới 280ms) vẫn
+   phải chờ hết delay đó mới bật animation gần-tức-thời lên opacity:1 — trong
+   lúc chờ, nội dung coi như biến mất với người dùng bật giảm chuyển động. */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
   ::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
   }
 }
 
@@ -196,7 +202,8 @@ body {
 }
 
 /* Nhấn xuống nhẹ khi bấm — dùng cho nút/card cần phản hồi rõ lúc :active,
-   bổ sung cho hover (transition-all đã có sẵn ở nhiều nơi). */
+   bổ sung cho transition hover/focus đã khai báo riêng theo property cụ thể
+   ở từng component (transition-opacity/transition-colors/transition-[filter]...). */
 .press {
   transition: transform var(--duration-fast) var(--ease-standard);
 }

@@ -51,7 +51,7 @@ export default function AddTrackDialog({
         </h2>
         <button
           onClick={onClose}
-          className="p-2 rounded cursor-pointer transition-all duration-150 hover:brightness-125 focus-visible:outline-none"
+          className="p-2 rounded cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none"
           style={{ color: 'var(--color-foreground)' }}
           aria-label="Đóng"
         >
@@ -83,9 +83,12 @@ export default function AddTrackDialog({
 
       <div className="flex-1 overflow-y-auto flex flex-col gap-2">
         {loading ? (
-          <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-            Đang tải kho nhạc...
-          </p>
+          <div className="flex flex-col gap-2" role="status" aria-label="Đang tải kho nhạc">
+            <div className="skeleton h-14 w-full" />
+            <div className="skeleton h-14 w-full" />
+            <div className="skeleton h-14 w-full" />
+            <span className="sr-only">Đang tải kho nhạc...</span>
+          </div>
         ) : visible.length === 0 ? (
           <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
             Không có bài nào khớp.
@@ -99,7 +102,7 @@ export default function AddTrackDialog({
                 key={track.id}
                 draggable={!added}
                 onDragStart={(e) => e.dataTransfer.setData('trackId', track.id)}
-                className="flex items-center justify-between gap-3 p-2 rounded-lg transition-all duration-150"
+                className="flex items-center justify-between gap-3 p-2 rounded-lg transition-opacity duration-[var(--duration-fast)]"
                 style={{
                   backgroundColor: 'var(--color-muted)',
                   border: '1px solid var(--color-border)',
@@ -129,7 +132,7 @@ export default function AddTrackDialog({
                 ) : (
                   <button
                     onClick={() => onAdd(track.id, track.title)}
-                    className="p-2 rounded cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
+                    className="p-2 rounded cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
                     style={{ color: 'var(--color-accent)' }}
                     aria-label={`Thêm ${track.title}`}
                   >

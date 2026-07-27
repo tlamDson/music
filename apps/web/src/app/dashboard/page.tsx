@@ -25,7 +25,7 @@ export default function DashboardPage() {
           </h2>
           <Link
             href="/dashboard/stores"
-            className="text-xs cursor-pointer underline transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
+            className="text-xs cursor-pointer underline transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
             style={{ color: 'var(--color-secondary)' }}
           >
             Quản lý quán
@@ -43,7 +43,7 @@ export default function DashboardPage() {
           Bấm vào một quán ở trên để chọn nhạc và phát ra loa quán đó. Trang{' '}
           <Link
             href="/dashboard/playlists"
-            className="underline cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
+            className="underline cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
             style={{ color: 'var(--color-secondary)' }}
           >
             Playlists

@@ -142,7 +142,7 @@ export default function PlayerPage() {
         {!isKiosk && (
           <button
             onClick={() => void handlePause()}
-            className="w-full py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
+            className="w-full py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
             style={{
               backgroundColor: 'var(--color-primary)',
               color: 'var(--color-foreground)',

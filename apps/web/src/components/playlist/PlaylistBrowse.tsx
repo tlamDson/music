@@ -86,15 +86,15 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
 
       setRecentIds(rememberRecentPlaylist(playlist.id));
     } catch (err) {
-      toast.error(
-        err instanceof Error && err.message ? err.message : 'Phát playlist thất bại',
-      );
+      toast.error(err instanceof Error && err.message ? err.message : 'Phát playlist thất bại');
     }
   };
 
   const previewFirstTrack = async (playlist: BrowsePlaylist) => {
     const detail = await api.get<{
-      playlistTracks: Array<{ track: { id: string; title: string; artist: string | null; durationMs: number } }>;
+      playlistTracks: Array<{
+        track: { id: string; title: string; artist: string | null; durationMs: number };
+      }>;
     }>(`/playlists/${playlist.id}`);
 
     const first = detail.playlistTracks[0]?.track;
@@ -164,7 +164,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
             <button
               key={chip.value}
               onClick={() => setScope(chip.value)}
-              className="px-4 py-1.5 rounded-full text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
+              className="px-4 py-1.5 rounded-full text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
               style={{
                 backgroundColor:
                   scope === chip.value ? 'var(--color-accent)' : 'var(--color-muted)',
@@ -183,7 +183,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Bạn muốn phát nội dung gì?"
             aria-label="Tìm playlist"
-            className="flex-1 min-w-48 px-4 py-2 rounded-full text-sm outline-none transition-all duration-150"
+            className="flex-1 min-w-48 px-4 py-2 rounded-full text-sm outline-none transition-shadow duration-[var(--duration-fast)]"
             style={{
               backgroundColor: 'var(--color-muted)',
               color: 'var(--color-foreground)',
@@ -210,7 +210,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
           <button
             type="submit"
             disabled={creating}
-            className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
+            className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
             style={{
               backgroundColor: 'var(--color-accent)',
               color: 'white',
@@ -222,9 +222,16 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
         </form>
 
         {loading ? (
-          <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-            Đang tải...
-          </p>
+          <div
+            className="flex gap-4 overflow-x-auto pb-2"
+            role="status"
+            aria-label="Đang tải playlist"
+          >
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="skeleton w-44 h-44 flex-shrink-0" />
+            ))}
+            <span className="sr-only">Đang tải...</span>
+          </div>
         ) : playlists.length === 0 ? (
           <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
             Không có playlist nào khớp.
@@ -244,7 +251,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
                   {row.title}
                 </h2>
                 <div className="flex gap-4 overflow-x-auto pb-2">
-                  {row.items.map((playlist) => (
+                  {row.items.map((playlist, index) => (
                     <PlaylistCard
                       key={`${row.title}-${playlist.id}`}
                       playlist={playlist}
@@ -252,6 +259,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
                       isPlaying={isPlaying && current?.id === playlist.id}
                       onPlay={() => void handlePlay(playlist)}
                       onDelete={canDelete(playlist) ? () => void handleDelete(playlist) : undefined}
+                      index={index}
                     />
                   ))}
                 </div>

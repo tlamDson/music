@@ -196,7 +196,7 @@ export default function PlaylistDetail({
         <div className="flex items-end gap-6">
           <Link
             href={backHref}
-            className="self-start p-2 rounded-lg cursor-pointer transition-all duration-150 hover:brightness-125 focus-visible:outline-none"
+            className="self-start p-2 rounded-lg cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none"
             style={{ color: 'var(--color-foreground)', border: '1px solid var(--color-border)' }}
             aria-label="Quay lại danh sách playlist"
           >
@@ -236,7 +236,7 @@ export default function PlaylistDetail({
         <div className="flex items-center gap-4">
           <button
             onClick={() => void playFrom(0)}
-            className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:brightness-110 focus-visible:outline-none"
+            className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer transition-[filter] duration-[var(--duration-base)] hover:brightness-110 focus-visible:outline-none"
             style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
             aria-label="Phát playlist"
           >
@@ -247,7 +247,7 @@ export default function PlaylistDetail({
 
           <button
             onClick={() => setDialogOpen(true)}
-            className="px-4 py-2 rounded-full text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-125 focus-visible:outline-none"
+            className="px-4 py-2 rounded-full text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none"
             style={{
               backgroundColor: 'var(--color-muted)',
               color: 'var(--color-foreground)',
@@ -267,7 +267,7 @@ export default function PlaylistDetail({
           onDragLeave={() => setDragOver(false)}
           onDrop={handleLibraryDrop}
           aria-label="Danh sách bài hát"
-          className="rounded-xl transition-all duration-200"
+          className="rounded-xl transition-colors duration-[var(--duration-base)]"
           style={{
             border: `1px ${dragOver ? 'dashed' : 'solid'} ${
               dragOver ? 'var(--color-accent)' : 'var(--color-border)'
