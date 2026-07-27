@@ -23,6 +23,11 @@ Layout lấy cảm hứng từ Spotify (sidebar thư viện, hàng card cuộn n
 - Chưa có bảng `Artist` → **không** dựng card "Giới thiệu nghệ sĩ"/"Người tham gia" như ảnh tham chiếu; panel phải dùng cho trạng thái phát + hàng chờ.
 - Modal/dialog dùng chung `components/ui/Dialog.tsx` — overlay + panel đã có sẵn animation enter/exit (180ms, tự tôn trọng `prefers-reduced-motion` qua rule global trong `globals.css`, không cần logic riêng). Đừng tự viết lại overlay/Escape/click-outside ở component mới — bọc nội dung trong `<Dialog open={...} onClose={...} ariaLabel="...">`, và render component cha **không điều kiện** (`open` prop điều khiển mount/unmount nội bộ) nếu muốn animation exit chạy được — xem `AddTrackDialog.tsx` + call site ở `PlaylistDetail.tsx` làm ví dụ.
 - Sidebar (`components/layout/AppShell.tsx`) là `sticky top-0 h-screen overflow-y-auto` + off-canvas drawer dưới `md` (hamburger + backdrop) — theo pattern này khi thêm layout mới có sidebar, đừng dùng `w-64` cố định không responsive.
+- **Bảng track dùng chung `components/track/TrackTable.tsx` (+ `TrackRow.tsx`)** — `PlaylistDetail` và `TrackLibrary` đều dùng component này (PR #5, xoá bỏ hai bảng copy-paste gần giống hệt nhau trước đó). Trang mới cần hiển thị danh sách track (vd danh sách bài ở console quán) thì **dùng lại `TrackTable`**, đừng viết bảng track thứ ba — cấu hình qua props (`showAddedAt`, `draggable`/`onReorder`, `onRemove`/`canRemove`, `extraColumns` cho cột riêng của trang như "Phạm vi"). Số thứ tự tự đổi thành nút phát khi hover/focus, hàng đang phát tự hiện icon sóng nhạc + tô accent — không cần tự dựng lại logic này.
+
+## Skeleton loading
+
+Thay chữ "Đang tải..." bằng class `.skeleton` có sẵn trong `globals.css` (PR #56) — khối `<div className="skeleton h-* w-*" />` phỏng theo hình dạng nội dung sắp hiện (vd `h-40 w-full` cho khối bảng, `h-6 w-64` cho tiêu đề), không dùng text thuần.
 
 ## Checklist pre-delivery cho mọi UI
 

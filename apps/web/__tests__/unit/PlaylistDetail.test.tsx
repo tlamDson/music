@@ -37,6 +37,7 @@ const playlistDetail = {
       playlistId: 'playlist-1',
       trackId: 'track-1',
       position: 0,
+      addedAt: '2026-07-20T10:00:00.000Z',
       track: track('track-1', 'Hẹn Em Ở Lần Yêu Thứ 2', 366_000, 'Nguyenn'),
     },
     {
@@ -44,6 +45,7 @@ const playlistDetail = {
       playlistId: 'playlist-1',
       trackId: 'track-2',
       position: 1,
+      addedAt: '2026-07-25T10:00:00.000Z',
       track: track('track-2', 'Rồi Sẽ Đến Nơi', 215_000, 'JUUN D'),
     },
   ],
@@ -116,6 +118,15 @@ describe('PlaylistDetail', () => {
     expect(row).toHaveTextContent('6:06');
   });
 
+  // Cột "Ngày thêm" chỉ có ở bảng track trong playlist (PlaylistTrack.addedAt),
+  // không có ở kho nhạc chung.
+  it('shows the "added on" date for each playlist track', async () => {
+    renderDetail();
+
+    const row = await screen.findByRole('row', { name: /hẹn em ở lần yêu thứ 2/i });
+    expect(row).toHaveTextContent('20/07/2026');
+  });
+
   // Admin chuỗi chỉ nghe thử tại chỗ — muốn phát ra loa quán thì vào
   // /dashboard/stores/[id]. Bấm ở đây mà broadcast là phát nhầm ra cả chuỗi.
   it('chỉ nghe thử tại chỗ khi admin chuỗi bấm phát, không gọi lệnh phát nào', async () => {
@@ -124,9 +135,7 @@ describe('PlaylistDetail', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /phát playlist/i }));
 
-    await waitFor(() =>
-      expect(mockApi.get).toHaveBeenCalledWith('/tracks/track-1/stream-url'),
-    );
+    await waitFor(() => expect(mockApi.get).toHaveBeenCalledWith('/tracks/track-1/stream-url'));
     expect(mockApi.post).not.toHaveBeenCalled();
   });
 
@@ -136,9 +145,7 @@ describe('PlaylistDetail', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /phát rồi sẽ đến nơi/i }));
 
-    await waitFor(() =>
-      expect(mockApi.get).toHaveBeenCalledWith('/tracks/track-2/stream-url'),
-    );
+    await waitFor(() => expect(mockApi.get).toHaveBeenCalledWith('/tracks/track-2/stream-url'));
     expect(mockApi.post).not.toHaveBeenCalled();
   });
 
