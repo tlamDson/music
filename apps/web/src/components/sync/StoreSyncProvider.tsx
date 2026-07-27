@@ -3,17 +3,25 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useSync } from '../../hooks/useSync';
 import { useClockOffset } from '../../hooks/useClockOffset';
-import type { WsStoreNowPlayingPayload } from '@cafe-music/shared';
+import type { WsStoreNowPlayingPayload, StoreRepeatMode } from '@cafe-music/shared';
 
 interface StoreSyncValue {
   isConnected: boolean;
   /** Hàng chờ đang phát của quán; null = quán chưa phát gì. */
   storeQueue: WsStoreNowPlayingPayload['queue'] | null;
+  /** Playlist đang phát; null khi quán chưa phát gì hoặc chưa hydrate xong. */
+  playlistId: string | null;
+  /** Repeat/shuffle do server xác nhận — theo đúng `useSync`. */
+  repeat: StoreRepeatMode;
+  shuffle: boolean;
 }
 
 const StoreSyncContext = createContext<StoreSyncValue>({
   isConnected: false,
   storeQueue: null,
+  playlistId: null,
+  repeat: 'OFF',
+  shuffle: false,
 });
 
 export function useStoreSync(): StoreSyncValue {
@@ -51,13 +59,16 @@ export default function StoreSyncProvider({
 
   // Token null khiến `useSync` thoát sớm, không mở socket — dùng luôn cơ chế đó
   // cho tài khoản chưa được gán quán, thay vì mở socket rồi không join room nào.
-  const { isConnected, storeQueue } = useSync({
+  const { isConnected, storeQueue, playlistId, repeat, shuffle } = useSync({
     storeId: storeId ?? undefined,
     token: storeId ? token : null,
     clockOffset: offset,
   });
 
-  const value = useMemo(() => ({ isConnected, storeQueue }), [isConnected, storeQueue]);
+  const value = useMemo(
+    () => ({ isConnected, storeQueue, playlistId, repeat, shuffle }),
+    [isConnected, storeQueue, playlistId, repeat, shuffle],
+  );
 
   return <StoreSyncContext.Provider value={value}>{children}</StoreSyncContext.Provider>;
 }

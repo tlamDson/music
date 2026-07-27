@@ -13,6 +13,7 @@ const mockApiGet = api.get as jest.Mock;
 const playTrack = jest.fn();
 const pause = jest.fn();
 const stop = jest.fn();
+const setPlaybackMode = jest.fn();
 jest.mock('../../src/components/player/PlayerProvider', () => ({
   usePlayer: jest.fn(),
 }));
@@ -38,11 +39,14 @@ jest.mock('../../src/hooks/useClockOffset', () => ({
 /** Một trang con bất kỳ trong `/store` — cố tình KHÔNG phải `StoreHome`, vì
  * đúng chỗ này là nơi bug xảy ra: `/store/playlists/[id]` không tự mở socket. */
 function SomeStorePage() {
-  const { isConnected, storeQueue } = useStoreSync();
+  const { isConnected, storeQueue, playlistId, repeat, shuffle } = useStoreSync();
   return (
     <div>
       <span>{isConnected ? 'connected' : 'offline'}</span>
       <span>{storeQueue ? `remaining:${storeQueue.remaining}` : 'no-queue'}</span>
+      <span>{playlistId ? `playlist:${playlistId}` : 'no-playlist'}</span>
+      <span>{`repeat:${repeat}`}</span>
+      <span>{`shuffle:${shuffle}`}</span>
     </div>
   );
 }
@@ -63,13 +67,15 @@ const nowPlayingPayload = {
   positionMs: 0,
   serverTs: Date.now(),
   queue: { index: 0, total: 2, remaining: 1 },
+  repeat: 'OFF' as const,
+  shuffle: false,
 };
 
 describe('StoreSyncProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSocket.on.mockImplementation(jest.fn());
-    mockUsePlayer.mockReturnValue({ playTrack, pause, stop });
+    mockUsePlayer.mockReturnValue({ playTrack, pause, stop, setPlaybackMode });
     mockApiGet.mockResolvedValue({ storeId: 'store-1', syncGroupId: null });
     localStorage.setItem('accessToken', 'test-token');
   });
@@ -163,5 +169,48 @@ describe('StoreSyncProvider', () => {
     );
 
     await waitFor(() => expect(io).toHaveBeenCalledTimes(1));
+  });
+
+  // PR #58: repeat/shuffle/playlistId giờ cũng phải chảy qua context của
+  // provider này, không chỉ storeQueue — trang con nào cũng đọc được cùng một
+  // nguồn thay vì tự gọi useSync() lần nữa (hai socket cùng lúc là bug cũ).
+  it('chia sẻ playlistId, repeat và shuffle qua context theo store-now-playing', async () => {
+    const listeners = captureListeners();
+
+    render(
+      <StoreSyncProvider storeId="store-1">
+        <SomeStorePage />
+      </StoreSyncProvider>,
+    );
+
+    expect(screen.getByText('repeat:OFF')).toBeInTheDocument();
+    expect(screen.getByText('shuffle:false')).toBeInTheDocument();
+
+    await act(async () => {
+      listeners['store-now-playing']?.({ ...nowPlayingPayload, repeat: 'ALL', shuffle: true });
+    });
+
+    await waitFor(() => expect(screen.getByText('repeat:ALL')).toBeInTheDocument());
+    expect(screen.getByText('shuffle:true')).toBeInTheDocument();
+  });
+
+  // Đổi mode không đi kèm track mới — context vẫn phải cập nhật ngay từ
+  // broadcast `store-mode-changed` riêng.
+  it('cập nhật repeat/shuffle qua context khi nhận store-mode-changed', async () => {
+    const listeners = captureListeners();
+
+    render(
+      <StoreSyncProvider storeId="store-1">
+        <SomeStorePage />
+      </StoreSyncProvider>,
+    );
+
+    await act(async () => {
+      listeners['store-mode-changed']?.({ storeId: 'store-1', repeat: 'ONE', shuffle: true });
+    });
+
+    await waitFor(() => expect(screen.getByText('repeat:ONE')).toBeInTheDocument());
+    expect(screen.getByText('shuffle:true')).toBeInTheDocument();
+    expect(setPlaybackMode).toHaveBeenCalledWith({ repeat: 'ONE', shuffle: true });
   });
 });

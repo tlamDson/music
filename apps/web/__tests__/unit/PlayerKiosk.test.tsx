@@ -31,6 +31,9 @@ describe('player screen', () => {
       isConnected: true,
       nowPlaying: null,
       storeQueue: null,
+      playlistId: null,
+      repeat: 'OFF',
+      shuffle: false,
     } as ReturnType<typeof useSync>);
     mockUsePlayer.mockReturnValue({
       current: { id: 'track-1', title: 'Cà phê sáng', url: 'https://s3/1.mp3' },

@@ -10,6 +10,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import type { StoreRepeatMode } from '@cafe-music/shared';
 
 export type PlayerMode = 'store' | 'preview';
 
@@ -36,6 +37,12 @@ interface PlayOptions {
   storeId?: string | null;
   positionMs?: number;
   queue?: PlayerQueueInfo | null;
+  /**
+   * Chỉ có ý nghĩa khi `mode: 'store'` — trạng thái do server xác nhận (broadcast
+   * `store-now-playing`/hydrate). Mặc định 'OFF'/false cho track mới hoặc preview.
+   */
+  repeat?: StoreRepeatMode;
+  shuffle?: boolean;
 }
 
 interface PlayerContextValue {
@@ -46,12 +53,25 @@ interface PlayerContextValue {
   mode: PlayerMode;
   storeId: string | null;
   queue: PlayerQueueInfo | null;
+  /**
+   * Chế độ lặp/trộn hiện tại. Ở `mode: 'store'` phản chiếu đúng trạng thái server
+   * (ghi qua `setPlaybackMode`, chờ broadcast `store-mode-changed` xác nhận thay
+   * vì tự đổi cục bộ — quán mở hai màn hình mới thấy cùng một trạng thái). Ở
+   * `mode: 'preview'` chỉ có `repeat` (ONE/OFF) đổi cục bộ qua `togglePreviewRepeat`
+   * vì nghe thử không có gì trên server để đồng bộ.
+   */
+  repeat: StoreRepeatMode;
+  shuffle: boolean;
   playTrack: (track: PlayerTrack, options?: PlayOptions) => void;
   toggle: () => void;
   pause: () => void;
   seek: (positionMs: number) => void;
   changeVolume: (volume: number) => void;
   stop: () => void;
+  /** Server xác nhận đổi repeat/shuffle (qua WS) — không đụng vào thẻ audio. */
+  setPlaybackMode: (mode: { repeat?: StoreRepeatMode; shuffle?: boolean }) => void;
+  /** Nghe thử: đổi cục bộ giữa lặp một bài (audio.loop) và không lặp. */
+  togglePreviewRepeat: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -171,6 +191,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<PlayerMode>('preview');
   const [storeId, setStoreId] = useState<string | null>(null);
   const [queue, setQueue] = useState<PlayerQueueInfo | null>(null);
+  const [repeat, setRepeatState] = useState<StoreRepeatMode>('OFF');
+  const [shuffle, setShuffleState] = useState(false);
 
   const ensureAudio = useCallback(() => {
     if (!audioRef.current) audioRef.current = new Audio();
@@ -291,6 +313,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const audio = ensureAudio();
       const nextMode = options.mode ?? 'preview';
       const startPositionMs = options.positionMs ?? 0;
+      const nextRepeat = options.repeat ?? 'OFF';
+      const nextShuffle = options.shuffle ?? false;
 
       modeRef.current = nextMode;
       storeIdRef.current = options.storeId ?? null;
@@ -301,6 +325,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setCurrent(track);
       setDurationMs(track.durationMs ?? 0);
       positionStore.set(startPositionMs);
+      setRepeatState(nextRepeat);
+      setShuffleState(nextShuffle);
+      // `loop` chỉ có ý nghĩa ở chế độ nghe thử: quán chuyển bài do server hẹn
+      // giờ (kể cả lặp một bài — server tự phát lại đúng track qua timer), audio
+      // native loop sẽ đá văng đồng bộ nếu bật ở chế độ store.
+      audio.loop = nextMode === 'preview' && nextRepeat === 'ONE';
 
       // Neo lại đồng hồ đồng bộ ở mọi lần nhận vị trí từ server (play mới,
       // chuyển bài, resume) — điểm tham chiếu để tự bắt kịp quán sau này.
@@ -391,6 +421,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = ensureAudio();
     audio.pause();
     audio.currentTime = 0;
+    audio.loop = false;
 
     anchorRef.current = null;
     currentTrackIdRef.current = null;
@@ -400,7 +431,32 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setCurrent(null);
     setQueue(null);
     positionStore.set(0);
+    setRepeatState('OFF');
+    setShuffleState(false);
   }, [ensureAudio, positionStore]);
+
+  // Server xác nhận đổi repeat/shuffle qua broadcast `store-mode-changed` (đổi
+  // mode không làm gián đoạn nhạc) — chỉ cập nhật state hiển thị, không đụng gì
+  // tới thẻ audio đang chạy.
+  const setPlaybackMode = useCallback(
+    (nextMode: { repeat?: StoreRepeatMode; shuffle?: boolean }) => {
+      if (nextMode.repeat !== undefined) setRepeatState(nextMode.repeat);
+      if (nextMode.shuffle !== undefined) setShuffleState(nextMode.shuffle);
+    },
+    [],
+  );
+
+  // Nghe thử không có state trên server để đồng bộ — lặp một bài chạy hẳn bằng
+  // thuộc tính `loop` gốc của thẻ audio, đổi cục bộ ngay khi bấm.
+  const togglePreviewRepeat = useCallback(() => {
+    if (modeRef.current !== 'preview') return;
+    const audio = ensureAudio();
+    setRepeatState((prev) => {
+      const next = prev === 'ONE' ? 'OFF' : 'ONE';
+      audio.loop = next === 'ONE';
+      return next;
+    });
+  }, [ensureAudio]);
 
   const value = useMemo(
     () => ({
@@ -411,12 +467,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       mode,
       storeId,
       queue,
+      repeat,
+      shuffle,
       playTrack,
       toggle,
       pause,
       seek,
       changeVolume,
       stop,
+      setPlaybackMode,
+      togglePreviewRepeat,
     }),
     [
       current,
@@ -426,12 +486,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       mode,
       storeId,
       queue,
+      repeat,
+      shuffle,
       playTrack,
       toggle,
       pause,
       seek,
       changeVolume,
       stop,
+      setPlaybackMode,
+      togglePreviewRepeat,
     ],
   );
 

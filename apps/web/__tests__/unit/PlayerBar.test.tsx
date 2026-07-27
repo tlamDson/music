@@ -1,11 +1,13 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PlayerProvider, usePlayer } from '../../src/components/player/PlayerProvider';
 import PlayerBar from '../../src/components/player/PlayerBar';
+import { api } from '../../src/lib/api-client';
 
 jest.mock('../../src/lib/api-client', () => ({
-  api: { get: jest.fn(), post: jest.fn() },
+  api: { get: jest.fn(), post: jest.fn(), patch: jest.fn() },
 }));
+const mockApi = api as jest.Mocked<typeof api>;
 
 let mockPathname = '/store';
 jest.mock('next/navigation', () => ({
@@ -18,6 +20,7 @@ class MockAudio {
   currentTime = 0;
   duration = 366;
   volume = 1;
+  loop = false;
   paused = true;
   private listeners: Record<string, Array<() => void>> = {};
 
@@ -52,22 +55,53 @@ function StartButton() {
   const player = usePlayer();
 
   return (
-    <button
-      onClick={() =>
-        player.playTrack(
-          {
-            id: 'track-1',
-            title: 'Hẹn Em Ở Lần Yêu Thứ 2',
-            artist: 'Nguyenn, Đặng Tuấn Vũ',
-            url: 'https://s3/1.mp3',
-            durationMs: 366_000,
-          },
-          { mode: 'store', storeId: 'store-1', queue: { index: 0, total: 3, remaining: 2 } },
-        )
-      }
-    >
-      start
-    </button>
+    <>
+      <button
+        onClick={() =>
+          player.playTrack(
+            {
+              id: 'track-1',
+              title: 'Hẹn Em Ở Lần Yêu Thứ 2',
+              artist: 'Nguyenn, Đặng Tuấn Vũ',
+              url: 'https://s3/1.mp3',
+              durationMs: 366_000,
+            },
+            {
+              mode: 'store',
+              storeId: 'store-1',
+              queue: { index: 0, total: 3, remaining: 2 },
+              repeat: 'OFF',
+              shuffle: false,
+            },
+          )
+        }
+      >
+        start
+      </button>
+      <button
+        onClick={() =>
+          player.playTrack(
+            {
+              id: 'track-preview',
+              title: 'Nghe thử',
+              artist: 'Ai đó',
+              url: 'https://s3/preview.mp3',
+              durationMs: 200_000,
+            },
+            { mode: 'preview', storeId: null },
+          )
+        }
+      >
+        start-preview
+      </button>
+      {/* Đại diện cho broadcast `store-mode-changed` mà useSync forward vào
+          player — PlayerBar.test.tsx render qua PlayerProvider thật, không mock
+          useSync, nên phải tự "bắn" xác nhận từ server bằng nút test này. */}
+      <button onClick={() => player.setPlaybackMode({ repeat: 'ALL' })}>simulate-repeat-all</button>
+      <button onClick={() => player.setPlaybackMode({ repeat: 'ONE' })}>simulate-repeat-one</button>
+      <button onClick={() => player.setPlaybackMode({ repeat: 'OFF' })}>simulate-repeat-off</button>
+      <button onClick={() => player.setPlaybackMode({ shuffle: true })}>simulate-shuffle-on</button>
+    </>
   );
 }
 
@@ -97,7 +131,7 @@ describe('PlayerBar', () => {
 
     await userEvent.click(screen.getByText('start'));
 
-    expect(await screen.findByText('Hẹn Em Ở Lần Yêu Thứ 2')).toBeInTheDocument();
+    expect((await screen.findAllByText('Hẹn Em Ở Lần Yêu Thứ 2')).length).toBeGreaterThan(0);
     expect(screen.getByText('Nguyenn, Đặng Tuấn Vũ')).toBeInTheDocument();
   });
 
@@ -140,5 +174,221 @@ describe('PlayerBar', () => {
     await userEvent.click(screen.getByText('start'));
 
     expect(await screen.findByText(/còn 2 bài/i)).toBeInTheDocument();
+  });
+
+  describe('transport controls for a store', () => {
+    it('asks the server to skip to the previous track', async () => {
+      mockApi.post.mockResolvedValue(undefined);
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Bài trước' }));
+
+      expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/previous');
+    });
+
+    it('asks the server to skip to the next track', async () => {
+      mockApi.post.mockResolvedValue(undefined);
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Bài kế tiếp' }));
+
+      expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/next');
+    });
+
+    it('toggles shuffle for the store', async () => {
+      mockApi.patch.mockResolvedValue(undefined);
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Phát ngẫu nhiên' }));
+
+      expect(mockApi.patch).toHaveBeenCalledWith('/sync/stores/store-1/playback-mode', {
+        shuffle: true,
+      });
+    });
+
+    // Vòng lặp OFF -> ALL -> ONE -> OFF: mỗi bước chỉ tính từ trạng thái đã được
+    // server xác nhận (mô phỏng bằng nút simulate-* — bấm dồn dập không đợi
+    // broadcast là lỗi ở người dùng thật, không phải điều component phải tự sửa).
+    it('cycles repeat through OFF -> ALL -> ONE -> OFF for the store', async () => {
+      mockApi.patch.mockResolvedValue(undefined);
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      const repeatButton = await screen.findByRole('button', { name: /lặp lại/i });
+
+      await userEvent.click(repeatButton);
+      expect(mockApi.patch).toHaveBeenLastCalledWith('/sync/stores/store-1/playback-mode', {
+        repeat: 'ALL',
+      });
+
+      await userEvent.click(screen.getByText('simulate-repeat-all'));
+      await userEvent.click(screen.getByRole('button', { name: 'Lặp lại danh sách' }));
+      expect(mockApi.patch).toHaveBeenLastCalledWith('/sync/stores/store-1/playback-mode', {
+        repeat: 'ONE',
+      });
+
+      await userEvent.click(screen.getByText('simulate-repeat-one'));
+      await userEvent.click(screen.getByRole('button', { name: 'Lặp lại một bài' }));
+      expect(mockApi.patch).toHaveBeenLastCalledWith('/sync/stores/store-1/playback-mode', {
+        repeat: 'OFF',
+      });
+    });
+
+    it('shows the active dot and accent color state via aria-pressed once the server confirms shuffle', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+      await userEvent.click(screen.getByText('simulate-shuffle-on'));
+
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Phát ngẫu nhiên' })).toHaveAttribute(
+          'aria-pressed',
+          'true',
+        ),
+      );
+    });
+  });
+
+  describe('preview mode (nghe thử tại /dashboard/playlists)', () => {
+    it('disables previous/next/shuffle with an explanatory title and never calls the sync API', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start-preview'));
+
+      const previousButton = await screen.findByRole('button', { name: 'Bài trước' });
+      const nextButton = screen.getByRole('button', { name: 'Bài kế tiếp' });
+      const shuffleButton = screen.getByRole('button', { name: 'Phát ngẫu nhiên' });
+
+      expect(previousButton).toBeDisabled();
+      expect(nextButton).toBeDisabled();
+      expect(shuffleButton).toBeDisabled();
+      expect(previousButton.title.toLowerCase()).toContain('nghe thử');
+      expect(nextButton.title.toLowerCase()).toContain('nghe thử');
+      expect(shuffleButton.title.toLowerCase()).toContain('nghe thử');
+
+      await userEvent.click(previousButton);
+      await userEvent.click(nextButton);
+      await userEvent.click(shuffleButton);
+
+      expect(mockApi.post).not.toHaveBeenCalled();
+      expect(mockApi.patch).not.toHaveBeenCalled();
+    });
+
+    it('toggles repeat-one locally via audio.loop without touching the API', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start-preview'));
+
+      const repeatButton = await screen.findByRole('button', { name: /lặp lại/i });
+      expect(repeatButton).not.toBeDisabled();
+
+      await userEvent.click(repeatButton);
+
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Lặp lại một bài' })).toHaveAttribute(
+          'aria-pressed',
+          'true',
+        ),
+      );
+      expect(MockAudio.instances[MockAudio.instances.length - 1].loop).toBe(true);
+      expect(mockApi.patch).not.toHaveBeenCalled();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Lặp lại một bài' }));
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Lặp lại' })).toBeInTheDocument(),
+      );
+      expect(MockAudio.instances[MockAudio.instances.length - 1].loop).toBe(false);
+    });
+  });
+
+  describe('volume control', () => {
+    it('mutes and restores the previous volume level', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      const muteButton = await screen.findByRole('button', { name: 'Tắt tiếng' });
+      const volumeSlider = screen.getByRole('slider', { name: 'Âm lượng' });
+
+      // Kéo về một mức khác 100% trước khi tắt, để kiểm tra đúng mức được nhớ
+      // lại (không phải luôn nhảy về 100%).
+      act(() => {
+        volumeSlider.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await userEvent.click(volumeSlider);
+
+      await userEvent.click(muteButton);
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Bật tiếng' })).toBeInTheDocument(),
+      );
+      expect(MockAudio.instances[MockAudio.instances.length - 1].volume).toBe(0);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Bật tiếng' }));
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Tắt tiếng' })).toBeInTheDocument(),
+      );
+      expect(MockAudio.instances[MockAudio.instances.length - 1].volume).toBeGreaterThan(0);
+    });
+  });
+
+  describe('fullscreen now playing overlay', () => {
+    let fullscreenElement: Element | null = null;
+
+    beforeEach(() => {
+      fullscreenElement = null;
+      Element.prototype.requestFullscreen = jest.fn(function (this: Element) {
+        fullscreenElement = this;
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }) as unknown as Element['requestFullscreen'];
+      document.exitFullscreen = jest.fn(() => {
+        fullscreenElement = null;
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      });
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        get: () => fullscreenElement,
+      });
+    });
+
+    it('opens the fullscreen now playing view via requestFullscreen', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      await userEvent.click(screen.getByRole('button', { name: 'Xem toàn màn hình' }));
+
+      expect(
+        await screen.findByRole('dialog', { name: /đang phát toàn màn hình/i }),
+      ).toBeInTheDocument();
+      expect(Element.prototype.requestFullscreen).toHaveBeenCalled();
+    });
+
+    it('closes via the close button and exits fullscreen', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+      await userEvent.click(screen.getByRole('button', { name: 'Xem toàn màn hình' }));
+      await screen.findByRole('dialog');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Đóng toàn màn hình' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(document.exitFullscreen).toHaveBeenCalled();
+    });
+
+    // Người dùng thoát bằng ESC/F11 của trình duyệt, không đi qua nút Đóng của
+    // ta — overlay vẫn phải đóng nhờ nghe `fullscreenchange`, không kẹt lại.
+    it('closes when the browser exits fullscreen on its own, syncing via fullscreenchange', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+      await userEvent.click(screen.getByRole('button', { name: 'Xem toàn màn hình' }));
+      await screen.findByRole('dialog');
+
+      await act(async () => {
+        fullscreenElement = null;
+        document.dispatchEvent(new Event('fullscreenchange'));
+      });
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
   });
 });

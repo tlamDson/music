@@ -115,6 +115,14 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 - DB chưa có ảnh bìa → `components/media/CoverArt.tsx` sinh bìa từ id bằng palette design system.
 - `/player/[storeId]?kiosk=1` = màn chiếu TV, không render nút điều khiển nào.
 
+### Bộ nút thanh phát + màn "Đang phát" toàn màn hình
+
+- **`repeat`/`shuffle` sống trong `PlayerProvider`, không phải `StoreSyncProvider`.** `PlayerBar` mount ở root layout (`app/layout.tsx`), là **anh em** (sibling) với `{children}` chứ không phải con của `StoreSyncProvider`/`StoresSyncBridge` (những cái đó nằm trong `{children}` của `/store` hay `/dashboard` layout) — nên `PlayerBar` **không đọc được** context của chúng qua `useStoreSync()`. `useSync()` đẩy repeat/shuffle vào `PlayerProvider` qua `playTrack(track, { repeat, shuffle })` (theo `store-now-playing`) và `setPlaybackMode({ repeat, shuffle })` (theo `store-mode-changed`, không kèm track nên không gọi `playTrack` lại — đổi mode không được làm gián đoạn nhạc). `StoreSyncProvider` **vẫn** forward `playlistId`/`repeat`/`shuffle` qua context của nó cho các trang con khác trong `/store` cần đọc mà không muốn phụ thuộc `PlayerProvider` trực tiếp.
+- **Nghe thử (`mode: 'preview'`) không gọi API sync** — `shuffle`/bài trước/bài sau bị `disabled` kèm `title` tiếng Việt giải thích lý do (không có hàng chờ). Riêng repeat vẫn bấm được, đổi cục bộ 2 trạng thái `OFF ⇄ ONE` qua `togglePreviewRepeat()` — set thẳng `audio.loop`, không qua server. Ở `mode: 'store'`, repeat đi đủ vòng 3 trạng thái `OFF → ALL → ONE → OFF`, mỗi bước là một `PATCH /sync/stores/:id/playback-mode` — **không tự cập nhật UI ngay**, chờ broadcast `store-mode-changed` xác nhận (quán mở hai màn hình phải thấy cùng một trạng thái).
+- `components/player/TransportControls.tsx` là cụm shuffle · trước · play/pause · sau · repeat dùng chung cho cả `PlayerBar` (nhỏ) và `NowPlayingOverlay` (to, `size="lg"`) — sửa logic một chỗ, cả hai nơi cùng đổi theo.
+- `components/player/NowPlayingOverlay.tsx` mở bằng `element.requestFullscreen()` thật (không phải overlay CSS suông) và đồng bộ đóng/mở qua sự kiện `fullscreenchange` của `document`, không chỉ dựa vào state React — người dùng thoát fullscreen bằng ESC/F11 của trình duyệt (không qua nút Đóng của mình) vẫn phải đóng được overlay, nếu không kẹt UI.
+- `components/player/MarqueeText.tsx`: tên bài dài chạy marquee khi hover bằng CSS thuần (`<style jsx>` — Next.js có sẵn styled-jsx, không cần cài thêm) — nhân đôi chữ trong track rồi trượt 50% khi hover, cố tình không đo bề rộng chữ bằng JS.
+
 ## Tài khoản (không có endpoint đăng ký công khai)
 
 | Lệnh               | Dùng cho        | Ghi chú                                                                                                                                           |

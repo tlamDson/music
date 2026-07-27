@@ -22,6 +22,7 @@ class MockAudio {
   currentTime = 0;
   duration = 180;
   volume = 1;
+  loop = false;
   paused = true;
   private listeners: Record<string, Array<() => void>> = {};
 
@@ -81,10 +82,14 @@ function Harness({
   mode = 'store',
   storeId = 'store-1',
   startPositionMs = 0,
+  startRepeat,
+  startShuffle,
 }: {
   mode?: PlayerMode;
   storeId?: string | null;
   startPositionMs?: number;
+  startRepeat?: 'OFF' | 'ALL' | 'ONE';
+  startShuffle?: boolean;
 }) {
   const player = usePlayer();
 
@@ -104,6 +109,8 @@ function Harness({
               storeId,
               positionMs: startPositionMs,
               queue: { index: 0, total: 3, remaining: 2 },
+              repeat: startRepeat,
+              shuffle: startShuffle,
             },
           )
         }
@@ -127,9 +134,16 @@ function Harness({
         rejoin-same-track
       </button>
       <button onClick={() => player.toggle()}>toggle</button>
+      <button onClick={() => player.stop()}>stop</button>
+      <button onClick={() => player.setPlaybackMode({ repeat: 'ALL', shuffle: true })}>
+        confirm-server-mode
+      </button>
+      <button onClick={() => player.togglePreviewRepeat()}>toggle-preview-repeat</button>
       <span data-testid="title">{player.current?.title ?? 'idle'}</span>
       <span data-testid="playing">{String(player.isPlaying)}</span>
       <span data-testid="remaining">{player.queue?.remaining ?? -1}</span>
+      <span data-testid="repeat">{player.repeat}</span>
+      <span data-testid="shuffle">{String(player.shuffle)}</span>
     </div>
   );
 }
@@ -319,5 +333,87 @@ describe('PlayerProvider', () => {
     expect(screen.getByTestId('position')).toHaveTextContent('400');
 
     jest.restoreAllMocks();
+  });
+
+  // PR player-bar-controls: repeat/shuffle giờ sống trong PlayerProvider để
+  // PlayerBar (mount ở root layout, ngoài cây StoreSyncProvider/StoresSyncBridge)
+  // vẫn đọc được đúng trạng thái do server xác nhận bất kể route nào.
+  it('seeds repeat/shuffle from playTrack options', async () => {
+    renderHarness({ mode: 'store', startRepeat: 'ALL', startShuffle: true });
+
+    await userEvent.click(screen.getByText('start'));
+
+    expect(screen.getByTestId('repeat')).toHaveTextContent('ALL');
+    expect(screen.getByTestId('shuffle')).toHaveTextContent('true');
+  });
+
+  it('defaults repeat to OFF and shuffle to false when not provided', async () => {
+    renderHarness({ mode: 'store' });
+
+    await userEvent.click(screen.getByText('start'));
+
+    expect(screen.getByTestId('repeat')).toHaveTextContent('OFF');
+    expect(screen.getByTestId('shuffle')).toHaveTextContent('false');
+  });
+
+  // `setPlaybackMode` là điểm useSync gọi vào sau broadcast `store-mode-changed`
+  // — chỉ cập nhật hiển thị, không được đụng vào thẻ audio đang chạy (không
+  // restart, không seek).
+  it('updates repeat/shuffle via setPlaybackMode without touching the audio element', async () => {
+    renderHarness({ mode: 'store' });
+    await userEvent.click(screen.getByText('start'));
+    await waitFor(() => expect(screen.getByTestId('playing')).toHaveTextContent('true'));
+
+    const audio = currentAudio();
+    const playCallsBefore = audio.play.mock.calls.length;
+
+    await userEvent.click(screen.getByText('confirm-server-mode'));
+
+    expect(screen.getByTestId('repeat')).toHaveTextContent('ALL');
+    expect(screen.getByTestId('shuffle')).toHaveTextContent('true');
+    expect(audio.play.mock.calls.length).toBe(playCallsBefore);
+  });
+
+  // Nghe thử không có gì trên server để đồng bộ — lặp một bài chạy hẳn bằng
+  // `audio.loop`, đổi cục bộ ngay khi bấm, không qua setPlaybackMode/API.
+  it('toggles preview repeat locally between OFF and ONE via audio.loop', async () => {
+    renderHarness({ mode: 'preview', storeId: null });
+    await userEvent.click(screen.getByText('start'));
+
+    expect(screen.getByTestId('repeat')).toHaveTextContent('OFF');
+    expect(currentAudio().loop).toBe(false);
+
+    await userEvent.click(screen.getByText('toggle-preview-repeat'));
+    expect(screen.getByTestId('repeat')).toHaveTextContent('ONE');
+    expect(currentAudio().loop).toBe(true);
+
+    await userEvent.click(screen.getByText('toggle-preview-repeat'));
+    expect(screen.getByTestId('repeat')).toHaveTextContent('OFF');
+    expect(currentAudio().loop).toBe(false);
+  });
+
+  // Quán tự chuyển bài bằng timer theo `durationMs`, không phải thuộc tính
+  // `loop` gốc của audio — bật `loop` ở chế độ store sẽ đá văng đồng bộ.
+  it('does not toggle preview repeat while in store mode', async () => {
+    renderHarness({ mode: 'store' });
+    await userEvent.click(screen.getByText('start'));
+
+    await userEvent.click(screen.getByText('toggle-preview-repeat'));
+
+    expect(screen.getByTestId('repeat')).toHaveTextContent('OFF');
+    expect(currentAudio().loop).toBe(false);
+  });
+
+  it('resets repeat/shuffle and audio.loop on stop', async () => {
+    renderHarness({ mode: 'store', startRepeat: 'ONE', startShuffle: true });
+    await userEvent.click(screen.getByText('start'));
+    expect(screen.getByTestId('repeat')).toHaveTextContent('ONE');
+    expect(screen.getByTestId('shuffle')).toHaveTextContent('true');
+
+    await userEvent.click(screen.getByText('stop'));
+
+    expect(screen.getByTestId('repeat')).toHaveTextContent('OFF');
+    expect(screen.getByTestId('shuffle')).toHaveTextContent('false');
+    expect(currentAudio().loop).toBe(false);
   });
 });

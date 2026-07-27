@@ -13,6 +13,7 @@ const mockApiGet = api.get as jest.Mock;
 const playTrack = jest.fn();
 const pause = jest.fn();
 const stop = jest.fn();
+const setPlaybackMode = jest.fn();
 jest.mock('../../src/components/player/PlayerProvider', () => ({
   usePlayer: jest.fn(),
 }));
@@ -47,7 +48,7 @@ describe('useSync hook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSocket.on.mockImplementation(jest.fn());
-    mockUsePlayer.mockReturnValue({ playTrack, pause, stop });
+    mockUsePlayer.mockReturnValue({ playTrack, pause, stop, setPlaybackMode });
     mockApiGet.mockResolvedValue({ storeId: 'store-1', syncGroupId: 'group-1' });
   });
 
@@ -165,5 +166,110 @@ describe('useSync hook', () => {
 
     expect(io).toHaveBeenCalledTimes(1);
     expect(mockSocket.disconnect).not.toHaveBeenCalled();
+  });
+
+  // PR #58: backend giờ gửi kèm repeat/shuffle trong `store-now-playing` —
+  // client dựng nút repeat/shuffle từ đây, không tự đoán/giữ state cục bộ.
+  it('exposes repeat and shuffle from the store-now-playing payload', async () => {
+    const listeners = connectWith();
+
+    await act(async () => {
+      listeners['store-now-playing']?.({
+        storeId: 'store-1',
+        trackId: 'track-1',
+        track: { id: 'track-1', title: 'Cà phê sáng', artist: 'Vũ', durationMs: 180_000 },
+        trackUrl: 'https://s3/song.mp3',
+        positionMs: 0,
+        serverTs: Date.now(),
+        queue: { index: 0, total: 2, remaining: 1 },
+        repeat: 'ALL',
+        shuffle: true,
+      });
+      await Promise.resolve();
+    });
+
+    expect(playTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'track-1' }),
+      expect.objectContaining({ repeat: 'ALL', shuffle: true }),
+    );
+  });
+
+  // Đổi repeat/shuffle không làm gián đoạn nhạc đang phát — broadcast riêng
+  // `store-mode-changed` thay vì gửi lại toàn bộ `store-now-playing`.
+  it('forwards store-mode-changed into the player without restarting playback', async () => {
+    const listeners = connectWith();
+
+    await act(async () => {
+      listeners['store-mode-changed']?.({ storeId: 'store-1', repeat: 'ONE', shuffle: true });
+    });
+
+    expect(setPlaybackMode).toHaveBeenCalledWith({ repeat: 'ONE', shuffle: true });
+    expect(playTrack).not.toHaveBeenCalled();
+  });
+
+  // playlistId chỉ có trong snapshot hydrate (không có trong broadcast live) —
+  // dùng để hiển thị "đang phát playlist nào" ngay khi mở trang giữa chừng.
+  it('picks up playlistId from the now-playing snapshot on hydrate', async () => {
+    mockApiGet.mockResolvedValue({
+      storeId: 'store-1',
+      playlistId: 'playlist-42',
+      track: { id: 'track-7', title: 'Hạ trắng', artist: null, durationMs: 240_000 },
+      trackUrl: 'https://s3/ha-trang.mp3',
+      positionMs: 34_000,
+      serverTs: Date.now(),
+      isPlaying: true,
+      queue: { index: 1, total: 3, remaining: 1 },
+      repeat: 'OFF',
+      shuffle: false,
+    });
+
+    const listeners: Record<string, (...args: unknown[]) => void> = {};
+    mockSocket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
+      listeners[event] = cb;
+    });
+    const { result } = renderHook(() => useSync({ storeId: 'store-1', token: 'test-token' }));
+
+    await act(async () => {
+      listeners['connect']?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.playlistId).toBe('playlist-42');
+  });
+
+  // Quán dừng hẳn thì mọi trạng thái mode phải reset — quán bắt đầu phát bài
+  // mới sau đó không được kế thừa nhầm repeat/shuffle của lượt phát trước.
+  it('resets playlistId, repeat and shuffle when the store stops', async () => {
+    const listeners: Record<string, (...args: unknown[]) => void> = {};
+    mockSocket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
+      listeners[event] = cb;
+    });
+    const { result } = renderHook(() => useSync({ storeId: 'store-1', token: 'test-token' }));
+
+    await act(async () => {
+      listeners['store-now-playing']?.({
+        storeId: 'store-1',
+        trackId: 'track-1',
+        track: { id: 'track-1', title: 'Cà phê sáng', artist: 'Vũ', durationMs: 180_000 },
+        trackUrl: 'https://s3/song.mp3',
+        positionMs: 0,
+        serverTs: Date.now(),
+        queue: { index: 0, total: 2, remaining: 1 },
+        repeat: 'ALL',
+        shuffle: true,
+      });
+    });
+    expect(result.current.repeat).toBe('ALL');
+    expect(result.current.shuffle).toBe(true);
+
+    await act(async () => {
+      listeners['store-stopped']?.({ storeId: 'store-1', serverTs: Date.now() });
+    });
+
+    expect(result.current.storeQueue).toBeNull();
+    expect(result.current.playlistId).toBeNull();
+    expect(result.current.repeat).toBe('OFF');
+    expect(result.current.shuffle).toBe(false);
   });
 });
