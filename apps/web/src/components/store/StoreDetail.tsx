@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
+import { useStoresSync } from '../sync/StoresSyncBridge';
 import CoverArt from '../media/CoverArt';
+import StorePlaylistTracks from './StorePlaylistTracks';
 import { formatTotalDuration } from '../../lib/format';
 import type { ApiResponse, NowPlayingSnapshot } from '@cafe-music/shared';
 
@@ -29,11 +31,19 @@ const REFRESH_MS = 10_000;
 /**
  * Trang điều khiển nhạc của **một quán** — chỗ duy nhất phát được nhạc ra loa
  * quán sau khi bỏ tầng sync group. `/dashboard/playlists` chỉ để nghe thử.
+ *
+ * Trước PR này, playlist chỉ có một nút "phát từ bài đầu" và trang phải chờ
+ * tới 10 giây poll (`GET /stores/:id`) mới thấy đổi bài. Giờ playlist đang
+ * phát hiện luôn danh sách bài (`StorePlaylistTracks`), playlist chưa phát
+ * bung được tại chỗ, và `StoresSyncBridge` (socket đã mở sẵn ở dashboard
+ * layout cho mọi quán) báo hiệu đổi bài để refetch ngay — 10s poll vẫn giữ
+ * làm phao cứu sinh khi socket rớt.
  */
 export default function StoreDetail({ storeId }: { storeId: string }) {
   const [store, setStore] = useState<StoreDetailData | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchStore = useCallback(async () => {
     try {
@@ -55,10 +65,25 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
   }, [fetchStore]);
 
   useEffect(() => {
-    // Nhạc đổi bài do server hẹn giờ, trang này không nghe WS của quán
+    // Nhạc đổi bài do server hẹn giờ, trang này không nghe WS của quán trực
+    // tiếp — vẫn giữ làm phao cứu sinh khi bridge bên dưới rớt kết nối.
     const timer = setInterval(() => void fetchStore(), REFRESH_MS);
     return () => clearInterval(timer);
   }, [fetchStore]);
+
+  // Bridge mở sẵn một socket cho mỗi quán của tổ chức (ở dashboard layout) —
+  // đọc đúng quán đang xem để refetch ngay khi có đổi bài, không phải chờ
+  // tới lần poll 10 giây kế tiếp.
+  const bridgeState = useStoresSync(storeId);
+  const isFirstBridgeUpdate = useRef(true);
+
+  useEffect(() => {
+    if (isFirstBridgeUpdate.current) {
+      isFirstBridgeUpdate.current = false;
+      return;
+    }
+    void fetchStore();
+  }, [bridgeState, fetchStore]);
 
   const run = async (action: () => Promise<unknown>, success: string) => {
     try {
@@ -72,10 +97,10 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
     }
   };
 
-  const playPlaylist = (playlist: PlaylistRow) =>
+  const playPlaylistFrom = (playlistId: string, trackIndex: number, name: string) =>
     run(
-      () => api.post(`/sync/stores/${storeId}/play`, { playlistId: playlist.id, trackIndex: 0 }),
-      `Đang phát "${playlist.name}" tại ${store?.name ?? 'quán'}`,
+      () => api.post(`/sync/stores/${storeId}/play`, { playlistId, trackIndex }),
+      `Đang phát "${name}" tại ${store?.name ?? 'quán'}`,
     );
 
   if (loading) {
@@ -218,6 +243,23 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                 Dừng hẳn
               </button>
             </div>
+
+            {/* Danh sách bài của playlist đang phát — bấm bài nào là nhảy
+                ngay tới bài đó, trước đây phải rời sang trang chi tiết playlist. */}
+            <div
+              className="rounded-xl overflow-hidden py-2"
+              style={{
+                backgroundColor: 'var(--color-background)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
+              <StorePlaylistTracks
+                playlistId={nowPlaying.playlistId}
+                onPlayTrack={(trackIndex, name) =>
+                  void playPlaylistFrom(nowPlaying.playlistId, trackIndex, name)
+                }
+              />
+            </div>
           </>
         ) : (
           <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
@@ -238,49 +280,108 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {playlists.map((playlist) => (
-              <li
-                key={playlist.id}
-                className="flex items-center justify-between gap-3 p-3 rounded-xl"
-                style={{
-                  backgroundColor: 'var(--color-muted)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <CoverArt seed={playlist.id} label={playlist.name} size={44} />
-                  <div className="min-w-0">
-                    <p
-                      className="text-sm font-medium truncate"
-                      style={{ color: 'var(--color-foreground)' }}
-                    >
-                      {playlist.name}
-                    </p>
-                    <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
-                      {playlist._count?.playlistTracks ?? 0} bài ·{' '}
-                      {formatTotalDuration(playlist.totalDurationMs)} ·{' '}
-                      {playlist.scope === 'ORG' ? 'của chuỗi' : 'của quán'}
-                    </p>
-                  </div>
-                </div>
+            {playlists.map((playlist) => {
+              const isCurrentPlaylist = playlist.id === nowPlaying?.playlistId;
+              const isExpanded = expandedId === playlist.id;
 
-                <button
-                  onClick={() => void playPlaylist(playlist)}
-                  className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-all duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
-                  style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-                  aria-label={`Phát ${playlist.name} tại ${store.name}`}
+              return (
+                <li
+                  key={playlist.id}
+                  className="flex flex-col rounded-xl transition-all duration-200"
+                  style={{
+                    backgroundColor: 'var(--color-muted)',
+                    border: `1px solid ${
+                      isCurrentPlaylist ? 'var(--color-accent)' : 'var(--color-border)'
+                    }`,
+                  }}
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="w-5 h-5"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86a1 1 0 00-1.5.86z" />
-                  </svg>
-                </button>
-              </li>
-            ))}
+                  <div className="flex items-center justify-between gap-3 p-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <CoverArt seed={playlist.id} label={playlist.name} size={44} />
+                      <div className="min-w-0">
+                        <p
+                          className="text-sm font-medium truncate flex items-center gap-2"
+                          style={{ color: 'var(--color-foreground)' }}
+                        >
+                          <span className="truncate">{playlist.name}</span>
+                          {isCurrentPlaylist && (
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+                              style={{
+                                backgroundColor: 'rgba(34,197,94,0.15)',
+                                color: 'var(--color-accent)',
+                              }}
+                            >
+                              Đang phát
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                          {playlist._count?.playlistTracks ?? 0} bài ·{' '}
+                          {formatTotalDuration(playlist.totalDurationMs)} ·{' '}
+                          {playlist.scope === 'ORG' ? 'của chuỗi' : 'của quán'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {!isCurrentPlaylist && (
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : playlist.id)}
+                          className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all duration-150 hover:brightness-125 focus-visible:outline-none focus-visible:ring-2"
+                          style={{ color: 'var(--color-foreground)' }}
+                          aria-label={
+                            isExpanded
+                              ? `Thu gọn danh sách bài của ${playlist.name}`
+                              : `Xem danh sách bài của ${playlist.name}`
+                          }
+                          aria-expanded={isExpanded}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-4 h-4 transition-transform duration-200"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            style={{ transform: isExpanded ? 'rotate(180deg)' : undefined }}
+                            aria-hidden="true"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+                          </svg>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => void playPlaylistFrom(playlist.id, 0, playlist.name)}
+                        className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-all duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
+                        style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
+                        aria-label={`Phát ${playlist.name} tại ${store.name}`}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="w-5 h-5"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86a1 1 0 00-1.5.86z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {isExpanded && !isCurrentPlaylist && (
+                    <div className="px-3 pb-3">
+                      <StorePlaylistTracks
+                        playlistId={playlist.id}
+                        onPlayTrack={(trackIndex, name) =>
+                          void playPlaylistFrom(playlist.id, trackIndex, name)
+                        }
+                      />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
