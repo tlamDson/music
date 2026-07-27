@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { WsStoreNowPlayingPayload, NowPlayingSnapshot } from '@cafe-music/shared';
+import type {
+  WsStoreNowPlayingPayload,
+  WsStoreModeChangedPayload,
+  NowPlayingSnapshot,
+  StoreRepeatMode,
+} from '@cafe-music/shared';
 import { api } from '../lib/api-client';
 import { resolveWsUrl } from '../lib/env';
 import { usePlayer } from '../components/player/PlayerProvider';
@@ -18,6 +23,13 @@ interface SyncState {
   isConnected: boolean;
   /** Hàng chờ đang phát của quán; null = quán chưa phát gì. */
   storeQueue: WsStoreNowPlayingPayload['queue'] | null;
+  /** Playlist đang phát; chỉ biết được qua hydrate (`now-playing` không có trong
+   * broadcast live) — null khi quán chưa phát gì hoặc chưa hydrate xong. */
+  playlistId: string | null;
+  /** Repeat/shuffle do server xác nhận — cập nhật theo cả `store-now-playing`
+   * lẫn `store-mode-changed`. */
+  repeat: StoreRepeatMode;
+  shuffle: boolean;
 }
 
 const WS_URL = resolveWsUrl(process.env.NEXT_PUBLIC_WS_URL);
@@ -32,8 +44,11 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [storeQueue, setStoreQueue] = useState<WsStoreNowPlayingPayload['queue'] | null>(null);
+  const [playlistId, setPlaylistId] = useState<string | null>(null);
+  const [repeat, setRepeat] = useState<StoreRepeatMode>('OFF');
+  const [shuffle, setShuffle] = useState(false);
 
-  const { playTrack, pause, stop } = usePlayer();
+  const { playTrack, pause, stop, setPlaybackMode } = usePlayer();
 
   // Giữ những giá trị hay đổi trong ref để effect socket chỉ phụ thuộc
   // token/storeId — nếu không `clockOffset` đổi sau mỗi lần đo đồng hồ sẽ kéo
@@ -46,10 +61,14 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
   pauseRef.current = pause;
   const stopRef = useRef(stop);
   stopRef.current = stop;
+  const setPlaybackModeRef = useRef(setPlaybackMode);
+  setPlaybackModeRef.current = setPlaybackMode;
 
   const playStoreTrack = useCallback(
     (payload: WsStoreNowPlayingPayload) => {
       setStoreQueue(payload.queue);
+      setRepeat(payload.repeat);
+      setShuffle(payload.shuffle);
       if (!payload.trackUrl || !storeId) return;
 
       const serverNow = Date.now() + clockOffsetRef.current;
@@ -68,6 +87,8 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
           storeId,
           positionMs: Math.max(0, elapsedMs),
           queue: payload.queue,
+          repeat: payload.repeat,
+          shuffle: payload.shuffle,
         },
       );
     },
@@ -85,6 +106,10 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
         `/sync/stores/${storeId}/now-playing`,
       );
       if (!snapshot?.isPlaying) return;
+
+      // `playlistId` chỉ có trong snapshot hydrate, broadcast live
+      // (`store-now-playing`) không mang field này.
+      setPlaylistId(snapshot.playlistId);
 
       playStoreTrack({
         storeId: snapshot.storeId,
@@ -127,6 +152,16 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
     socket.on('store-stopped', () => {
       stopRef.current();
       setStoreQueue(null);
+      setPlaylistId(null);
+      setRepeat('OFF');
+      setShuffle(false);
+    });
+    // Đổi repeat/shuffle không làm gián đoạn nhạc đang phát — broadcast riêng
+    // (khác `store-now-playing`) để không phải reload cả track chỉ vì đổi mode.
+    socket.on('store-mode-changed', (payload: WsStoreModeChangedPayload) => {
+      setRepeat(payload.repeat);
+      setShuffle(payload.shuffle);
+      setPlaybackModeRef.current({ repeat: payload.repeat, shuffle: payload.shuffle });
     });
 
     return () => {
@@ -134,5 +169,5 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
     };
   }, [token, storeId, hydrate, playStoreTrack]);
 
-  return { isConnected, storeQueue };
+  return { isConnected, storeQueue, playlistId, repeat, shuffle };
 }
