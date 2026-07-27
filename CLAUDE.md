@@ -50,6 +50,19 @@ Nợ đã biết: chưa có bảng `Artist`; track upload trước đợt này c
   - **Auto-next chuyển sang server** (`setTimeout` theo `durationMs`, keyed theo storeId). Trước đây client bắt `ended` rồi gọi `/next`: quán mở hai màn hình thì mỗi màn bắn một lệnh làm nhạc nhảy cóc, không màn nào mở thì nhạc đứng im.
   - Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _Sync engine_.
 
+**PR #56–#62 (nâng cấp trải nghiệm phát nhạc theo tham chiếu Spotify) đã merge vào `develop`:**
+
+Xuất phát từ 4 điểm thiếu khi đối chiếu với Spotify: thanh phát nghèo nút, trang quán không xem được từng bài, app giật khi đang phát, motion rời rạc.
+
+- **#57 — nguyên nhân "lag" không phải thiếu animation.** `PlayerProvider` bắn `setPositionMs` mỗi `timeupdate` nên **mọi** consumer của `usePlayer()` re-render vài lần/giây, kể cả bảng track dài chỉ cần biết bài nào đang phát. Vị trí phát tách sang `usePlayerPosition()` (`useSyncExternalStore` + vòng lặp rAF **tiết lưu 250ms** — ghi mỗi khung hình sẽ khiến `PlayerBar` và màn kiosk render 60 lần/giây, tệ hơn cả trước khi sửa). **Đừng đưa `positionMs` trở lại context `usePlayer()`.**
+- **#58 — repeat / shuffle / bài trước làm ở server**, cùng chỗ với timer auto-next; làm ở client thì quán mở hai màn hình mỗi màn một trạng thái. Thêm `order`/`repeat`/`shuffle` vào `StorePlaybackState`, endpoint `/previous` + `PATCH /playback-mode`, event WS `store-mode-changed`, và cột `PlaylistTrack.addedAt`.
+- **#59 — `TrackTable` + `TrackRow` dùng chung** (`components/track/`). Trước đó `PlaylistDetail` và `TrackLibrary` có hai bảng copy-paste gần giống hệt; #61 cần cái thứ ba nên tách trước. Có `extraColumns` để trang mới chèn cột riêng — **đừng dựng bảng track thứ tư**.
+- **#60 — thanh phát đủ nút**: `CoverArt` + marquee, shuffle/prev/play/next/repeat, nút loa bấm để tắt tiếng, overlay "Đang phát" toàn màn hình (`NowPlayingOverlay.tsx`, đồng bộ qua `fullscreenchange` chứ không chỉ state React).
+- **#61 — trang quán chọn được từng bài.** `/store` và `/dashboard/stores/[id]` hiện danh sách bài của playlist đang phát, bấm bài nào phát bài đó. `StoresSyncBridge` nâng thành external store lộ `useStoresSync(storeId)` để bỏ độ trễ 10 giây của poll (poll vẫn giữ làm phao).
+- **#56 + #62 — motion.** Token `--duration-*`/`--ease-*` + class `.animate-slide-up`/`.animate-stagger-item`/`.skeleton`/`.press` trong `globals.css`; bỏ sạch `transition-all`; stagger giới hạn 8 item đầu. Khối `prefers-reduced-motion` phải ép **cả delay** về 0 — chỉ tắt duration thì item stagger index lớn kẹt ở `opacity: 0` suốt thời gian delay và **nội dung biến mất** với người bật giảm chuyển động.
+
+Nợ đã biết (không đổi): chưa có bảng `Artist` nên không có cột Album / card nghệ sĩ; timer auto-next chỉ đúng khi backend chạy 1 instance; `SchedulerService.matchesCron` vẫn bỏ qua ngày/tháng/thứ. **Track `durationMs = 0` giờ có triệu chứng rõ hơn**: server không hẹn được giờ chuyển bài nên quán kẹt trạng thái "đang phát" vô hạn, và bộ đếm vị trí trên UI ngoại suy không giới hạn (quan sát thấy 331:32 cho một bài dài 25:52). Cần backfill `durationMs` cho track cũ hoặc chặn ngay lúc upload.
+
 ## MCP Servers
 
 Khai báo ở [.mcp.json](.mcp.json), mỗi người tự bật trong `.claude/settings.local.json` (`enabledMcpjsonServers`). Chi tiết setup: [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md).
