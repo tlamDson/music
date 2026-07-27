@@ -165,19 +165,23 @@ export default function StoreHome({ storeId }: { storeId: string }) {
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {playlists.map((playlist) => {
+            {playlists.map((playlist, index) => {
               const isCurrentPlaylist = playlist.id === playlistId;
               const isExpanded = expandedId === playlist.id;
+              const staggered = index < 8;
 
               return (
                 <li
                   key={playlist.id}
-                  className="flex flex-col rounded-xl transition-all duration-200"
+                  className={`flex flex-col rounded-xl transition-colors duration-[var(--duration-base)] ${
+                    staggered ? 'animate-stagger-item' : ''
+                  }`}
                   style={{
                     backgroundColor: 'var(--color-muted)',
                     border: `1px solid ${
                       isCurrentPlaylist ? 'var(--color-accent)' : 'var(--color-border)'
                     }`,
+                    ...(staggered ? ({ '--i': index } as React.CSSProperties) : {}),
                   }}
                 >
                   <div className="flex items-center justify-between gap-3 p-3">
@@ -213,7 +217,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
                       {!isCurrentPlaylist && (
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : playlist.id)}
-                          className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all duration-150 hover:brightness-125 focus-visible:outline-none focus-visible:ring-2"
+                          className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none focus-visible:ring-2"
                           style={{ color: 'var(--color-foreground)' }}
                           aria-label={
                             isExpanded
@@ -224,7 +228,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
                         >
                           <svg
                             viewBox="0 0 24 24"
-                            className="w-4 h-4 transition-transform duration-200"
+                            className="w-4 h-4 transition-transform duration-[var(--duration-base)]"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="2"
@@ -238,7 +242,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
 
                       <button
                         onClick={() => void playFrom(playlist.id, 0, playlist.name)}
-                        className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-all duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
+                        className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-[filter] duration-[var(--duration-base)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                         style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
                         aria-label={`Phát ${playlist.name}`}
                       >

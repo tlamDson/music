@@ -49,7 +49,7 @@ export default function TrackPlayButton({
     <button
       onClick={() => void handleClick()}
       disabled={loading}
-      className="p-2 rounded cursor-pointer transition-all duration-150 hover:opacity-80 focus-visible:outline-none"
+      className="p-2 rounded cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 focus-visible:outline-none"
       style={{ color: 'var(--color-accent)', opacity: loading ? 0.5 : 1 }}
       aria-label={playing ? `Pause ${title}` : `Play ${title}`}
     >

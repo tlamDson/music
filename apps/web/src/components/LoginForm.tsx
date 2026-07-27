@@ -52,7 +52,7 @@ export default function LoginForm() {
           required
           autoComplete="email"
           placeholder="admin@cafe.com"
-          className="px-4 py-2 rounded-lg text-sm outline-none transition-all duration-150 focus:ring-2"
+          className="px-4 py-2 rounded-lg text-sm outline-none transition-shadow duration-[var(--duration-fast)] focus:ring-2"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-foreground)',
@@ -78,7 +78,7 @@ export default function LoginForm() {
           required
           autoComplete="current-password"
           placeholder="••••••••"
-          className="px-4 py-2 rounded-lg text-sm outline-none transition-all duration-150 focus:ring-2"
+          className="px-4 py-2 rounded-lg text-sm outline-none transition-shadow duration-[var(--duration-fast)] focus:ring-2"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-foreground)',
@@ -97,7 +97,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 rounded-lg font-semibold cursor-pointer transition-all duration-200 hover:opacity-90 focus-visible:outline-none"
+        className="w-full py-3 rounded-lg font-semibold cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-90 focus-visible:outline-none"
         style={{
           backgroundColor: 'var(--color-accent)',
           color: 'white',

@@ -111,7 +111,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="px-4 py-2 rounded-full text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
+          className="px-4 py-2 rounded-full text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
           style={{
             backgroundColor: 'var(--color-accent)',
             color: 'white',
@@ -133,7 +133,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
             const file = e.dataTransfer.files[0];
             if (file) void uploadFile(file);
           }}
-          className="px-4 py-2 rounded-full text-xs transition-all duration-200"
+          className="px-4 py-2 rounded-full text-xs transition-colors duration-[var(--duration-base)]"
           style={{
             border: `1px dashed ${dragOver ? 'var(--color-accent)' : 'var(--color-border)'}`,
             backgroundColor: dragOver ? 'rgba(34,197,94,0.05)' : 'transparent',

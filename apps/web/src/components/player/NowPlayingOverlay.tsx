@@ -79,7 +79,7 @@ export default function NowPlayingOverlay({ onClose }: NowPlayingOverlayProps) {
     >
       <button
         onClick={handleClose}
-        className="absolute top-6 right-6 p-2 rounded-full cursor-pointer transition-all duration-200 hover:opacity-80 focus-visible:outline-none"
+        className="absolute top-6 right-6 p-2 rounded-full cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-80 focus-visible:outline-none"
         style={{ color: 'var(--color-foreground)' }}
         aria-label="Đóng toàn màn hình"
       >

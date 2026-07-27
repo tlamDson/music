@@ -101,7 +101,7 @@ export default function PlayerBar() {
 
           <button
             onClick={() => setIsOverlayOpen(true)}
-            className="p-2 rounded-full cursor-pointer transition-all duration-200 hover:opacity-80 focus-visible:outline-none flex-shrink-0"
+            className="p-2 rounded-full cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-80 focus-visible:outline-none flex-shrink-0"
             style={{ color: MUTED_TEXT }}
             aria-label="Xem toàn màn hình"
             title="Xem toàn màn hình"

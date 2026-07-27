@@ -113,7 +113,7 @@ export default function UsersPage() {
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all hover:opacity-90"
+          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity hover:opacity-90"
           style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
         >
           {showForm ? 'Cancel' : '+ Add User'}
@@ -224,7 +224,7 @@ export default function UsersPage() {
           <button
             type="submit"
             disabled={creating}
-            className="py-2 rounded-lg text-sm font-medium cursor-pointer transition-all hover:opacity-90"
+            className="py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity hover:opacity-90"
             style={{
               backgroundColor: 'var(--color-accent)',
               color: 'white',
@@ -292,7 +292,7 @@ export default function UsersPage() {
                     type="button"
                     disabled={isSelf}
                     onClick={() => setEditingUser(u)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-150 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
                     style={{
                       color: 'var(--color-foreground)',
                       border: '1px solid var(--color-border)',
@@ -306,7 +306,7 @@ export default function UsersPage() {
                       type="button"
                       disabled={isSelf}
                       onClick={() => setDeactivatingUser(u)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-150 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
                       style={{
                         color: 'var(--color-destructive)',
                         border: '1px solid var(--color-border)',
@@ -318,7 +318,7 @@ export default function UsersPage() {
                     <button
                       type="button"
                       onClick={() => void handleReactivate(u.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-150 hover:opacity-80"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
                       style={{
                         color: 'var(--color-accent)',
                         border: '1px solid var(--color-border)',

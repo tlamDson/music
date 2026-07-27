@@ -76,7 +76,7 @@ export default function TransportControls({
   const gap = size === 'lg' ? 'gap-6' : 'gap-4';
 
   const buttonBase =
-    'relative p-2 rounded-full cursor-pointer transition-all duration-200 hover:opacity-80 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:opacity-30';
+    'relative p-2 rounded-full cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-80 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:opacity-30';
 
   return (
     <div className={`flex items-center justify-center ${gap} ${className ?? ''}`}>
@@ -106,7 +106,7 @@ export default function TransportControls({
 
       <button
         onClick={toggle}
-        className={`${playButtonSize} rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:opacity-90 focus-visible:outline-none`}
+        className={`${playButtonSize} rounded-full flex items-center justify-center cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-90 focus-visible:outline-none`}
         style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
         aria-label={isPlaying ? 'Tạm dừng' : 'Phát'}
       >

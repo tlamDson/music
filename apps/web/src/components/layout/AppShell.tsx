@@ -65,7 +65,7 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
       <button
         type="button"
         onClick={() => setMobileNavOpen((v) => !v)}
-        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg cursor-pointer transition-all duration-150 hover:opacity-80"
+        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
         style={{ backgroundColor: 'var(--color-primary)', border: '1px solid var(--color-border)' }}
         aria-label={mobileNavOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
         aria-expanded={mobileNavOpen}
@@ -109,7 +109,7 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
       )}
 
       <nav
-        className={`w-64 flex-shrink-0 flex flex-col gap-1 overflow-y-auto px-4 pt-4 pb-28 fixed inset-y-0 left-0 z-40 transition-transform duration-200 md:sticky md:top-0 md:h-screen md:z-auto ${
+        className={`w-64 flex-shrink-0 flex flex-col gap-1 overflow-y-auto px-4 pt-4 pb-28 fixed inset-y-0 left-0 z-40 transition-transform duration-[var(--duration-base)] md:sticky md:top-0 md:h-screen md:z-auto ${
           mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
         style={{
@@ -130,7 +130,7 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
             key={item.href}
             href={item.href}
             aria-current={isActive(item.href) ? 'page' : undefined}
-            className="px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:opacity-80 focus-visible:outline-none"
+            className="px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 focus-visible:outline-none"
             style={{
               color: isActive(item.href) ? 'var(--color-accent)' : 'var(--color-foreground)',
               backgroundColor: isActive(item.href) ? 'rgba(34,197,94,0.1)' : 'transparent',
@@ -155,11 +155,14 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {playlists.map((playlist) => (
+              {playlists.map((playlist, index) => (
                 <li key={playlist.id}>
                   <Link
                     href={`${navItems[1]?.href ?? '/dashboard/playlists'}/${playlist.id}`}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 hover:opacity-80 focus-visible:outline-none"
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 focus-visible:outline-none ${
+                      index < 8 ? 'animate-stagger-item' : ''
+                    }`}
+                    style={index < 8 ? ({ '--i': index } as React.CSSProperties) : undefined}
                   >
                     <CoverArt seed={playlist.id} label={playlist.name} size={32} />
                     <span className="min-w-0">
@@ -193,7 +196,7 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
           {onLogout && (
             <button
               onClick={onLogout}
-              className="mt-2 text-xs underline cursor-pointer transition-all duration-150 hover:opacity-80 focus-visible:outline-none"
+              className="mt-2 text-xs underline cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 focus-visible:outline-none"
               style={{ color: 'var(--color-secondary)' }}
             >
               Đăng xuất

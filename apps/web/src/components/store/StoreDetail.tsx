@@ -105,9 +105,12 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
 
   if (loading) {
     return (
-      <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-        Đang tải thông tin quán...
-      </p>
+      <div className="flex flex-col gap-3" role="status" aria-label="Đang tải thông tin quán">
+        <div className="skeleton h-6 w-48" />
+        <div className="skeleton h-32 w-full" />
+        <div className="skeleton h-32 w-full" />
+        <span className="sr-only">Đang tải thông tin quán...</span>
+      </div>
     );
   }
 
@@ -135,7 +138,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
       <div className="flex flex-col gap-2">
         <Link
           href="/dashboard/stores"
-          className="text-xs uppercase tracking-wide cursor-pointer hover:brightness-125 transition-all duration-150 w-fit"
+          className="text-xs uppercase tracking-wide cursor-pointer hover:brightness-125 transition-[filter] duration-[var(--duration-fast)] w-fit"
           style={{ color: 'var(--color-secondary)' }}
         >
           ← Quay lại danh sách quán
@@ -191,7 +194,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                       'Đã tạm dừng nhạc tại quán',
                     )
                   }
-                  className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
+                  className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                   style={{
                     backgroundColor: 'var(--color-primary)',
                     color: 'var(--color-foreground)',
@@ -208,7 +211,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                       'Đã phát tiếp tại quán',
                     )
                   }
-                  className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
+                  className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                   style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
                 >
                   Phát tiếp
@@ -219,7 +222,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                 onClick={() =>
                   void run(() => api.post(`/sync/stores/${storeId}/next`), 'Đã chuyển bài')
                 }
-                className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
+                className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                 style={{
                   backgroundColor: 'var(--color-primary)',
                   color: 'var(--color-foreground)',
@@ -233,7 +236,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                 onClick={() =>
                   void run(() => api.post(`/sync/stores/${storeId}/stop`), 'Đã dừng nhạc tại quán')
                 }
-                className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
+                className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                 style={{
                   backgroundColor: 'transparent',
                   color: 'var(--color-destructive)',
@@ -280,19 +283,23 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {playlists.map((playlist) => {
+            {playlists.map((playlist, index) => {
               const isCurrentPlaylist = playlist.id === nowPlaying?.playlistId;
               const isExpanded = expandedId === playlist.id;
+              const staggered = index < 8;
 
               return (
                 <li
                   key={playlist.id}
-                  className="flex flex-col rounded-xl transition-all duration-200"
+                  className={`flex flex-col rounded-xl transition-colors duration-[var(--duration-base)] ${
+                    staggered ? 'animate-stagger-item' : ''
+                  }`}
                   style={{
                     backgroundColor: 'var(--color-muted)',
                     border: `1px solid ${
                       isCurrentPlaylist ? 'var(--color-accent)' : 'var(--color-border)'
                     }`,
+                    ...(staggered ? ({ '--i': index } as React.CSSProperties) : {}),
                   }}
                 >
                   <div className="flex items-center justify-between gap-3 p-3">
@@ -328,7 +335,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                       {!isCurrentPlaylist && (
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : playlist.id)}
-                          className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all duration-150 hover:brightness-125 focus-visible:outline-none focus-visible:ring-2"
+                          className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none focus-visible:ring-2"
                           style={{ color: 'var(--color-foreground)' }}
                           aria-label={
                             isExpanded
@@ -339,7 +346,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                         >
                           <svg
                             viewBox="0 0 24 24"
-                            className="w-4 h-4 transition-transform duration-200"
+                            className="w-4 h-4 transition-transform duration-[var(--duration-base)]"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="2"
@@ -353,7 +360,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
 
                       <button
                         onClick={() => void playPlaylistFrom(playlist.id, 0, playlist.name)}
-                        className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-all duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
+                        className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-[filter] duration-[var(--duration-base)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                         style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
                         aria-label={`Phát ${playlist.name} tại ${store.name}`}
                       >
@@ -392,7 +399,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
           href={`/player/${storeId}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110"
+          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-foreground)',
@@ -405,7 +412,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
           href={`/player/${storeId}?kiosk=1`}
           target="_blank"
           rel="noopener noreferrer"
-          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110"
+          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110"
           style={{
             backgroundColor: 'transparent',
             color: 'var(--color-secondary)',

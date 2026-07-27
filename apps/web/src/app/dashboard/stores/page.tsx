@@ -95,7 +95,7 @@ export default function StoresPage() {
         <button
           type="submit"
           disabled={creating}
-          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
+          className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
           style={{
             backgroundColor: 'var(--color-accent)',
             color: 'white',
@@ -107,23 +107,29 @@ export default function StoresPage() {
       </form>
 
       {loading ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-          Đang tải danh sách quán...
-        </p>
+        <div className="grid gap-3" role="status" aria-label="Đang tải danh sách quán">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton h-20" />
+          ))}
+          <span className="sr-only">Đang tải danh sách quán...</span>
+        </div>
       ) : stores.length === 0 ? (
         <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
           Chưa có quán nào.
         </p>
       ) : (
         <div className="grid gap-3">
-          {stores.map((store) => (
+          {stores.map((store, index) => (
             <Link
               key={store.id}
               href={`/dashboard/stores/${store.id}`}
-              className="p-4 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-all duration-150 hover:brightness-125 focus-visible:outline-none focus-visible:brightness-125"
+              className={`p-4 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none focus-visible:brightness-125 ${
+                index < 8 ? 'animate-stagger-item' : ''
+              }`}
               style={{
                 backgroundColor: 'var(--color-muted)',
                 border: '1px solid var(--color-border)',
+                ...(index < 8 ? ({ '--i': index } as React.CSSProperties) : {}),
               }}
             >
               <div className="flex items-center gap-3 min-w-0">

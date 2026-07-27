@@ -37,7 +37,7 @@ export default function VolumeControl({ className }: { className?: string }) {
         onClick={handleToggleMute}
         aria-pressed={isMuted}
         aria-label={isMuted ? 'Bật tiếng' : 'Tắt tiếng'}
-        className="p-1 rounded-full cursor-pointer transition-all duration-200 hover:opacity-80 focus-visible:outline-none"
+        className="p-1 rounded-full cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-80 focus-visible:outline-none"
       >
         <Icon />
       </button>

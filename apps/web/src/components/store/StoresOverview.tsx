@@ -46,9 +46,16 @@ export default function StoresOverview() {
 
   if (loading) {
     return (
-      <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-        Đang tải trạng thái các quán...
-      </p>
+      <div
+        className="flex gap-4 overflow-x-auto pb-2"
+        role="status"
+        aria-label="Đang tải trạng thái các quán"
+      >
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="skeleton w-64 h-28 flex-shrink-0" />
+        ))}
+        <span className="sr-only">Đang tải trạng thái các quán...</span>
+      </div>
     );
   }
 
@@ -62,12 +69,18 @@ export default function StoresOverview() {
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-2">
-      {rows.map((row) => (
+      {rows.map((row, index) => (
         <Link
           key={row.storeId}
           href={`/dashboard/stores/${row.storeId}`}
-          className="w-64 flex-shrink-0 p-4 rounded-xl flex flex-col gap-3 cursor-pointer transition-all duration-150 hover:brightness-125 focus-visible:outline-none focus-visible:brightness-125"
-          style={{ backgroundColor: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
+          className={`w-64 flex-shrink-0 p-4 rounded-xl flex flex-col gap-3 cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none focus-visible:brightness-125 ${
+            index < 8 ? 'animate-stagger-item' : ''
+          }`}
+          style={{
+            backgroundColor: 'var(--color-muted)',
+            border: '1px solid var(--color-border)',
+            ...(index < 8 ? ({ '--i': index } as React.CSSProperties) : {}),
+          }}
         >
           <div className="flex items-center gap-3 min-w-0">
             <CoverArt seed={row.storeId} label={row.name} size={44} />
@@ -95,11 +108,7 @@ export default function StoresOverview() {
               aria-hidden="true"
             />
             <span className="text-xs" style={{ color: 'rgba(248,250,252,0.6)' }}>
-              {row.isPlaying
-                ? 'Đang phát'
-                : row.status === 'PAUSED'
-                  ? 'Tạm dừng'
-                  : 'Đang im lặng'}
+              {row.isPlaying ? 'Đang phát' : row.status === 'PAUSED' ? 'Tạm dừng' : 'Đang im lặng'}
             </span>
           </div>
 

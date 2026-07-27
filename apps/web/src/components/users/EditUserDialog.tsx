@@ -151,7 +151,7 @@ export default function EditUserDialog({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:opacity-80"
+            className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
             style={{ color: 'var(--color-foreground)' }}
           >
             Huỷ
@@ -159,7 +159,7 @@ export default function EditUserDialog({
           <button
             type="submit"
             disabled={saving}
-            className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 hover:opacity-90"
+            className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-90"
             style={{
               backgroundColor: 'var(--color-accent)',
               color: 'white',
