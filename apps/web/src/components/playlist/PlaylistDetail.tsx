@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
-import { formatDuration, formatTotalDuration } from '../../lib/format';
+import { formatTotalDurationExact } from '../../lib/format';
 import { usePlayer } from '../player/PlayerProvider';
 import CoverArt from '../media/CoverArt';
 import AddTrackDialog from './AddTrackDialog';
+import TrackTable, { type TrackTableRow } from '../track/TrackTable';
 import type { Playlist, Track, UserRole } from '@cafe-music/shared';
 
 interface PlaylistTrackRow {
@@ -15,6 +16,7 @@ interface PlaylistTrackRow {
   playlistId: string;
   trackId: string;
   position: number;
+  addedAt: string;
   track: Track;
 }
 
@@ -38,10 +40,9 @@ export default function PlaylistDetail({
   const [playlist, setPlaylist] = useState<PlaylistDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const { current, isPlaying, queue, playTrack } = usePlayer();
+  const { current, queue, playTrack } = usePlayer();
 
   const isStore = role === 'STORE_ADMIN';
 
@@ -61,6 +62,11 @@ export default function PlaylistDetail({
 
   const rows = playlist?.playlistTracks ?? [];
   const totalDurationMs = rows.reduce((sum, row) => sum + (row.track.durationMs ?? 0), 0);
+  const trackTableRows: TrackTableRow[] = rows.map((row) => ({
+    id: row.trackId,
+    track: row.track,
+    addedAt: row.addedAt,
+  }));
 
   /**
    * Quán bấm phát = phát thật ra loa quán. Admin chuỗi bấm phát = **nghe thử
@@ -131,27 +137,28 @@ export default function PlaylistDetail({
     }
   };
 
-  // Kéo từ kho nhạc thả vào danh sách
+  // Kéo từ kho nhạc thả vào danh sách. `TrackTable` tự bắt kéo-thả nội bộ để
+  // đổi thứ tự (dừng nổi bọt bằng `stopPropagation`) nên chỉ còn phải lo
+  // trường hợp kéo từ ngoài vào ở đây.
   const handleLibraryDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
 
     const trackId = e.dataTransfer.getData('trackId');
-    if (!trackId || dragIndex !== null) return;
+    if (!trackId) return;
 
     void addTrack(trackId, trackId);
   };
 
   // Kéo thả trong danh sách để đổi thứ tự phát
-  const handleReorderDrop = async (targetIndex: number) => {
-    if (dragIndex === null || dragIndex === targetIndex || !playlist) return;
+  const handleReorder = async (fromIndex: number, toIndex: number) => {
+    if (!playlist) return;
 
     const next = [...playlist.playlistTracks];
-    const [moved] = next.splice(dragIndex, 1);
-    next.splice(targetIndex, 0, moved);
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
 
     setPlaylist({ ...playlist, playlistTracks: next });
-    setDragIndex(null);
 
     try {
       await api.patch(`/playlists/${playlistId}/tracks/reorder`, {
@@ -166,9 +173,11 @@ export default function PlaylistDetail({
 
   if (loading) {
     return (
-      <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-        Đang tải...
-      </p>
+      <div className="flex flex-col gap-3" aria-label="Đang tải playlist">
+        <div className="skeleton h-6 w-64" />
+        <div className="skeleton h-40 w-full" />
+        <div className="skeleton h-40 w-full" />
+      </div>
     );
   }
 
@@ -218,7 +227,7 @@ export default function PlaylistDetail({
               {playlist.name}
             </h1>
             <p className="text-sm mt-3" style={{ color: 'rgba(248,250,252,0.6)' }}>
-              {rows.length} bài · {formatTotalDuration(totalDurationMs)}
+              {rows.length} bài · {formatTotalDurationExact(totalDurationMs)}
             </p>
           </div>
         </div>
@@ -266,150 +275,19 @@ export default function PlaylistDetail({
             backgroundColor: dragOver ? 'rgba(34,197,94,0.05)' : 'transparent',
           }}
         >
-          {rows.length === 0 ? (
+          {trackTableRows.length === 0 ? (
             <p className="text-sm p-8 text-center" style={{ color: 'rgba(248,250,252,0.5)' }}>
               Chưa có bài nào — bấm &quot;Thêm bài hát&quot; hoặc kéo từ kho nhạc vào đây.
             </p>
           ) : (
-            <table className="w-full text-left">
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <th
-                    className="w-12 px-4 py-2 text-xs font-normal"
-                    style={{ color: 'rgba(248,250,252,0.5)' }}
-                  >
-                    #
-                  </th>
-                  <th
-                    className="px-2 py-2 text-xs font-normal"
-                    style={{ color: 'rgba(248,250,252,0.5)' }}
-                  >
-                    Tiêu đề
-                  </th>
-                  <th
-                    className="w-24 px-4 py-2 text-xs font-normal text-right"
-                    style={{ color: 'rgba(248,250,252,0.5)' }}
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="w-4 h-4 inline-block"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden="true"
-                    >
-                      <circle cx="12" cy="12" r="9" />
-                      <path strokeLinecap="round" d="M12 7v5l3 2" />
-                    </svg>
-                    <span className="sr-only">Thời lượng</span>
-                  </th>
-                  <th className="w-24 px-4 py-2" aria-label="Thao tác" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) => {
-                  const isCurrent = current?.id === row.trackId && isPlaying;
-
-                  return (
-                    <tr
-                      key={row.trackId}
-                      draggable
-                      onDragStart={() => setDragIndex(index)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => {
-                        e.stopPropagation();
-                        void handleReorderDrop(index);
-                      }}
-                      className="group cursor-grab active:cursor-grabbing transition-all duration-150 hover:brightness-125"
-                      style={{
-                        borderBottom: '1px solid var(--color-border)',
-                        opacity: dragIndex === index ? 0.5 : 1,
-                        backgroundColor: isCurrent ? 'rgba(34,197,94,0.08)' : 'transparent',
-                      }}
-                    >
-                      <td
-                        className="px-4 py-3 text-sm tabular-nums"
-                        style={{
-                          color: isCurrent ? 'var(--color-accent)' : 'rgba(248,250,252,0.5)',
-                        }}
-                      >
-                        {index + 1}
-                      </td>
-                      <td className="px-2 py-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <CoverArt seed={row.trackId} label={row.track.title} size={40} />
-                          <div className="min-w-0">
-                            <p
-                              className="text-sm font-medium truncate"
-                              style={{
-                                color: isCurrent
-                                  ? 'var(--color-accent)'
-                                  : 'var(--color-foreground)',
-                              }}
-                            >
-                              {row.track.title}
-                            </p>
-                            {row.track.artist && (
-                              <p
-                                className="text-xs truncate"
-                                style={{ color: 'rgba(248,250,252,0.5)' }}
-                              >
-                                {row.track.artist}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td
-                        className="px-4 py-3 text-sm text-right tabular-nums"
-                        style={{ color: 'rgba(248,250,252,0.5)' }}
-                      >
-                        {formatDuration(row.track.durationMs)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => void playFrom(index)}
-                            className="p-2 rounded cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
-                            style={{ color: 'var(--color-accent)' }}
-                            aria-label={`Phát ${row.track.title}`}
-                          >
-                            <svg
-                              viewBox="0 0 24 24"
-                              className="w-4 h-4"
-                              fill="currentColor"
-                              aria-hidden="true"
-                            >
-                              <path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86a1 1 0 00-1.5.86z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => void removeTrack(row.trackId, row.track.title)}
-                            className="p-2 rounded cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all duration-150 hover:brightness-110 focus-visible:outline-none"
-                            style={{ color: 'var(--color-destructive)' }}
-                            aria-label={`Xóa ${row.track.title}`}
-                          >
-                            <svg
-                              viewBox="0 0 24 24"
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <TrackTable
+              rows={trackTableRows}
+              showAddedAt
+              draggable
+              onReorder={(fromIndex, toIndex) => void handleReorder(fromIndex, toIndex)}
+              onPlay={(_row, index) => void playFrom(index)}
+              onRemove={(row) => void removeTrack(row.track.id, row.track.title)}
+            />
           )}
         </div>
       </div>

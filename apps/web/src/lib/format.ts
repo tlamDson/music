@@ -26,6 +26,39 @@ export function formatTotalDuration(ms: number | null | undefined): string {
   return `khoảng ${Math.round(minutes / 60)} giờ`;
 }
 
+/**
+ * Tổng thời lượng đúng kiểu Spotify cho header trang chi tiết playlist: "3 giờ
+ * 15 phút" — khác `formatTotalDuration` (áng chừng, dùng ở card) ở chỗ không
+ * làm tròn xuống giờ, giữ luôn số phút lẻ.
+ */
+export function formatTotalDurationExact(ms: number | null | undefined): string {
+  if (!ms || ms <= 0) return '0 phút';
+
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 60) return `${minutes} phút`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainderMinutes = minutes % 60;
+  return remainderMinutes === 0 ? `${hours} giờ` : `${hours} giờ ${remainderMinutes} phút`;
+}
+
+/**
+ * Ngày/tháng/năm cho cột "Ngày thêm" trong bảng track của playlist
+ * (`PlaylistTrack.addedAt`). Thiếu dữ liệu hoặc chuỗi ngày không hợp lệ → "--".
+ */
+export function formatAddedAt(iso: string | null | undefined): string {
+  if (!iso) return '--';
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '--';
+
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
 function toClock(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
