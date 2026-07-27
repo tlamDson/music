@@ -57,20 +57,32 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 
 **Quán (`Store`) là đơn vị phát.** Tầng `SyncGroup` đã bị bỏ (PR #54) vì trùng chức năng với quán — cùng với nó là toàn bộ khái niệm override / rejoin / `returnToGroupOnFinish`: không còn nhóm thì không có gì để tách ra hay quay về.
 
-| Thành phần | Vị trí                                                                                                        |
-| ---------- | ------------------------------------------------------------------------------------------------------------- |
-| Điều khiển | `POST /sync/stores/:id/play\|pause\|resume\|next\|stop` (ORG_ADMIN + STORE_ADMIN của chính quán)              |
-| Room WS    | `store:<id>`                                                                                                  |
-| State      | Redis `store:<id>:playback` (TTL 24h) + cột `status`/`currentTrackId`/`trackIndex`/`startedAtTs` trên `Store` |
+| Thành phần | Vị trí                                                                                                                                              |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Điều khiển | `POST /sync/stores/:id/play\|pause\|resume\|next\|previous\|stop` · `PATCH /sync/stores/:id/playback-mode` (ORG_ADMIN + STORE_ADMIN của chính quán) |
+| Room WS    | `store:<id>`                                                                                                                                        |
+| State      | Redis `store:<id>:playback` (TTL 24h) + cột `status`/`currentTrackId`/`trackIndex`/`startedAtTs` trên `Store`                                       |
 
-- **Chuyển bài do server lái**, không phải client. `startStoreTrack` hẹn `setTimeout` theo `track.durationMs`; hết playlist thì dừng hẳn (không loop). `onModuleInit` dựng lại timer sau restart theo thời lượng còn lại. Trước đây client bắt sự kiện `ended` rồi gọi `/next` — quán mở hai màn hình thì mỗi màn bắn một lệnh và nhạc nhảy cóc, còn không màn nào mở thì nhạc đứng im.
+- **Chuyển bài do server lái**, không phải client. `startStoreTrack` hẹn `setTimeout` theo `track.durationMs`; hết playlist thì dừng hẳn (không loop) trừ khi `repeat: 'ALL'`. `onModuleInit` dựng lại timer sau restart theo thời lượng còn lại. Trước đây client bắt sự kiện `ended` rồi gọi `/next` — quán mở hai màn hình thì mỗi màn bắn một lệnh và nhạc nhảy cóc, còn không màn nào mở thì nhạc đứng im.
 - **Giới hạn: timer nằm trong bộ nhớ process** → chỉ đúng khi chạy 1 instance backend. Scale nhiều instance phải chuyển sang khoá phân tán trên Redis.
 - `pauseStore` huỷ timer (nếu không nhạc đang dừng vẫn tự nhảy bài) và gộp thời gian đã trôi vào `positionMs` để hydrate lúc đang dừng đọc đúng vị trí.
 - Track có `durationMs = 0` (upload trước khi web biết đo thời lượng) → không auto-next được, UI hiện `--:--`.
-- WS event: `store-now-playing` / `store-paused` / `store-stopped`. Client join `join-store`.
-- Payload `store-now-playing` **kèm `track: WsTrackMeta` ({id,title,artist,durationMs})** để client dựng thanh phát mà không phải gọi thêm API — đừng chỉ gửi `trackId`.
-- **Broadcast WS không replay khi join room.** Client mở trang sau lúc admin bấm phát phải gọi `GET /sync/stores/:id/now-playing` để hydrate — trả `NowPlayingSnapshot` với `positionMs` đã bù thời gian trôi. Thiếu bước này thì trang trắng tới lần chuyển bài kế.
+- WS event: `store-now-playing` / `store-paused` / `store-stopped` / `store-mode-changed`. Client join `join-store`.
+- Payload `store-now-playing` **kèm `track: WsTrackMeta` ({id,title,artist,durationMs})** cùng `repeat`/`shuffle` để client dựng thanh phát mà không phải gọi thêm API — đừng chỉ gửi `trackId`.
+- **Broadcast WS không replay khi join room.** Client mở trang sau lúc admin bấm phát phải gọi `GET /sync/stores/:id/now-playing` để hydrate — trả `NowPlayingSnapshot` (`playlistId` + `repeat`/`shuffle` + `positionMs` đã bù thời gian trôi). Thiếu bước này thì trang trắng tới lần chuyển bài kế.
 - `SyncGateway.countStoreClients(storeId)` đếm client trong room `store:<id>` = số màn hình đang thực sự nghe. Trang chi tiết quán và `/sync/overview` hiện con số này để admin biết bấm phát xong có ai nghe không.
+
+### Lặp lại / phát ngẫu nhiên / bài trước (PR #2 nâng cấp phát nhạc)
+
+`StorePlaybackState` (`packages/shared/src/types/index.ts`) thêm ba field:
+
+- `order: number[]` — hoán vị chỉ số vào `trackIds`. **`trackIds` luôn giữ đúng thứ tự playlist gốc**, `trackIndex` là vị trí trong `order` chứ không phải chỉ số trực tiếp vào `trackIds`. Tắt shuffle chỉ cần đặt `order` về `[0..n)` là quay lại thứ tự gốc ngay, không phải gọi lại DB. `SyncService.trackIdAt(playback, pos)` là nơi duy nhất tra `trackIds[order[pos]]` — mọi chỗ đọc "bài ở vị trí X" trong service đều phải qua đây, không suy ra thẳng bằng `trackIds[trackIndex]`.
+- `repeat: 'OFF' | 'ALL' | 'ONE'` — chỉ ảnh hưởng **auto-next** trong `advance()` (timer server): `ONE` phát lại đúng bài, `ALL` hết hàng chờ quay về đầu (xáo lại `order` nếu đang shuffle), `OFF` dừng hẳn như cũ. Bấm nút "next" thủ công (`nextStore`) **không** áp dụng lặp — luôn đi bài kế thật, dừng ở cuối hàng chờ bất kể `repeat`.
+- `shuffle: boolean` — bật giữa chừng (`setPlaybackMode`) xáo lại `order` nhưng **đặt bài đang phát lên vị trí đầu** rồi `trackIndex = 0`, nhạc đang chạy không nhảy ngang. Tắt shuffle thì `order` về `[0..n)`, `trackIndex` trỏ lại đúng vị trí gốc của bài đang phát.
+
+`POST /sync/stores/:id/previous` giống Spotify: đã phát > 3s thì tua về đầu bài hiện tại, chưa tới 3s thì lùi một bậc trong `order`; đang ở bài đầu thì `ALL` nhảy về bài cuối, còn lại tua về đầu bài đó. `PATCH /sync/stores/:id/playback-mode` (`{ repeat?, shuffle? }`, cả hai optional) đổi mode **không làm gián đoạn nhạc** — chỉ ghi lại state + broadcast `store-mode-changed`, không gọi `startStoreTrack`.
+
+**Tương thích ngược bắt buộc:** state cũ trong Redis (ghi trước PR này) không có `order`/`repeat`/`shuffle`. Chuẩn hoá **một chỗ duy nhất** trong `RedisService.getStorePlayback` — thiếu thì mặc định `order = trackIds.map((_, i) => i)`, `repeat: 'OFF'`, `shuffle: false`. `SyncService` không rải `??` phòng thủ ở nơi khác, vì mọi state đọc ra từ đây đã được đảm bảo đủ field.
 
 ### Frontend
 
@@ -85,14 +97,14 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 
 ## Bản đồ API (`/api/v1`)
 
-| Nhóm     | Endpoint chính                                                                                                                                                                                     |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Auth     | `POST /auth/login`, `/auth/refresh`                                                                                                                                                                |
-| Quán     | `POST /sync/stores/:id/play\|pause\|resume\|next\|stop` · `GET /sync/stores/:id/playback\|now-playing` · `GET /sync/overview` (ORG_ADMIN) · `GET /stores/:id` (chi tiết + đang phát + số màn hình) |
-| Playlist | `GET /playlists?scope=&q=&sort=` (trả kèm `totalDurationMs`) · CRUD `/playlists/:id` · `/playlists/:id/tracks[/reorder]`                                                                           |
-| Folder   | `GET                                                                                                                                                                                               | POST                                                                                         | DELETE /folders`— **không phải**`/playlists/folders`, tách controller riêng để `@Get(':id')` không nuốt route |
-| Track    | `GET                                                                                                                                                                                               | POST /tracks`(multipart kèm`durationMs`) · `GET /tracks/:id/stream-url`·`DELETE /tracks/:id` |
-| Khác     | `/stores`, `/users`, `/schedules`, `/health`, `/health/ready`                                                                                                                                      |
+| Nhóm     | Endpoint chính                                                                                                                                                                                                                                        |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Auth     | `POST /auth/login`, `/auth/refresh`                                                                                                                                                                                                                   |
+| Quán     | `POST /sync/stores/:id/play\|pause\|resume\|next\|previous\|stop` · `PATCH /sync/stores/:id/playback-mode` · `GET /sync/stores/:id/playback\|now-playing` · `GET /sync/overview` (ORG_ADMIN) · `GET /stores/:id` (chi tiết + đang phát + số màn hình) |
+| Playlist | `GET /playlists?scope=&q=&sort=` (trả kèm `totalDurationMs`) · CRUD `/playlists/:id` · `/playlists/:id/tracks[/reorder]`                                                                                                                              |
+| Folder   | `GET                                                                                                                                                                                                                                                  | POST                                                                                         | DELETE /folders`— **không phải**`/playlists/folders`, tách controller riêng để `@Get(':id')` không nuốt route |
+| Track    | `GET                                                                                                                                                                                                                                                  | POST /tracks`(multipart kèm`durationMs`) · `GET /tracks/:id/stream-url`·`DELETE /tracks/:id` |
+| Khác     | `/stores`, `/users`, `/schedules`, `/health`, `/health/ready`                                                                                                                                                                                         |
 
 ## Frontend — quy ước dùng chung
 
@@ -133,6 +145,8 @@ Vercel (web) · Railway (backend + Postgres + Redis) · Cloudflare R2 (track). T
 - **`next dev` có thể kẹt ở build cũ sau khi pull code mới** (chunk 404, MIME type sai khi load `.js`/`.css`) — dừng tiến trình `next dev` (lọc `CommandLine` chứa `next` + `dev`), `rm -rf apps/web/.next`, chạy lại `pnpm dev`.
 - **Sau khi merge PR + `git checkout develop && git pull`, tạo nhánh mới NGAY trước khi sửa code tiếp** — dễ quên bước này giữa chuỗi nhiều PR liên tiếp và lỡ commit thẳng vào `develop`. Nếu lỡ commit mà CHƯA push (`git status` báo "ahead of origin"), sửa an toàn: `git branch <ten-nhanh-moi>` (giữ commit lại) → `git reset --hard origin/develop` (đưa `develop` local về đúng remote) → `git checkout <ten-nhanh-moi>`.
 - **`railway ssh` trên Windows Git Bash âm thầm không chạy lệnh thật** — Git Bash tự dịch path Unix (`/app/...`) thành path Windows (set `MSYS_NO_PATHCONV=1` để tắt), và `railway ssh -- sh -c "..."` (nhiều tham số riêng) bị CLI nối lại làm mất ranh giới `-c`, remote chỉ chạy đúng từ đầu rồi thoát exit 0 không output. Gộp remote command thành **một chuỗi duy nhất** sau `--`, tránh khoảng trắng trong giá trị biến. Chi tiết đầy đủ + ví dụ ở [docs/PRODUCTION_READINESS.md](../../docs/PRODUCTION_READINESS.md) cạm bẫy #14.
+- **`jest` chạy trong worktree agent nằm dưới thư mục `.claude/worktrees/<id>` báo "No tests found" cho MỌI file, kể cả file không đổi gì** — bug của `jest-util`'s `replacePathSepForGlob`: khi rootDir tuyệt đối chứa một segment bắt đầu bằng dấu chấm (`.claude`), hàm né không đổi đúng một dấu `\` (cái đứng ngay trước `.`) từ backslash sang forward-slash vì tưởng đó là ký tự escape glob, sinh ra pattern lẫn lộn dấu phân cách không khớp được path thật. Không sửa được bằng cách đổi `jest.config.ts` (rootDir tuyệt đối vẫn luôn chứa `.claude`) hay dùng NTFS junction trỏ ra ngoài (Jest gọi `realpath` nên vẫn ra lại path thật). Cách né duy nhất: copy toàn bộ working tree (trừ `node_modules`, `.git`) ra một path KHÔNG có thư mục nào bắt đầu bằng dấu chấm (vd `D:\some-clean-path`), `pnpm install` + `pnpm --filter @cafe-music/shared build` + `pnpm --filter @cafe-music/backend exec prisma generate` lại trong bản copy đó rồi chạy test ở đó. Nhớ dọn thư mục copy sau khi xong — **và luôn dùng ổ đĩa còn nhiều dung lượng trống** (từng làm ổ `C:` cạn sạch chỉ còn vài trăm KB khi copy + cài đặt vào một ổ gần đầy).
+- **`eslint`/`tsc` báo hàng loạt `no-unsafe-member-access`/`Cannot find module '@cafe-music/shared'` dù code không sai** — do `@prisma/client` chưa được generate (cần `pnpm --filter @cafe-music/backend exec prisma generate`) hoặc `packages/shared` chưa build (`pnpm --filter @cafe-music/shared build`, vì `main`/`types` trỏ vào `dist/`). Thấy lỗi type lan ra cả những file không liên quan tới thay đổi của mình thì kiểm tra hai bước này trước khi nghi ngờ code.
 
 ## Yêu cầu tối thiểu
 

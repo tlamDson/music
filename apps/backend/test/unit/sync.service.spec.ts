@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { PrismaClient } from '@prisma/client';
@@ -7,6 +8,20 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { RedisService } from '../../src/modules/sync/redis.service';
 import { SyncGateway } from '../../src/modules/sync/sync.gateway';
 import { S3Service } from '../../src/modules/tracks/s3.service';
+import type { StoreRepeatMode } from '@cafe-music/shared';
+
+// Chỉ để dựng một RedisService THẬT (không mock toàn bộ) cho case tương thích
+// ngược với state cũ — không cần kết nối Redis thật vì thay `client` bằng
+// stub ngay sau khi tạo, giống kỹ thuật ở redis.service.spec.ts.
+jest.mock('ioredis', () => ({
+  __esModule: true,
+  default: class MockRedis {
+    setex = jest.fn();
+    get = jest.fn();
+    del = jest.fn();
+    quit = jest.fn();
+  },
+}));
 
 describe('SyncService', () => {
   let service: SyncService;
@@ -67,15 +82,31 @@ describe('SyncService', () => {
     ],
   };
 
-  /** Hàng chờ 2 bài của quán, đang ở bài thứ `trackIndex`. */
-  const playbackAt = (trackIndex: number, isPlaying = true) => ({
+  /**
+   * Hàng chờ 2 bài của quán, đang ở bài thứ `trackIndex`. Mặc định
+   * `order: [0, 1]` (đúng thứ tự playlist), `repeat: 'OFF'`, `shuffle: false`
+   * — override khi test cần state khác, y hệt shape `RedisService` chuẩn hoá
+   * trả về trong thực tế.
+   */
+  const playbackAt = (
+    trackIndex: number,
+    isPlaying = true,
+    overrides: Partial<{
+      order: number[];
+      repeat: StoreRepeatMode;
+      shuffle: boolean;
+    }> = {},
+  ) => ({
     storeId: 'store-1',
     playlistId: 'playlist-1',
     trackIds: [trackA.id, trackB.id],
+    order: overrides.order ?? [0, 1],
     trackIndex,
     positionMs: 0,
     startedAtServerTs: Date.now(),
     isPlaying,
+    repeat: overrides.repeat ?? 'OFF',
+    shuffle: overrides.shuffle ?? false,
   });
 
   beforeEach(async () => {
@@ -543,6 +574,272 @@ describe('SyncService', () => {
       redis.getStorePlayback.mockResolvedValue(null);
 
       await expect(service.onModuleInit()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('repeat', () => {
+    it('ONE: hết bài phát lại chính nó, không sang bài kế', async () => {
+      jest.useFakeTimers();
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as never);
+
+      await service.playStore(
+        'store-1',
+        { playlistId: 'playlist-1', trackIndex: 0 },
+        orgAdminUser,
+      );
+
+      redis.getStorePlayback.mockResolvedValue(
+        playbackAt(0, true, { repeat: 'ONE' }) as never,
+      );
+      prisma.track.findFirst.mockResolvedValue(trackA as never);
+      gateway.broadcastToStore.mockClear();
+
+      await jest.advanceTimersByTimeAsync(trackA.durationMs + 10);
+
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({
+          trackId: trackA.id,
+          queue: { index: 0, total: 2, remaining: 1 },
+        }),
+      );
+    });
+
+    it('ALL: hết queue quay về đầu thay vì dừng', async () => {
+      jest.useFakeTimers();
+      prisma.playlist.findFirst.mockResolvedValue(mockPlaylist as never);
+
+      await service.playStore(
+        'store-1',
+        { playlistId: 'playlist-1', trackIndex: 1 },
+        orgAdminUser,
+      );
+
+      redis.getStorePlayback.mockResolvedValue(
+        playbackAt(1, true, { repeat: 'ALL' }) as never,
+      );
+      prisma.track.findFirst.mockResolvedValue(trackA as never);
+      gateway.broadcastToStore.mockClear();
+
+      await jest.advanceTimersByTimeAsync(trackB.durationMs + 10);
+
+      expect(redis.clearStorePlayback).not.toHaveBeenCalled();
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({
+          trackId: trackA.id,
+          queue: { index: 0, total: 2, remaining: 1 },
+        }),
+      );
+    });
+
+    // Test sẵn có "dừng hẳn sau bài cuối, không lặp lại playlist" (repeat mặc
+    // định OFF) đứng riêng phía trên vẫn phải xanh — đây chính là hành vi mặc
+    // định khi không truyền repeat.
+  });
+
+  describe('shuffle', () => {
+    it('bật giữa chừng: bài đang phát nằm đầu order mới, order vẫn là hoán vị đủ mọi chỉ số', async () => {
+      redis.getStorePlayback.mockResolvedValue(playbackAt(1) as never);
+
+      const result = await service.setPlaybackMode(
+        'store-1',
+        { shuffle: true },
+        orgAdminUser,
+      );
+
+      expect(result.shuffle).toBe(true);
+      // Đang ở order[1] = 1 (trackB) trước khi bật shuffle → phải đứng đầu order mới.
+      expect(result.order[0]).toBe(1);
+      expect(result.trackIndex).toBe(0);
+      expect([...result.order].sort()).toEqual([0, 1]);
+      expect(redis.setStorePlayback).toHaveBeenCalledWith(
+        'store-1',
+        expect.objectContaining({ shuffle: true }),
+      );
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-mode-changed',
+        { storeId: 'store-1', repeat: 'OFF', shuffle: true },
+      );
+    });
+
+    it('tắt shuffle: quay về đúng thứ tự playlist gốc', async () => {
+      redis.getStorePlayback.mockResolvedValue(
+        playbackAt(0, true, { order: [1, 0], shuffle: true }) as never,
+      );
+
+      const result = await service.setPlaybackMode(
+        'store-1',
+        { shuffle: false },
+        orgAdminUser,
+      );
+
+      expect(result.shuffle).toBe(false);
+      expect(result.order).toEqual([0, 1]);
+      // order[0] trước đó (=1, trackB) phải vẫn là bài đang phát sau khi tắt shuffle.
+      expect(result.trackIndex).toBe(1);
+    });
+
+    it('đổi mode không làm gián đoạn nhạc — không gọi lại startStoreTrack/broadcast store-now-playing', async () => {
+      redis.getStorePlayback.mockResolvedValue(playbackAt(0) as never);
+      gateway.broadcastToStore.mockClear();
+
+      await service.setPlaybackMode('store-1', { repeat: 'ALL' }, orgAdminUser);
+
+      expect(gateway.broadcastToStore).not.toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.anything(),
+      );
+    });
+
+    it('chặn store admin quán khác đổi mode', async () => {
+      await expect(
+        service.setPlaybackMode('store-2', { shuffle: true }, storeAdminUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('previousStore', () => {
+    it('đã phát quá 3s thì tua về đầu bài hiện tại', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        ...playbackAt(1),
+        positionMs: 0,
+        startedAtServerTs: Date.now() - 5_000,
+      } as never);
+      prisma.track.findFirst.mockResolvedValue(trackB as never);
+
+      const result = await service.previousStore('store-1', orgAdminUser);
+
+      expect(result.trackIndex).toBe(1);
+      expect(result.positionMs).toBe(0);
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({ trackId: trackB.id }),
+      );
+    });
+
+    it('mới phát dưới 3s thì lùi một bài', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        ...playbackAt(1),
+        positionMs: 0,
+        startedAtServerTs: Date.now() - 1_000,
+      } as never);
+      prisma.track.findFirst.mockResolvedValue(trackA as never);
+
+      const result = await service.previousStore('store-1', orgAdminUser);
+
+      expect(result.trackIndex).toBe(0);
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({ trackId: trackA.id }),
+      );
+    });
+
+    it('ở bài đầu mà repeat OFF thì tua về đầu bài đó', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        ...playbackAt(0),
+        positionMs: 0,
+        startedAtServerTs: Date.now() - 1_000,
+      } as never);
+      prisma.track.findFirst.mockResolvedValue(trackA as never);
+
+      const result = await service.previousStore('store-1', orgAdminUser);
+
+      expect(result.trackIndex).toBe(0);
+      expect(result.positionMs).toBe(0);
+    });
+
+    it('ở bài đầu mà repeat ALL thì nhảy về bài cuối', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        ...playbackAt(0, true, { repeat: 'ALL' }),
+        positionMs: 0,
+        startedAtServerTs: Date.now() - 1_000,
+      } as never);
+      prisma.track.findFirst.mockResolvedValue(trackB as never);
+
+      const result = await service.previousStore('store-1', orgAdminUser);
+
+      expect(result.trackIndex).toBe(1);
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({ trackId: trackB.id }),
+      );
+    });
+
+    it('báo lỗi khi quán không phát gì', async () => {
+      redis.getStorePlayback.mockResolvedValue(null);
+
+      await expect(
+        service.previousStore('store-1', orgAdminUser),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('chặn store admin quán khác gọi previous', async () => {
+      await expect(
+        service.previousStore('store-2', storeAdminUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('tương thích ngược với state Redis cũ', () => {
+    // State cũ (ghi trước khi thêm repeat/shuffle/order) không có cả ba field
+    // này. RedisService chuẩn hoá đúng một chỗ — ở đây dựng một RedisService
+    // THẬT (chỉ thay `client` bằng stub, không kết nối Redis thật) để xác
+    // nhận SyncService chạy được xuyên suốt qua tầng đó, không phải qua mock
+    // đã tự bịa sẵn field.
+    it('vẫn nhảy bài đúng khi Redis trả JSON thiếu order/repeat/shuffle', async () => {
+      const realRedis = new RedisService({
+        get: jest.fn().mockReturnValue(undefined),
+      } as unknown as ConfigService);
+      const fakeClient = (
+        realRedis as unknown as { client: { get: jest.Mock } }
+      ).client;
+
+      const legacyState = {
+        storeId: 'store-1',
+        playlistId: 'playlist-1',
+        trackIds: [trackA.id, trackB.id],
+        trackIndex: 0,
+        positionMs: 0,
+        startedAtServerTs: Date.now(),
+        isPlaying: true,
+      };
+      fakeClient.get.mockResolvedValue(JSON.stringify(legacyState));
+
+      const s3Stub = {
+        getPresignedUrl: jest.fn().mockResolvedValue('https://s3/x.mp3'),
+      } as unknown as S3Service;
+      const legacyAwareService = new SyncService(
+        prisma as unknown as PrismaService,
+        realRedis,
+        gateway,
+        s3Stub,
+      );
+
+      prisma.track.findFirst.mockResolvedValue(trackB as never);
+
+      const result = await legacyAwareService.nextStore(
+        'store-1',
+        orgAdminUser,
+      );
+
+      expect(result.finished).toBe(false);
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({
+          trackId: trackB.id,
+          repeat: 'OFF',
+          shuffle: false,
+        }),
+      );
     });
   });
 });

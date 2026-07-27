@@ -29,9 +29,24 @@ export class RedisService {
     );
   }
 
+  /**
+   * State cũ trong Redis (TTL 24h) được ghi trước khi thêm repeat/shuffle/order
+   * nên có thể thiếu cả ba field — chuẩn hoá đúng một chỗ ở đây, đừng rải `??`
+   * khắp `SyncService`.
+   */
   async getStorePlayback(storeId: string): Promise<StorePlaybackState | null> {
     const data = await this.client.get(`store:${storeId}:playback`);
-    return data ? (JSON.parse(data) as StorePlaybackState) : null;
+    if (!data) return null;
+
+    const parsed = JSON.parse(data) as Partial<StorePlaybackState> &
+      Pick<StorePlaybackState, 'trackIds' | 'trackIndex'>;
+
+    return {
+      ...parsed,
+      order: parsed.order ?? parsed.trackIds.map((_, i) => i),
+      repeat: parsed.repeat ?? 'OFF',
+      shuffle: parsed.shuffle ?? false,
+    } as StorePlaybackState;
   }
 
   async clearStorePlayback(storeId: string): Promise<void> {
