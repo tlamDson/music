@@ -11,8 +11,8 @@ const mockApiGet = api.get as jest.Mock;
 
 // useSync giờ đẩy nhạc vào PlayerProvider thay vì tự lái thẻ audio
 const playTrack = jest.fn();
-const pause = jest.fn();
-const stop = jest.fn();
+const pauseStore = jest.fn();
+const stopStore = jest.fn();
 const setPlaybackMode = jest.fn();
 jest.mock('../../src/components/player/PlayerProvider', () => ({
   usePlayer: jest.fn(),
@@ -48,7 +48,7 @@ describe('useSync hook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSocket.on.mockImplementation(jest.fn());
-    mockUsePlayer.mockReturnValue({ playTrack, pause, stop, setPlaybackMode });
+    mockUsePlayer.mockReturnValue({ playTrack, pauseStore, stopStore, setPlaybackMode });
     mockApiGet.mockResolvedValue({ storeId: 'store-1', syncGroupId: 'group-1' });
   });
 
@@ -139,7 +139,7 @@ describe('useSync hook', () => {
       listeners['store-paused']?.({ storeId: 'store-1', serverTs: Date.now() });
     });
 
-    expect(pause).toHaveBeenCalled();
+    expect(pauseStore).toHaveBeenCalledWith('store-1');
   });
 
   it('stops the player when a store-stopped event arrives', async () => {
@@ -149,7 +149,48 @@ describe('useSync hook', () => {
       listeners['store-stopped']?.({ storeId: 'store-1', serverTs: Date.now() });
     });
 
-    expect(stop).toHaveBeenCalled();
+    expect(stopStore).toHaveBeenCalledWith('store-1');
+  });
+
+  // Bug QC: một tab từng giữ socket của mọi quán và cả 3 handler đều không lọc
+  // `storeId` — quán khác đổi bài/tạm dừng/dừng hẳn là cướp luôn thẻ audio dùng
+  // chung. Mọi event không phải của quán này phải bị bỏ qua hoàn toàn.
+  it('ignores every event belonging to a different store', async () => {
+    const listeners = connectWith();
+
+    await act(async () => {
+      listeners['store-now-playing']?.({
+        storeId: 'store-2',
+        trackId: 'track-9',
+        track: { id: 'track-9', title: 'Bài của quán khác', artist: null, durationMs: 120_000 },
+        trackUrl: 'https://s3/other.mp3',
+        positionMs: 0,
+        serverTs: Date.now(),
+        queue: { index: 0, total: 5, remaining: 4 },
+        repeat: 'ALL',
+        shuffle: true,
+      });
+      listeners['store-paused']?.({ storeId: 'store-2', serverTs: Date.now() });
+      listeners['store-stopped']?.({ storeId: 'store-2', serverTs: Date.now() });
+      listeners['store-mode-changed']?.({ storeId: 'store-2', repeat: 'ONE', shuffle: true });
+    });
+
+    expect(playTrack).not.toHaveBeenCalled();
+    expect(pauseStore).not.toHaveBeenCalled();
+    expect(stopStore).not.toHaveBeenCalled();
+    expect(setPlaybackMode).not.toHaveBeenCalled();
+  });
+
+  // Rời quán (đổi quán đang xem, rời trang, đăng xuất) thì thẻ audio phải im —
+  // nếu không thanh phát vẫn chạy nhạc quán vừa rời và nút "Bài kế tiếp" trên đó
+  // lại bắn lệnh vào chính quán đó.
+  it('stops that store when the hook unmounts', () => {
+    const { unmount } = renderHook(() => useSync({ storeId: 'store-1', token: 'test-token' }));
+
+    unmount();
+
+    expect(mockSocket.disconnect).toHaveBeenCalled();
+    expect(stopStore).toHaveBeenCalledWith('store-1');
   });
 
   // clockOffset đổi liên tục sau khi đo — không được kéo socket dựng lại, nếu

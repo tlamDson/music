@@ -11,8 +11,8 @@ const mockApiGet = api.get as jest.Mock;
 // useSync đẩy nhạc vào PlayerProvider — mock provider để test tập trung vào
 // chuyện "event WS có tới được player hay không".
 const playTrack = jest.fn();
-const pause = jest.fn();
-const stop = jest.fn();
+const pauseStore = jest.fn();
+const stopStore = jest.fn();
 const setPlaybackMode = jest.fn();
 jest.mock('../../src/components/player/PlayerProvider', () => ({
   usePlayer: jest.fn(),
@@ -75,7 +75,7 @@ describe('StoreSyncProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSocket.on.mockImplementation(jest.fn());
-    mockUsePlayer.mockReturnValue({ playTrack, pause, stop, setPlaybackMode });
+    mockUsePlayer.mockReturnValue({ playTrack, pauseStore, stopStore, setPlaybackMode });
     mockApiGet.mockResolvedValue({ storeId: 'store-1', syncGroupId: null });
     localStorage.setItem('accessToken', 'test-token');
   });

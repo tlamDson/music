@@ -5,6 +5,7 @@ import { io, Socket } from 'socket.io-client';
 import type {
   WsStoreNowPlayingPayload,
   WsStoreModeChangedPayload,
+  WsStoreStatePayload,
   NowPlayingSnapshot,
   StoreRepeatMode,
 } from '@cafe-music/shared';
@@ -48,7 +49,7 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
   const [repeat, setRepeat] = useState<StoreRepeatMode>('OFF');
   const [shuffle, setShuffle] = useState(false);
 
-  const { playTrack, pause, stop, setPlaybackMode } = usePlayer();
+  const { playTrack, pauseStore, stopStore, setPlaybackMode } = usePlayer();
 
   // Giữ những giá trị hay đổi trong ref để effect socket chỉ phụ thuộc
   // token/storeId — nếu không `clockOffset` đổi sau mỗi lần đo đồng hồ sẽ kéo
@@ -57,19 +58,25 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
   clockOffsetRef.current = clockOffset;
   const playTrackRef = useRef(playTrack);
   playTrackRef.current = playTrack;
-  const pauseRef = useRef(pause);
-  pauseRef.current = pause;
-  const stopRef = useRef(stop);
-  stopRef.current = stop;
+  const pauseStoreRef = useRef(pauseStore);
+  pauseStoreRef.current = pauseStore;
+  const stopStoreRef = useRef(stopStore);
+  stopStoreRef.current = stopStore;
   const setPlaybackModeRef = useRef(setPlaybackMode);
   setPlaybackModeRef.current = setPlaybackMode;
 
   const playStoreTrack = useCallback(
     (payload: WsStoreNowPlayingPayload) => {
+      // Một tab có thể giữ socket của nhiều quán (dashboard trước đây mở một
+      // socket cho mỗi quán). Event của quán khác lọt vào đây thì nó ghi đè
+      // hàng chờ + cướp thẻ audio dùng chung — đúng bug QC "store admin đổi bài
+      // làm cả chuỗi đổi theo". Bỏ qua mọi payload không phải của quán này.
+      if (!storeId || payload.storeId !== storeId) return;
+
       setStoreQueue(payload.queue);
       setRepeat(payload.repeat);
       setShuffle(payload.shuffle);
-      if (!payload.trackUrl || !storeId) return;
+      if (!payload.trackUrl) return;
 
       const serverNow = Date.now() + clockOffsetRef.current;
       const elapsedMs = payload.positionMs + (serverNow - payload.serverTs);
@@ -148,9 +155,17 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
     socket.on('disconnect', () => setIsConnected(false));
 
     socket.on('store-now-playing', (payload: WsStoreNowPlayingPayload) => playStoreTrack(payload));
-    socket.on('store-paused', () => pauseRef.current());
-    socket.on('store-stopped', () => {
-      stopRef.current();
+    // `store-paused`/`store-stopped` từng bỏ payload đi hoàn toàn nên event của
+    // quán khác cũng dừng được nhạc đang phát trong tab này. Lọc theo `storeId`
+    // và chỉ dừng qua `pauseStore`/`stopStore` (tự no-op nếu thẻ audio đang phát
+    // nhạc của quán khác).
+    socket.on('store-paused', (payload: WsStoreStatePayload) => {
+      if (payload?.storeId !== storeId) return;
+      pauseStoreRef.current(storeId);
+    });
+    socket.on('store-stopped', (payload: WsStoreStatePayload) => {
+      if (payload?.storeId !== storeId) return;
+      stopStoreRef.current(storeId);
       setStoreQueue(null);
       setPlaylistId(null);
       setRepeat('OFF');
@@ -159,6 +174,7 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
     // Đổi repeat/shuffle không làm gián đoạn nhạc đang phát — broadcast riêng
     // (khác `store-now-playing`) để không phải reload cả track chỉ vì đổi mode.
     socket.on('store-mode-changed', (payload: WsStoreModeChangedPayload) => {
+      if (payload.storeId !== storeId) return;
       setRepeat(payload.repeat);
       setShuffle(payload.shuffle);
       setPlaybackModeRef.current({ repeat: payload.repeat, shuffle: payload.shuffle });
@@ -166,6 +182,10 @@ export function useSync({ storeId, token, clockOffset = 0 }: UseSyncOptions): Sy
 
     return () => {
       socket.disconnect();
+      // Rời quán này (đổi sang quán khác, rời trang chi tiết, đăng xuất) thì
+      // thẻ audio phải im theo. Nếu không, thanh phát vẫn chạy nhạc của quán vừa
+      // rời và nút "Bài kế tiếp" trên đó lại bắn lệnh vào quán đó.
+      stopStoreRef.current(storeId);
     };
   }, [token, storeId, hydrate, playStoreTrack]);
 

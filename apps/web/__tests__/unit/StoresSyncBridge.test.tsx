@@ -1,5 +1,8 @@
 import { render, screen, act, waitFor } from '@testing-library/react';
-import StoresSyncBridge, { useStoresSync } from '../../src/components/sync/StoresSyncBridge';
+import StoresSyncBridge, {
+  useStoresSync,
+  focusedStoreIdFrom,
+} from '../../src/components/sync/StoresSyncBridge';
 import { usePlayer } from '../../src/components/player/PlayerProvider';
 import { api } from '../../src/lib/api-client';
 
@@ -8,17 +11,20 @@ jest.mock('../../src/lib/api-client', () => ({
 }));
 const mockApiGet = api.get as jest.Mock;
 
+let mockPathname = '/dashboard';
+jest.mock('next/navigation', () => ({
+  usePathname: () => mockPathname,
+}));
+
 const playTrack = jest.fn();
-const pause = jest.fn();
-const stop = jest.fn();
+const pauseStore = jest.fn();
+const stopStore = jest.fn();
 const setPlaybackMode = jest.fn();
 jest.mock('../../src/components/player/PlayerProvider', () => ({
   usePlayer: jest.fn(),
 }));
 const mockUsePlayer = usePlayer as jest.Mock;
 
-// Một socket giả cho mỗi lần `io(...)` được gọi — mỗi quán có socket riêng,
-// giữ trong danh sách theo thứ tự tạo để test lấy ra đúng listener của quán nào.
 const mockSockets: Array<{
   on: jest.Mock;
   off: jest.Mock;
@@ -82,11 +88,27 @@ function ReadStoreSync({ storeId }: { storeId: string }) {
   );
 }
 
+function nowPlayingSnapshot(storeId: string, playlistId: string) {
+  return {
+    storeId,
+    playlistId,
+    track: { id: `track-${storeId}`, title: storeId, artist: null, durationMs: 100_000 },
+    trackUrl: `https://s3/${storeId}.mp3`,
+    positionMs: 0,
+    serverTs: Date.now(),
+    isPlaying: true,
+    queue: { index: 0, total: 1, remaining: 0 },
+    repeat: 'OFF',
+    shuffle: false,
+  };
+}
+
 describe('StoresSyncBridge / useStoresSync', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSockets.length = 0;
-    mockUsePlayer.mockReturnValue({ playTrack, pause, stop, setPlaybackMode });
+    mockPathname = '/dashboard';
+    mockUsePlayer.mockReturnValue({ playTrack, pauseStore, stopStore, setPlaybackMode });
     localStorage.setItem('accessToken', 'test-token');
   });
 
@@ -94,8 +116,18 @@ describe('StoresSyncBridge / useStoresSync', () => {
     localStorage.clear();
   });
 
+  describe('focusedStoreIdFrom', () => {
+    it('chỉ nhận trang chi tiết quán, không nhận trang danh sách', () => {
+      expect(focusedStoreIdFrom('/dashboard/stores/store-1')).toBe('store-1');
+      expect(focusedStoreIdFrom('/dashboard/stores/store-1/anything')).toBe('store-1');
+      expect(focusedStoreIdFrom('/dashboard/stores')).toBeNull();
+      expect(focusedStoreIdFrom('/dashboard')).toBeNull();
+      expect(focusedStoreIdFrom('/dashboard/playlists')).toBeNull();
+      expect(focusedStoreIdFrom(null)).toBeNull();
+    });
+  });
+
   it('trả về trạng thái mặc định khi quán chưa có socket nào báo cáo', () => {
-    mockApiGet.mockResolvedValue({ data: [] });
     render(<ReadStoreSync storeId="store-1" />);
 
     expect(screen.getByText('offline')).toBeInTheDocument();
@@ -103,74 +135,43 @@ describe('StoresSyncBridge / useStoresSync', () => {
     expect(screen.getByText('no-playlist')).toBeInTheDocument();
   });
 
-  it('cập nhật trạng thái đúng quán khi bridge mở nhiều socket cùng lúc', async () => {
-    mockApiGet.mockImplementation((path: string) => {
-      if (path === '/stores') {
-        return Promise.resolve({ data: [{ id: 'store-1' }, { id: 'store-2' }] });
-      }
-      return Promise.resolve(null);
-    });
+  // Bug QC: bridge từng fetch `GET /stores` rồi mở một socket cho MỌI quán, tất
+  // cả đổ vào một thẻ audio dùng chung — store admin đổi bài ở quán mình làm tab
+  // org admin nhảy theo.
+  it('không mở socket nào ở các trang dashboard không phải chi tiết quán', async () => {
+    mockPathname = '/dashboard';
+    render(<StoresSyncBridge />);
 
-    render(
-      <>
-        <StoresSyncBridge />
-        <ReadStoreSync storeId="store-1" />
-        <ReadStoreSync storeId="store-2" />
-      </>,
-    );
-
-    await waitFor(() => expect(mockSockets).toHaveLength(2));
-
-    await act(async () => {
-      mockSockets[0].listeners['connect']?.();
-    });
-    await act(async () => {
-      mockSockets[0].listeners['store-now-playing']?.(nowPlayingPayload('store-1', 3));
-    });
-
-    await waitFor(() => expect(screen.getByText('remaining:3')).toBeInTheDocument());
-
-    // Quán 2 chưa nhận gì — không bị lây trạng thái từ quán 1.
-    const store2Section = screen.getAllByText('no-queue');
-    expect(store2Section.length).toBeGreaterThan(0);
+    await waitFor(() => expect(measureOffset).toHaveBeenCalled());
+    expect(mockSockets).toHaveLength(0);
+    expect(mockApiGet).not.toHaveBeenCalledWith('/stores');
   });
 
-  it('không lẫn playlistId giữa hai quán khác nhau', async () => {
-    mockApiGet.mockImplementation((path: string) => {
-      if (path === '/stores') {
-        return Promise.resolve({ data: [{ id: 'store-1' }, { id: 'store-2' }] });
-      }
-      // now-playing hydrate cho từng quán
-      if (path === '/sync/stores/store-1/now-playing') {
-        return Promise.resolve({
-          storeId: 'store-1',
-          playlistId: 'playlist-A',
-          track: { id: 'track-1', title: 'A', artist: null, durationMs: 100_000 },
-          trackUrl: 'https://s3/a.mp3',
-          positionMs: 0,
-          serverTs: Date.now(),
-          isPlaying: true,
-          queue: { index: 0, total: 1, remaining: 0 },
-          repeat: 'OFF',
-          shuffle: false,
-        });
-      }
-      if (path === '/sync/stores/store-2/now-playing') {
-        return Promise.resolve({
-          storeId: 'store-2',
-          playlistId: 'playlist-B',
-          track: { id: 'track-2', title: 'B', artist: null, durationMs: 100_000 },
-          trackUrl: 'https://s3/b.mp3',
-          positionMs: 0,
-          serverTs: Date.now(),
-          isPlaying: true,
-          queue: { index: 0, total: 1, remaining: 0 },
-          repeat: 'OFF',
-          shuffle: false,
-        });
-      }
-      return Promise.resolve(null);
+  it('mở đúng một socket, cho đúng quán đang mở', async () => {
+    mockPathname = '/dashboard/stores/store-1';
+    mockApiGet.mockResolvedValue(nowPlayingSnapshot('store-1', 'playlist-A'));
+
+    render(
+      <>
+        <StoresSyncBridge />
+        <ReadStoreSync storeId="store-1" />
+      </>,
+    );
+
+    await waitFor(() => expect(mockSockets).toHaveLength(1));
+
+    await act(async () => {
+      mockSockets[0].listeners['connect']?.();
     });
+
+    expect(mockSockets[0].emit).toHaveBeenCalledWith('join-store', { storeId: 'store-1' });
+    expect(mockSockets[0].emit).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByText('playlist:playlist-A')).toBeInTheDocument());
+  });
+
+  it('bỏ qua event của quán khác lọt vào socket của quán đang mở', async () => {
+    mockPathname = '/dashboard/stores/store-1';
+    mockApiGet.mockResolvedValue(null);
 
     render(
       <>
@@ -180,16 +181,65 @@ describe('StoresSyncBridge / useStoresSync', () => {
       </>,
     );
 
-    await waitFor(() => expect(mockSockets).toHaveLength(2));
-
+    await waitFor(() => expect(mockSockets).toHaveLength(1));
     await act(async () => {
       mockSockets[0].listeners['connect']?.();
     });
+
     await act(async () => {
-      mockSockets[1].listeners['connect']?.();
+      mockSockets[0].listeners['store-now-playing']?.(nowPlayingPayload('store-2', 3));
     });
 
-    await waitFor(() => expect(screen.getByText('playlist:playlist-A')).toBeInTheDocument());
-    expect(screen.getByText('playlist:playlist-B')).toBeInTheDocument();
+    expect(playTrack).not.toHaveBeenCalled();
+    expect(screen.queryByText('remaining:3')).not.toBeInTheDocument();
+
+    // Event của đúng quán thì vẫn chạy bình thường.
+    await act(async () => {
+      mockSockets[0].listeners['store-now-playing']?.(nowPlayingPayload('store-1', 1));
+    });
+
+    expect(playTrack).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByText('remaining:1')).toBeInTheDocument());
+  });
+
+  it('không dừng nhạc khi quán khác báo tạm dừng hoặc dừng hẳn', async () => {
+    mockPathname = '/dashboard/stores/store-1';
+    mockApiGet.mockResolvedValue(null);
+
+    render(<StoresSyncBridge />);
+    await waitFor(() => expect(mockSockets).toHaveLength(1));
+    await act(async () => {
+      mockSockets[0].listeners['connect']?.();
+    });
+
+    await act(async () => {
+      mockSockets[0].listeners['store-paused']?.({ storeId: 'store-2', serverTs: Date.now() });
+      mockSockets[0].listeners['store-stopped']?.({ storeId: 'store-2', serverTs: Date.now() });
+    });
+
+    expect(pauseStore).not.toHaveBeenCalled();
+    expect(stopStore).not.toHaveBeenCalled();
+
+    await act(async () => {
+      mockSockets[0].listeners['store-paused']?.({ storeId: 'store-1', serverTs: Date.now() });
+    });
+    expect(pauseStore).toHaveBeenCalledWith('store-1');
+  });
+
+  it('đổi sang quán khác thì ngắt socket cũ và dừng nhạc của quán cũ', async () => {
+    mockPathname = '/dashboard/stores/store-1';
+    mockApiGet.mockResolvedValue(null);
+
+    const { rerender } = render(<StoresSyncBridge />);
+    await waitFor(() => expect(mockSockets).toHaveLength(1));
+
+    mockPathname = '/dashboard/stores/store-2';
+    await act(async () => {
+      rerender(<StoresSyncBridge />);
+    });
+
+    await waitFor(() => expect(mockSockets).toHaveLength(2));
+    expect(mockSockets[0].disconnect).toHaveBeenCalled();
+    expect(stopStore).toHaveBeenCalledWith('store-1');
   });
 });
