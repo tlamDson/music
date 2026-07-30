@@ -48,8 +48,12 @@ echo "== Upload lên r2://$R2_BUCKET/$file =="
 aws s3 cp "$file" "s3://$R2_BUCKET/$file" --endpoint-url "$R2_ENDPOINT"
 
 echo "== Dọn bản cũ hơn $RETENTION_DAYS ngày =="
-# `date -d` là GNU date (có trên ubuntu-latest của Actions và trong Git Bash).
-cutoff=$(date -u -d "-${RETENTION_DAYS} days" +%Y%m%d)
+# Tính mốc bằng epoch rồi mới format. `date -d "-30 days"` là cú pháp riêng của
+# GNU date và BusyBox (Alpine — chính là image workflow chạy) từ chối thẳng:
+# "date: invalid date '-30 days'". Với `set -e`, lỗi trong command substitution
+# làm script thoát ngay SAU khi đã upload xong, nên job đỏ mỗi đêm dù backup vẫn
+# lên bucket. Dạng `-d @<epoch>` chạy được trên cả BusyBox lẫn GNU.
+cutoff=$(date -u -d "@$(($(date -u +%s) - RETENTION_DAYS * 86400))" +%Y%m%d)
 aws s3 ls "s3://$R2_BUCKET/" --endpoint-url "$R2_ENDPOINT" | awk '{print $4}' |
   while IFS= read -r object; do
     [ -n "$object" ] || continue

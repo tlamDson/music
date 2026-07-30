@@ -135,6 +135,9 @@ Hai lớp, vì snapshot của Railway nằm **cùng account** với DB — mất
 - `pg_dump` phải **>= major version của server** (Railway đang chạy **Postgres 18**) — client cũ hơn sẽ từ chối dump. Workflow vì thế chạy trong container `postgres:18-alpine`.
 - `DATABASE_URL` cho backup phải là **`DATABASE_PUBLIC_URL`** — bản nội bộ trỏ `*.railway.internal` chỉ resolve trong mạng Railway.
 - `scripts/restore-db.sh` từ chối chạy nếu URL đích trông giống database trên Railway (script ghi đè schema — chỉ dùng cho DB scratch).
+- **Đích restore phải >= major version của `pg_dump` đã tạo file**, không phải của server nguồn: pg_dump >= 17 ghi `SET transaction_timeout = 0` vào đầu dump, server cũ hơn chết giữa chừng với `unrecognized configuration parameter` — thông báo không gợi ý gì về nguyên nhân thật. **DB dev trong `docker-compose.yml` là PG16** nên không làm đích restore được; dựng container `postgres:18-alpine` một lần rồi xoá. Script tự kiểm và chặn trước kèm câu lệnh đúng.
+- **Script chạy trong container Alpine → `date` là BusyBox, không phải GNU.** `date -d "-30 days"` bị từ chối thẳng; dạng chạy được ở cả hai là `date -u -d "@<epoch>"`. Với `set -e`, lỗi này làm job đỏ **sau khi** đã upload xong: backup vẫn có nhưng retention không bao giờ chạy.
+- Cả hai lỗi trên chỉ lộ ra khi **chạy thật script trong đúng image của workflow** — đọc code không thấy. Dựng lại bằng Postgres + MinIO của `docker-compose` (MinIO là S3-compatible nên không cần credential R2 thật); nhớ dùng **tên service** (`minio`, `postgres`) làm host vì `aws` CLI từ chối hostname có dấu gạch dưới như `cafe_music_minio`.
 
 ## Bản đồ API (`/api/v1`)
 

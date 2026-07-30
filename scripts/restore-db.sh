@@ -5,14 +5,17 @@
 #
 # Usage:
 #   R2_ENDPOINT=... R2_ACCESS_KEY=... R2_SECRET_KEY=... \
-#     sh scripts/restore-db.sh "postgresql://postgres:postgres@localhost:5432/cafe_music_restore_test"
+#     sh scripts/restore-db.sh "postgresql://postgres@localhost:55432/postgres"
 #
 #   # restore một bản cụ thể thay vì bản mới nhất
 #   sh scripts/restore-db.sh "<target-url>" cafe-music-production-20260801-1800.sql.gz
 #
 # ⚠️ Script GHI ĐÈ schema public của database đích. Đừng trỏ vào DB đang dùng —
-# hãy tạo một DB scratch riêng:
-#   docker exec cafe_music_postgres createdb -U postgres cafe_music_restore_test
+# hãy dựng một DB scratch dùng một lần, ĐÚNG major version của bản dump (DB dev
+# trong docker-compose là PG16, không đọc được dump của pg_dump 18):
+#   docker run -d --name pg-restore-test -e POSTGRES_HOST_AUTH_METHOD=trust \
+#     -p 55432:5432 postgres:18-alpine
+#   (trust auth: container tạm, chỉ nghe localhost, xoá ngay sau khi test xong)
 
 set -eu
 
@@ -50,7 +53,24 @@ fi
 echo "== Tải $OBJECT =="
 aws s3 cp "s3://$R2_BUCKET/$OBJECT" "$OBJECT" --endpoint-url "$R2_ENDPOINT"
 
-echo "== Restore vào database đích =="
+# Ràng buộc là phiên bản **pg_dump đã tạo file**, không phải phiên bản server
+# nguồn: pg_dump >= 17 ghi `SET transaction_timeout = 0` vào đầu file, và server
+# cũ hơn từ chối tham số đó rồi chết giữa chừng với "unrecognized configuration
+# parameter" — thông báo chẳng gợi ý gì về nguyên nhân thật.
+# Đã dẫm phải: pg_dump 18 dump một server PG16, restore vào PG16 vẫn hỏng.
+dump_major=$(gunzip -c "$OBJECT" | sed -n 's/^-- Dumped by pg_dump version \([0-9]*\).*/\1/p' | head -1)
+target_major=$(psql "$TARGET_URL" -t -A -c 'SHOW server_version_num;' | cut -c1-2)
+
+if [ -n "$dump_major" ] && [ -n "$target_major" ] && [ "$target_major" -lt "$dump_major" ]; then
+  echo "DỪNG: file dump do pg_dump $dump_major tạo, database đích là Postgres $target_major." >&2
+  echo "Server cũ hơn không đọc được lệnh SET của bản dump mới. Dựng DB scratch đúng version:" >&2
+  echo "  docker run -d --name pg-restore-test -e POSTGRES_HOST_AUTH_METHOD=trust -p 55432:5432 postgres:${dump_major}-alpine" >&2
+  echo "  sh scripts/restore-db.sh 'postgresql://postgres@localhost:55432/postgres' $OBJECT" >&2
+  rm -f "$OBJECT"
+  exit 1
+fi
+
+echo "== Restore vào database đích (dump pg_dump $dump_major → đích PG$target_major) =="
 # Dựng lại schema public để restore không đụng object cũ còn sót.
 psql "$TARGET_URL" -v ON_ERROR_STOP=1 \
   -c 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;'

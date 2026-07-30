@@ -77,11 +77,16 @@ Lớp 2 chạy bằng [.github/workflows/backup-db.yml](.github/workflows/backup
 **Restore** (dùng cả cho lúc sự cố lẫn bài test định kỳ):
 
 ```bash
-# tạo DB scratch — ĐỪNG restore đè lên DB đang dùng
-docker exec cafe_music_postgres createdb -U postgres cafe_music_restore_test
+# DB scratch dùng một lần — ĐỪNG restore đè lên DB đang dùng.
+# Phải là Postgres 18: DB dev trong docker-compose là PG16, mà bản dump do
+# pg_dump 18 tạo mang lệnh SET mà server cũ hơn không hiểu. Trỏ nhầm thì script
+# dừng lại và nhắc đúng câu lệnh dưới đây.
+docker run -d --name pg-restore-test -e POSTGRES_HOST_AUTH_METHOD=trust -p 55432:5432 postgres:18-alpine
 
 R2_ENDPOINT=... R2_ACCESS_KEY=... R2_SECRET_KEY=... \
-  sh scripts/restore-db.sh "postgresql://postgres:postgres@localhost:5432/cafe_music_restore_test"
+  sh scripts/restore-db.sh "postgresql://postgres@localhost:55432/postgres"
+
+docker rm -f pg-restore-test   # dọn sau khi xong
 ```
 
 Script tự lấy bản mới nhất (truyền tên file làm tham số 2 nếu muốn bản cũ hơn).
@@ -93,9 +98,9 @@ DATABASE_URL='<scratch>' pnpm --filter @cafe-music/backend exec prisma migrate s
 psql '<scratch>' -c 'SELECT count(*) FROM "User";'                                      # → khớp nguồn
 ```
 
-| Lần test restore gần nhất | Kết quả |
-| ------------------------- | ------- |
-| _(chưa chạy)_             | —       |
+| Lần test restore gần nhất | Kết quả                                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 2026-07-30                | ✅ Dump → upload → retention → restore chạy hết; số row khớp nguồn và `prisma migrate status` báo up to date |
 
 ## Sức khoẻ hệ thống
 
