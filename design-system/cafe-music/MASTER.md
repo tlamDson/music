@@ -16,18 +16,18 @@
 
 ### Color Palette
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#1E1B4B` | `--color-primary` |
-| On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#4338CA` | `--color-secondary` |
-| Accent/CTA | `#22C55E` | `--color-accent` |
-| Background | `#0F0F23` | `--color-background` |
-| Foreground | `#F8FAFC` | `--color-foreground` |
-| Muted | `#27273B` | `--color-muted` |
-| Border | `#312E81` | `--color-border` |
+| Role        | Hex       | CSS Variable          |
+| ----------- | --------- | --------------------- |
+| Primary     | `#1E1B4B` | `--color-primary`     |
+| On Primary  | `#FFFFFF` | `--color-on-primary`  |
+| Secondary   | `#4338CA` | `--color-secondary`   |
+| Accent/CTA  | `#22C55E` | `--color-accent`      |
+| Background  | `#0F0F23` | `--color-background`  |
+| Foreground  | `#F8FAFC` | `--color-foreground`  |
+| Muted       | `#27273B` | `--color-muted`       |
+| Border      | `#312E81` | `--color-border`      |
 | Destructive | `#EF4444` | `--color-destructive` |
-| Ring | `#1E1B4B` | `--color-ring` |
+| Ring        | `#1E1B4B` | `--color-ring`        |
 
 **Color Notes:** Dark audio + play green
 
@@ -39,29 +39,49 @@
 - **Google Fonts:** [Fira Code + Fira Sans](https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap)
 
 **CSS Import:**
+
 ```css
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
 ```
 
 ### Spacing Variables
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-xs` | `4px` / `0.25rem` | Tight gaps |
-| `--space-sm` | `8px` / `0.5rem` | Icon gaps, inline spacing |
-| `--space-md` | `16px` / `1rem` | Standard padding |
-| `--space-lg` | `24px` / `1.5rem` | Section padding |
-| `--space-xl` | `32px` / `2rem` | Large gaps |
-| `--space-2xl` | `48px` / `3rem` | Section margins |
-| `--space-3xl` | `64px` / `4rem` | Hero padding |
+| Token         | Value             | Usage                     |
+| ------------- | ----------------- | ------------------------- |
+| `--space-xs`  | `4px` / `0.25rem` | Tight gaps                |
+| `--space-sm`  | `8px` / `0.5rem`  | Icon gaps, inline spacing |
+| `--space-md`  | `16px` / `1rem`   | Standard padding          |
+| `--space-lg`  | `24px` / `1.5rem` | Section padding           |
+| `--space-xl`  | `32px` / `2rem`   | Large gaps                |
+| `--space-2xl` | `48px` / `3rem`   | Section margins           |
+| `--space-3xl` | `64px` / `4rem`   | Hero padding              |
+
+### Layering (z-index)
+
+Khai báo trong `apps/web/src/app/globals.css`. Dùng `z-[var(--z-*)]`, **không viết số thẳng vào component** — trước đây mỗi file tự chọn `z-30/40/50` nên drawer nav nằm dưới thanh phát và che mất nút Đăng xuất trên mobile.
+
+| Token              | Value | Usage                                             |
+| ------------------ | ----- | ------------------------------------------------- |
+| `--z-player-bar`   | `50`  | Thanh phát cố định dưới cùng                      |
+| `--z-nav-backdrop` | `60`  | Backdrop của drawer nav mobile                    |
+| `--z-nav-drawer`   | `70`  | Drawer nav mobile                                 |
+| `--z-nav-toggle`   | `80`  | Nút hamburger (phải trên drawer để bấm đóng được) |
+| `--z-now-playing`  | `90`  | Overlay "Đang phát" toàn màn hình                 |
+| `--z-dialog`       | `100` | Modal — luôn trên tất cả                          |
+
+### Layout Variables
+
+| Token            | Value                               | Usage                                                                                       |
+| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| `--player-bar-h` | `64px` (mobile) / `88px` (`≥768px`) | Chiều cao thật của thanh phát. `<main>` chừa chỗ theo biến này, **không** bằng padding cứng |
 
 ### Shadow Depths
 
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
+| Level         | Value                          | Usage                       |
+| ------------- | ------------------------------ | --------------------------- |
+| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)`   | Subtle lift                 |
+| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)`    | Cards, buttons              |
+| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)`  | Modals, dropdowns           |
 | `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
 
 ---
@@ -73,7 +93,7 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #22C55E;
+  background: #22c55e;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -90,8 +110,8 @@
 /* Secondary Button */
 .btn-secondary {
   background: transparent;
-  color: #1E1B4B;
-  border: 2px solid #1E1B4B;
+  color: #1e1b4b;
+  border: 2px solid #1e1b4b;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
@@ -104,7 +124,7 @@
 
 ```css
 .card {
-  background: #0F0F23;
+  background: #0f0f23;
   border-radius: 12px;
   padding: 24px;
   box-shadow: var(--shadow-md);
@@ -123,16 +143,16 @@
 ```css
 .input {
   padding: 12px 16px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 16px;
   transition: border-color 200ms ease;
 }
 
 .input:focus {
-  border-color: #1E1B4B;
+  border-color: #1e1b4b;
   outline: none;
-  box-shadow: 0 0 0 3px #1E1B4B20;
+  box-shadow: 0 0 0 3px #1e1b4b20;
 }
 ```
 

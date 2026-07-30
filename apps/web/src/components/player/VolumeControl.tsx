@@ -10,7 +10,12 @@ const MUTED_TEXT = 'rgba(248,250,252,0.6)';
  * Nút loa giờ bấm được (trước đây chỉ là hình trang trí): tắt/bật tiếng, nhớ
  * lại mức âm lượng cũ để bật lại đúng chỗ đã tắt thay vì nhảy về 100%.
  */
-export default function VolumeControl({ className }: { className?: string }) {
+/**
+ * `className` phải mang luôn class `display` (mặc định `flex`) — `PlayerBar`
+ * truyền `hidden md:flex` để ẩn cụm âm lượng trên mobile, mà `hidden` chỉ thắng
+ * nếu ở đây không có `flex` cứng đè lại.
+ */
+export default function VolumeControl({ className = 'flex' }: { className?: string }) {
   const { volume, changeVolume } = usePlayer();
   const previousVolumeRef = useRef(volume > 0 ? volume : 1);
 
@@ -32,7 +37,7 @@ export default function VolumeControl({ className }: { className?: string }) {
   };
 
   return (
-    <div className={`flex items-center gap-2 ${className ?? ''}`} style={{ color: MUTED_TEXT }}>
+    <div className={`items-center gap-2 ${className}`} style={{ color: MUTED_TEXT }}>
       <button
         onClick={handleToggleMute}
         aria-pressed={isMuted}

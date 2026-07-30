@@ -71,7 +71,7 @@ export default function NowPlayingOverlay({ onClose }: NowPlayingOverlayProps) {
   return (
     <div
       ref={containerRef}
-      className="animate-slide-up fixed inset-0 z-[60] flex flex-col items-center justify-center gap-8 p-8"
+      className="animate-slide-up fixed inset-0 z-[var(--z-now-playing)] flex flex-col items-center justify-center gap-8 p-8"
       style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-foreground)' }}
       role="dialog"
       aria-modal="true"

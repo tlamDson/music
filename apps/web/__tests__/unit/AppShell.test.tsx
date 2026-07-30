@@ -69,14 +69,65 @@ describe('AppShell', () => {
     await waitFor(() => expect(mockApi.get).toHaveBeenCalledWith('/playlists'));
   });
 
-  it('pins the sidebar to the viewport so it never scrolls away with the page', () => {
+  // QC: sidebar tự sinh thanh cuộn riêng, cuộn mất cả tiêu đề lẫn nút đăng
+  // xuất. Sidebar phải đứng yên tuyệt đối — chỉ `<main>` cuộn, và trong sidebar
+  // chỉ danh sách playlist (dài vô hạn) được cuộn.
+  it('không cho sidebar tự cuộn — chỉ khối thư viện playlist được cuộn', () => {
     renderShell('ORG_ADMIN');
 
     const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
-    expect(nav.className).toEqual(expect.stringContaining('sticky'));
-    expect(nav.className).toEqual(expect.stringContaining('top-0'));
-    expect(nav.className).toEqual(expect.stringContaining('h-screen'));
-    expect(nav.className).toEqual(expect.stringContaining('overflow-y-auto'));
+    expect(nav.className).toEqual(expect.stringContaining('overflow-hidden'));
+    expect(nav.className).not.toEqual(expect.stringContaining('overflow-y-auto'));
+
+    // `min-h-0` là điều kiện để `overflow-y-auto` có tác dụng trong flex column.
+    const library = nav.querySelector('.overflow-y-auto');
+    expect(library).not.toBeNull();
+    expect(library?.className).toEqual(expect.stringContaining('min-h-0'));
+  });
+
+  it('giao việc cuộn trang cho <main>, shell cao đúng một màn hình', () => {
+    const { container } = renderShell('ORG_ADMIN');
+
+    const shell = container.firstElementChild as HTMLElement;
+    expect(shell.className).toEqual(expect.stringContaining('h-[100dvh]'));
+    expect(shell.className).toEqual(expect.stringContaining('overflow-hidden'));
+
+    const main = screen.getByRole('main');
+    expect(main.className).toEqual(expect.stringContaining('overflow-y-auto'));
+    // Chừa chỗ cho thanh phát cố định theo chiều cao thật của nó.
+    expect(main.style.paddingBottom).toEqual(expect.stringContaining('--player-bar-h'));
+  });
+
+  // Drawer mobile chiếm cả màn hình — không có đường thoát bằng bàn phím thì
+  // người dùng bị kẹt trong đó.
+  it('đóng drawer mobile khi bấm Escape', () => {
+    renderShell('ORG_ADMIN');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mở menu điều hướng' }));
+    const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+    expect(nav.className).not.toEqual(expect.stringContaining('-translate-x-full'));
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(nav.className).toEqual(expect.stringContaining('-translate-x-full'));
+  });
+
+  // Bug QC: thanh phát (z-50) đè lên drawer nav (z-40) nên mở menu trên mobile
+  // là không thấy email/vai trò và không bấm được nút Đăng xuất.
+  it('xếp drawer và backdrop lên trên thanh phát theo thang z-index', () => {
+    renderShell('ORG_ADMIN');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mở menu điều hướng' }));
+
+    const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+    expect(nav.className).toEqual(expect.stringContaining('z-[var(--z-nav-drawer)]'));
+    expect(screen.getByTestId('mobile-nav-backdrop').className).toEqual(
+      expect.stringContaining('z-[var(--z-nav-backdrop)]'),
+    );
+    // Nút hamburger phải trên drawer để còn bấm đóng được.
+    expect(screen.getByRole('button', { name: 'Đóng menu điều hướng' }).className).toEqual(
+      expect.stringContaining('z-[var(--z-nav-toggle)]'),
+    );
   });
 
   it('hides the sidebar off-canvas on small screens until the menu button opens it', () => {
