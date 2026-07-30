@@ -31,3 +31,33 @@ export function clientIpTracker(req: Request): string {
     firstValue(req.headers?.[EDGE_CLIENT_IP_HEADER]) ?? req.ip ?? 'unknown'
   );
 }
+
+/**
+ * Định danh cho rate limit của `/auth/login`: **email đang bị dò**, không phải
+ * đường mạng của người dò.
+ *
+ * Đo thật trên staging sau khi đã chuyển counter sang Redis: cùng một client
+ * vẫn ra hai key khác nhau (X-RateLimit-Remaining chạy 4,4,3,3,2,2 — hai counter
+ * luân phiên, mỗi cái chỉ đếm nửa số request), nên 6 lần đăng nhập sai liên tiếp
+ * vẫn không ra 429. Edge của Railway round-robin qua nhiều địa chỉ và
+ * `x-envoy-external-address` không có mặt để bù lại.
+ *
+ * Khoá theo email cắt hẳn sự phụ thuộc vào tầng mạng: dò một tài khoản là một
+ * counter, dù đi qua bao nhiêu hop hay bao nhiêu IP. Đây cũng đúng là thứ cần
+ * bảo vệ — tài khoản, không phải cái IP.
+ *
+ * Giới hạn còn lại (ghi rõ để không tưởng nhầm là đã kín): cách này **không**
+ * chặn kiểu rải mật khẩu qua nhiều tài khoản khác nhau. Giới hạn 100 req/60s
+ * toàn cục vẫn tính theo IP nên vẫn dính vấn đề trên — muốn kín thì phải có
+ * định danh client đáng tin từ edge, xem `EDGE_CLIENT_IP_HEADER`.
+ */
+export function loginIdentityTracker(req: Request): string {
+  const body = req.body as { email?: unknown } | undefined;
+  const email = typeof body?.email === 'string' ? body.email.trim() : '';
+
+  // Guard chạy trước ZodValidationPipe nên body có thể chưa hợp lệ — không được
+  // ném lỗi ở đây. Prefix để định danh theo email và theo IP không đụng nhau.
+  if (!email) return `ip:${clientIpTracker(req)}`;
+
+  return `email:${email.toLowerCase()}`;
+}
