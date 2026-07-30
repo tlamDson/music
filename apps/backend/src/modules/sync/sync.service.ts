@@ -333,10 +333,16 @@ export class SyncService implements OnModuleInit {
   }
 
   /**
-   * Bỏ qua bài đang phát — cùng đường đi với auto-next của server. Đây là
-   * lệnh thủ công nên luôn đi tới bài kế thật (không phát lại theo `repeat:
-   * 'ONE'`) và dừng hẳn ở cuối hàng chờ bất kể `repeat` — hành vi lặp ALL chỉ
-   * áp dụng cho auto-next trong `advance()`.
+   * Bỏ qua bài đang phát — cùng đường đi với auto-next của server. Đây là lệnh
+   * thủ công nên luôn đi tới bài kế thật, không phát lại theo `repeat: 'ONE'`.
+   *
+   * Ở **bài cuối** thì đây là **no-op**: giữ nguyên nhạc đang phát và trả
+   * `finished: true`. Trước đây nó gọi `stopStore()` — xoá state Redis và
+   * broadcast `store-stopped` — nên bấm "Bài kế tiếp" ở bài cuối làm thanh phát
+   * biến mất và mất luôn ngữ cảnh playlist (QC: "tự out khỏi playlist"). Dừng
+   * hẳn khi hết hàng chờ chỉ đúng cho auto-next trong `advance()`, nơi bài cuối
+   * đã phát xong thật; ở đây thì chưa. `repeat: 'ALL'` vẫn quay về bài đầu vì
+   * lúc đó hàng chờ còn chỗ để đi.
    */
   async nextStore(storeId: string, user: JwtPayload) {
     await this.assertStoreAccess(storeId, user);
@@ -344,10 +350,10 @@ export class SyncService implements OnModuleInit {
     const playback = await this.redis.getStorePlayback(storeId);
     if (!playback) throw new NotFoundException('Store is not playing');
 
-    const nextIndex = playback.trackIndex + 1;
+    let nextIndex = playback.trackIndex + 1;
     if (nextIndex >= playback.trackIds.length) {
-      await this.stopStore(storeId);
-      return { finished: true, playback: null };
+      if (playback.repeat !== 'ALL') return { finished: true, playback };
+      nextIndex = 0;
     }
 
     const track = await this.prisma.track.findFirst({

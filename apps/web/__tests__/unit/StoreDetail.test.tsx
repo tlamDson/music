@@ -202,6 +202,60 @@ describe('StoreDetail', () => {
     await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/next'));
   });
 
+  // QC: nút chuyển bài ở hai đầu hàng chờ đá admin ra khỏi playlist — bấm "Bài
+  // sau" ở bài cuối làm server dừng hẳn quán. Hết chỗ để đi thì bỏ nút hẳn.
+  describe('hai đầu hàng chờ', () => {
+    it('không có "Bài trước" ở bài đầu', async () => {
+      renderDetail();
+
+      expect(await screen.findByRole('button', { name: /bài sau/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /bài trước/i })).not.toBeInTheDocument();
+    });
+
+    it('không có "Bài sau" ở bài cuối', async () => {
+      mockGet(
+        storeResponse({
+          nowPlaying: { ...nowPlaying, queue: { index: 2, total: 3, remaining: 0 } },
+        }),
+      );
+      renderDetail();
+
+      expect(await screen.findByRole('button', { name: /bài trước/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /bài sau/i })).not.toBeInTheDocument();
+    });
+
+    it('quay lại bài trước qua server khi đang ở giữa hàng chờ', async () => {
+      mockGet(
+        storeResponse({
+          nowPlaying: { ...nowPlaying, queue: { index: 1, total: 3, remaining: 1 } },
+        }),
+      );
+      renderDetail();
+
+      await userEvent.click(await screen.findByRole('button', { name: /bài trước/i }));
+
+      await waitFor(() =>
+        expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/previous'),
+      );
+    });
+
+    it('hiện lại cả hai nút khi quán đang lặp cả danh sách', async () => {
+      mockUseStoresSync.mockReturnValue({
+        ...defaultBridgeState(),
+        repeat: 'ALL',
+      } as ReturnType<typeof useStoresSync>);
+      mockGet(
+        storeResponse({
+          nowPlaying: { ...nowPlaying, queue: { index: 2, total: 3, remaining: 0 } },
+        }),
+      );
+      renderDetail();
+
+      expect(await screen.findByRole('button', { name: /bài trước/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /bài sau/i })).toBeInTheDocument();
+    });
+  });
+
   it('đổi nút thành "Phát tiếp" khi quán đang tạm dừng', async () => {
     mockGet(storeResponse({ status: 'PAUSED', nowPlaying: { ...nowPlaying, isPlaying: false } }));
     renderDetail();
