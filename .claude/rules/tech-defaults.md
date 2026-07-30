@@ -109,6 +109,31 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 - **Cách kiểm tra lại** (không cần deploy log tạm): curl `/auth/login` nhiều lần rồi đọc header `X-RateLimit-Remaining` — phải giảm đều tới 0 rồi `429`, không được nhảy ngược lên.
 - `blockDuration` cố tình không hiện thực hoá: repo chỉ dùng `ttl` + `limit`.
 
+## Error tracking — Sentry
+
+- **Backend**: `src/instrument.ts` gọi `Sentry.init`, được import ở **dòng đầu tiên** của `main.ts` (trước cả `AppModule` — Sentry vá thư viện lúc chúng được require, nạp sau thì instrumentation không gắn được).
+- **Chỉ 5xx mới lên Sentry**, quyết định trong `AllExceptionsFilter` (dùng lại filter đã có, **không** thêm `SentryGlobalFilter`). Gửi cả 4xx sẽ đốt hết quota free tier bằng 401/404/429 vốn là traffic bình thường.
+- **`SENTRY_ENVIRONMENT` là bắt buộc khi có DSN** — staging và production **đều** chạy `NODE_ENV=production`, thiếu nó thì hai môi trường trộn lẫn và không biết lỗi từ đâu.
+- Không có DSN (local, CI, test) → không init, app chạy bình thường. Vì thế `SENTRY_DSN` optional trong `env.schema.ts`.
+- **Web**: `instrumentation.ts` (server + `onRequestError`) + `instrumentation-client.ts` + **`app/global-error.tsx`** — thiếu file cuối thì lỗi React render (component crash, đúng loại QC hay gặp) không bao giờ tới Sentry.
+- `next.config.ts` bọc bằng `withSentryConfig`. **Security header của PR #15 phải còn nguyên sau khi bọc** — đã kiểm chứng là `withSentryConfig` giữ lại `headers()`, nhưng vẫn `curl -I` sau mỗi lần deploy.
+- Body của `/auth/login` + `/auth/refresh` bị redact trong `beforeSend` (`scrubAuthPayloads`) — pino đã redact credential, Sentry phải giữ cùng mức, không để credential rời server qua đường thứ hai.
+- Không bật tracing (`tracesSampleRate: 0`) và không bật Session Replay: quota free tier tính cả transaction/replay, mà thứ cần ở đây là lỗi.
+
+## Backup database
+
+Hai lớp, vì snapshot của Railway nằm **cùng account** với DB — mất account là mất luôn backup:
+
+| Lớp                       | Chạy bằng                                       |
+| ------------------------- | ----------------------------------------------- |
+| Snapshot Railway          | Bật trong dashboard, hằng ngày                  |
+| `pg_dump` → R2 (off-site) | `.github/workflows/backup-db.yml`, 01:00 giờ VN |
+
+- `scripts/backup-db.sh` **fail nếu dump nhỏ bất thường** — backup lỗi âm thầm là cái bẫy kinh điển, thà để job đỏ và có mail.
+- `pg_dump` phải **>= major version của server** (Railway đang chạy **Postgres 18**) — client cũ hơn sẽ từ chối dump. Workflow vì thế chạy trong container `postgres:18-alpine`.
+- `DATABASE_URL` cho backup phải là **`DATABASE_PUBLIC_URL`** — bản nội bộ trỏ `*.railway.internal` chỉ resolve trong mạng Railway.
+- `scripts/restore-db.sh` từ chối chạy nếu URL đích trông giống database trên Railway (script ghi đè schema — chỉ dùng cho DB scratch).
+
 ## Bản đồ API (`/api/v1`)
 
 | Nhóm     | Endpoint chính                                                                                                                                                                                                                                        |
@@ -168,6 +193,7 @@ Vercel (web) · Railway (backend + Postgres + Redis) · Cloudflare R2 (track). T
 - **Sau khi merge PR + `git checkout develop && git pull`, tạo nhánh mới NGAY trước khi sửa code tiếp** — dễ quên bước này giữa chuỗi nhiều PR liên tiếp và lỡ commit thẳng vào `develop`. Nếu lỡ commit mà CHƯA push (`git status` báo "ahead of origin"), sửa an toàn: `git branch <ten-nhanh-moi>` (giữ commit lại) → `git reset --hard origin/develop` (đưa `develop` local về đúng remote) → `git checkout <ten-nhanh-moi>`.
 - **`railway ssh` trên Windows Git Bash âm thầm không chạy lệnh thật** — Git Bash tự dịch path Unix (`/app/...`) thành path Windows (set `MSYS_NO_PATHCONV=1` để tắt), và `railway ssh -- sh -c "..."` (nhiều tham số riêng) bị CLI nối lại làm mất ranh giới `-c`, remote chỉ chạy đúng từ đầu rồi thoát exit 0 không output. Gộp remote command thành **một chuỗi duy nhất** sau `--`, tránh khoảng trắng trong giá trị biến. Chi tiết đầy đủ + ví dụ ở [docs/PRODUCTION_READINESS.md](../../docs/PRODUCTION_READINESS.md) cạm bẫy #14.
 - **`jest` chạy trong worktree agent nằm dưới thư mục `.claude/worktrees/<id>` báo "No tests found" cho MỌI file, kể cả file không đổi gì** — bug của `jest-util`'s `replacePathSepForGlob`: khi rootDir tuyệt đối chứa một segment bắt đầu bằng dấu chấm (`.claude`), hàm né không đổi đúng một dấu `\` (cái đứng ngay trước `.`) từ backslash sang forward-slash vì tưởng đó là ký tự escape glob, sinh ra pattern lẫn lộn dấu phân cách không khớp được path thật. Không sửa được bằng cách đổi `jest.config.ts` (rootDir tuyệt đối vẫn luôn chứa `.claude`) hay dùng NTFS junction trỏ ra ngoài (Jest gọi `realpath` nên vẫn ra lại path thật). Cách né duy nhất: copy toàn bộ working tree (trừ `node_modules`, `.git`) ra một path KHÔNG có thư mục nào bắt đầu bằng dấu chấm (vd `D:\some-clean-path`), `pnpm install` + `pnpm --filter @cafe-music/shared build` + `pnpm --filter @cafe-music/backend exec prisma generate` lại trong bản copy đó rồi chạy test ở đó. Nhớ dọn thư mục copy sau khi xong — **và luôn dùng ổ đĩa còn nhiều dung lượng trống** (từng làm ổ `C:` cạn sạch chỉ còn vài trăm KB khi copy + cài đặt vào một ổ gần đầy).
+- **`overrides` của pnpm nằm trong `pnpm-workspace.yaml`, KHÔNG phải `package.json`** (pnpm 11) — đặt nhầm chỗ thì bị bỏ qua âm thầm, install vẫn lỗi y như cũ. Hiện có một override: `import-in-the-middle: 3.2.0`, vì bản 3.3.x khai báo phụ thuộc `es-module-lexer: ^2.2.0` — một version **chưa từng được publish** — làm cả cây phụ thuộc của `@sentry/*` không cài được. Gỡ override khi upstream sửa.
 - **`eslint`/`tsc` báo hàng loạt `no-unsafe-member-access`/`Cannot find module '@cafe-music/shared'` dù code không sai** — do `@prisma/client` chưa được generate (cần `pnpm --filter @cafe-music/backend exec prisma generate`) hoặc `packages/shared` chưa build (`pnpm --filter @cafe-music/shared build`, vì `main`/`types` trỏ vào `dist/`). Thấy lỗi type lan ra cả những file không liên quan tới thay đổi của mình thì kiểm tra hai bước này trước khi nghi ngờ code.
 
 ## Yêu cầu tối thiểu

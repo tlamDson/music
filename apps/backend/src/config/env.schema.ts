@@ -53,6 +53,15 @@ export const envSchema = z.object({
   S3_FORCE_PATH_STYLE: booleanFromEnv(true),
 
   CDN_BASE_URL: z.string().optional(),
+
+  // Optional để local/CI/test chạy được mà không cần tài khoản Sentry — thiếu
+  // DSN thì `instrument.ts` không init và app chạy bình thường.
+  SENTRY_DSN: z.string().optional(),
+  /**
+   * Staging và production ĐỀU chạy `NODE_ENV=production`, nên thiếu biến này là
+   * hai môi trường trộn lẫn trong Sentry và không biết lỗi đến từ đâu.
+   */
+  SENTRY_ENVIRONMENT: z.string().optional(),
 });
 
 /**

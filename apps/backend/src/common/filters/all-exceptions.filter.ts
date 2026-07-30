@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as Sentry from '@sentry/nestjs';
 
 /**
  * Chuẩn hoá mọi lỗi chưa bắt được thành 500 không lộ chi tiết nội bộ
@@ -32,6 +33,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `${request.method} ${request.url} → ${status}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+      // Chỉ 5xx mới lên Sentry. Gửi cả 4xx sẽ đốt hết quota free tier bằng
+      // 401/404/429 — những thứ hoàn toàn bình thường và không ai cần biết.
+      // Dùng lại filter này thay vì thêm SentryGlobalFilter để giữ đúng một
+      // chỗ quyết định "lỗi nào là lỗi thật".
+      Sentry.captureException(exception);
     }
 
     response.status(status).json({
