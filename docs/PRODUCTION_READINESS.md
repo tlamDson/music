@@ -203,7 +203,7 @@ GitHub secrets (cho workflow backup): `PROD_DATABASE_URL` (phải là `DATABASE_
 **Backup chưa test restore thì coi như chưa có backup.**
 
 - [ ] Chạy tay workflow `Backup Database` với environment `staging` (staging có data thật hơn prod lúc này).
-- [ ] Restore vào DB scratch cục bộ: `docker exec cafe_music_postgres createdb -U postgres cafe_music_restore_test` rồi `sh scripts/restore-db.sh "<scratch-url>"`.
+- [ ] Restore vào DB scratch **Postgres 18** dùng một lần (DB dev trong docker-compose là PG16, không đọc được dump của pg_dump 18 — script sẽ chặn): `docker run -d --name pg-restore-test -e POSTGRES_HOST_AUTH_METHOD=trust -p 55432:5432 postgres:18-alpine` rồi `sh scripts/restore-db.sh "postgresql://postgres@localhost:55432/postgres"`.
 - [ ] Xác nhận bản restore **dùng được**, đừng dừng ở "lệnh chạy xong": `prisma migrate status` báo up to date, số row các bảng chính khớp nguồn, boot backend trỏ vào DB scratch và đăng nhập được.
 - [ ] Ghi ngày + kết quả vào `README.md`. Dọn DB scratch.
 
@@ -264,14 +264,14 @@ BASE_URL=https://<railway-backend-domain>/api/v1 sh scripts/smoke-staging.sh
 
 ## Fast-follow (không chặn launch — quyết định sau)
 
-| Việc                                                   | Khi nào cần                                                                                                         |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| Socket.IO Redis adapter                                | **Bắt buộc** trước khi chạy ≥ 2 instance, nếu không trạng thái phát của quán bị split-brain. 5 cửa hàng / 1 instance thì chưa cần |
-| Refresh token revocation                               | Token 7 ngày hiện không thu hồi được. Nên làm trước khi có user thật                                                |
-| Upload streaming lên R2                                | Hiện buffer tối đa 50MB vào RAM. Đủ dùng ở concurrency thấp                                                         |
-| Dùng `CDN_BASE_URL`                                    | Env đã có nhưng chưa consume — tối ưu chi phí/độ trễ                                                                |
-| Bật integration + E2E trong CI                         | Scaffolding đã có, CI mới chạy unit test                                                                            |
-| Chặn `durationMs = 0` lúc upload                        | DB prod còn trống nên fix lúc nào cũng không cần backfill; hiện quán kẹt "đang phát" vô hạn                         |
+| Việc                             | Khi nào cần                                                                                                                       |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Socket.IO Redis adapter          | **Bắt buộc** trước khi chạy ≥ 2 instance, nếu không trạng thái phát của quán bị split-brain. 5 cửa hàng / 1 instance thì chưa cần |
+| Refresh token revocation         | Token 7 ngày hiện không thu hồi được. Nên làm trước khi có user thật                                                              |
+| Upload streaming lên R2          | Hiện buffer tối đa 50MB vào RAM. Đủ dùng ở concurrency thấp                                                                       |
+| Dùng `CDN_BASE_URL`              | Env đã có nhưng chưa consume — tối ưu chi phí/độ trễ                                                                              |
+| Bật integration + E2E trong CI   | Scaffolding đã có, CI mới chạy unit test                                                                                          |
+| Chặn `durationMs = 0` lúc upload | DB prod còn trống nên fix lúc nào cũng không cần backfill; hiện quán kẹt "đang phát" vô hạn                                       |
 
 ## Quyết định thiết kế đã chốt (đừng lật lại nếu không có lý do mới)
 
