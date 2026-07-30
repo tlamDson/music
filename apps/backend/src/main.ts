@@ -1,3 +1,6 @@
+// PHẢI đứng trước mọi import khác: Sentry vá thư viện lúc chúng được require,
+// nạp sau thì phần lớn instrumentation không gắn được.
+import './instrument';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';

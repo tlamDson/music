@@ -1,5 +1,10 @@
 import { HttpException, HttpStatus, ArgumentsHost } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { AllExceptionsFilter } from '../../src/common/filters/all-exceptions.filter';
+
+jest.mock('@sentry/nestjs', () => ({ captureException: jest.fn() }));
+
+const captureException = Sentry.captureException as jest.Mock;
 
 describe('AllExceptionsFilter', () => {
   type ResponseBody = Record<string, unknown>;
@@ -38,7 +43,41 @@ describe('AllExceptionsFilter', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    captureException.mockClear();
     delete process.env.NODE_ENV_OVERRIDE;
+  });
+
+  /**
+   * Quota free tier của Sentry tính theo số event. 401 (sai mật khẩu), 404 và
+   * 429 (rate limit) là chuyện bình thường xảy ra hằng ngày — đẩy hết lên thì
+   * lỗi thật bị chôn giữa đống nhiễu và hết quota trước cuối tháng.
+   */
+  describe('Sentry reporting', () => {
+    it('reports unexpected errors', () => {
+      filter.catch(new Error('database exploded'), host);
+
+      expect(captureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports 5xx HttpExceptions', () => {
+      filter.catch(
+        new HttpException('upstream down', HttpStatus.BAD_GATEWAY),
+        host,
+      );
+
+      expect(captureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays silent on 4xx, which are normal traffic', () => {
+      filter.catch(new HttpException('nope', HttpStatus.UNAUTHORIZED), host);
+      filter.catch(new HttpException('gone', HttpStatus.NOT_FOUND), host);
+      filter.catch(
+        new HttpException('slow down', HttpStatus.TOO_MANY_REQUESTS),
+        host,
+      );
+
+      expect(captureException).not.toHaveBeenCalled();
+    });
   });
 
   it('preserves the status code of an HttpException', () => {
