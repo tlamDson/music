@@ -23,7 +23,14 @@ const BACKDROP_EXIT_MS = 200;
 /**
  * Khung dùng chung cho console chuỗi (`/dashboard`) và console quán (`/store`):
  * cùng sidebar thư viện, khác danh sách nav. Thanh phát nằm ở layout gốc nên
- * shell chỉ chừa khoảng trống dưới cùng cho nó.
+ * shell chỉ chừa khoảng trống dưới cùng cho nó (`--player-bar-h`).
+ *
+ * **Chỉ `<main>` cuộn.** Shell cao đúng một màn hình (`h-[100dvh]`) và
+ * `overflow-hidden`, nên sidebar đứng yên hoàn toàn: tiêu đề "Cafe Music", danh
+ * sách nav và khối email/đăng xuất luôn ở đúng chỗ. Trước đây `<nav>` tự có
+ * `overflow-y-auto` (và khối thư viện có thêm một cái nữa) nên sidebar sinh
+ * thanh cuộn riêng và cuộn mất cả header lẫn nút đăng xuất. Riêng danh sách
+ * playlist trong thư viện **vẫn** cuộn được — nó là phần duy nhất dài vô hạn.
  */
 export default function AppShell({ navItems, user, onLogout, children }: AppShellProps) {
   const pathname = usePathname();
@@ -34,6 +41,17 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname]);
+
+  // Escape đóng drawer — drawer mobile chiếm cả màn hình, không có đường thoát
+  // bằng bàn phím thì người dùng bị kẹt trong đó.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileNavOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileNavOpen]);
 
   // Cùng pattern với components/ui/Dialog.tsx: giữ backdrop trong DOM thêm
   // một nhịp sau khi đóng để animation exit (.mobile-nav-backdrop[data-state])
@@ -59,13 +77,13 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
 
   return (
     <div
-      className="min-h-screen flex pb-28"
+      className="h-[100dvh] flex overflow-hidden"
       style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-foreground)' }}
     >
       <button
         type="button"
         onClick={() => setMobileNavOpen((v) => !v)}
-        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
+        className="md:hidden fixed top-4 left-4 z-[var(--z-nav-toggle)] p-2 rounded-lg cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
         style={{ backgroundColor: 'var(--color-primary)', border: '1px solid var(--color-border)' }}
         aria-label={mobileNavOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
         aria-expanded={mobileNavOpen}
@@ -104,12 +122,12 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
           data-testid="mobile-nav-backdrop"
           data-state={mobileNavOpen ? 'open' : 'closed'}
           onClick={() => setMobileNavOpen(false)}
-          className="mobile-nav-backdrop md:hidden fixed inset-0 z-30 bg-black/50"
+          className="mobile-nav-backdrop md:hidden fixed inset-0 z-[var(--z-nav-backdrop)] bg-black/50"
         />
       )}
 
       <nav
-        className={`w-64 flex-shrink-0 flex flex-col gap-1 overflow-y-auto px-4 pt-4 pb-28 fixed inset-y-0 left-0 z-40 transition-transform duration-[var(--duration-base)] md:sticky md:top-0 md:h-screen md:z-auto ${
+        className={`w-64 flex-shrink-0 flex flex-col gap-1 overflow-hidden px-4 pt-4 pb-2 fixed inset-y-0 left-0 z-[var(--z-nav-drawer)] transition-transform duration-[var(--duration-base)] md:static md:h-full md:z-auto ${
           mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
         style={{
@@ -140,8 +158,11 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
           </Link>
         ))}
 
-        {/* Thư viện playlist */}
-        <div className="mt-6 flex-1 overflow-y-auto">
+        {/* Thư viện playlist — phần DUY NHẤT trong sidebar được cuộn (danh sách
+            playlist dài vô hạn). `min-h-0` là bắt buộc: thiếu nó thì flex item
+            không co xuống dưới content size, `overflow-y-auto` vô hiệu và danh
+            sách dài đẩy khối đăng xuất ra ngoài màn hình. */}
+        <div className="mt-6 flex-1 min-h-0 overflow-y-auto">
           <p
             className="px-3 pb-2 text-xs uppercase tracking-wide"
             style={{ color: 'rgba(248,250,252,0.4)' }}
@@ -186,7 +207,14 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
           )}
         </div>
 
-        <div className="px-3 py-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+        {/* Khối tài khoản luôn dính đáy sidebar. Trên mobile, drawer nằm TRÊN
+            thanh phát (`--z-nav-drawer` > `--z-player-bar`) nên khối này không
+            còn bị thanh nhạc che — trước đây mở menu ra là không thấy nút Đăng
+            xuất. Vẫn chừa `safe-area-inset-bottom` cho vạch home của iPhone. */}
+        <div
+          className="flex-shrink-0 px-3 py-2 border-t pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+          style={{ borderColor: 'var(--color-border)' }}
+        >
           <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
             {user.email}
           </p>
@@ -205,7 +233,14 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
         </div>
       </nav>
 
-      <main key={pathname} className="flex-1 p-8 overflow-auto animate-fade-in">
+      {/* Vùng cuộn DUY NHẤT của trang. `pt-16` dưới `md` để nội dung không nằm
+          dưới nút hamburger `fixed top-4 left-4`; `paddingBottom` chừa đúng
+          chiều cao thanh phát đang thật sự chiếm chỗ. */}
+      <main
+        key={pathname}
+        className="flex-1 min-w-0 overflow-y-auto p-4 pt-16 md:p-8 animate-fade-in"
+        style={{ paddingBottom: 'calc(var(--player-bar-h) + var(--space-md))' }}
+      >
         {children}
       </main>
     </div>

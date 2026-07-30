@@ -84,7 +84,13 @@ export default function TransportControls({
   const iconSize = size === 'lg' ? 'w-5 h-5' : 'w-4 h-4';
   const playIconSize = size === 'lg' ? 'w-8 h-8' : 'w-5 h-5';
   const playButtonSize = size === 'lg' ? 'w-14 h-14' : 'w-9 h-9';
-  const gap = size === 'lg' ? 'gap-6' : 'gap-4';
+  const gap = size === 'lg' ? 'gap-6' : 'gap-2 md:gap-4';
+
+  // Thanh phát trên mobile chỉ vừa chỗ cho bài trước/play/bài sau — shuffle và
+  // repeat ẩn dưới `md` (mở overlay "Đang phát" thì có đủ, vì nó dùng
+  // `size="lg"`). Ẩn bằng class responsive chứ không bỏ render: hai nút này vẫn
+  // phải ở trong DOM cho test và cho người dùng bàn phím trên desktop hẹp.
+  const modeButtonVisibility = size === 'lg' ? '' : 'hidden md:inline-flex';
 
   const buttonBase =
     'relative p-2 rounded-full cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-80 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:opacity-30';
@@ -97,7 +103,7 @@ export default function TransportControls({
         title={disabledTitle}
         aria-pressed={shuffle}
         aria-label="Phát ngẫu nhiên"
-        className={buttonBase}
+        className={`${buttonBase} ${modeButtonVisibility}`}
         style={{ color: shuffle ? 'var(--color-accent)' : 'var(--color-foreground)' }}
       >
         <ShuffleIcon className={iconSize} />
@@ -145,7 +151,7 @@ export default function TransportControls({
         aria-label={
           repeat === 'ONE' ? 'Lặp lại một bài' : repeat === 'ALL' ? 'Lặp lại danh sách' : 'Lặp lại'
         }
-        className={buttonBase}
+        className={`${buttonBase} ${modeButtonVisibility}`}
         style={{ color: repeat !== 'OFF' ? 'var(--color-accent)' : 'var(--color-foreground)' }}
       >
         <RepeatIcon mode={repeat} className={iconSize} />

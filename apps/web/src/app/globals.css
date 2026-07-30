@@ -33,6 +33,29 @@
   --duration-slow: 300ms;
   --ease-standard: ease;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Thang z-index — nguồn duy nhất cho mọi lớp nổi. Trước đây mỗi file tự chọn
+     z-30/40/50 nên drawer nav (z-40) nằm DƯỚI thanh phát (z-50) và bị nó che
+     mất khối email/vai trò/nút Đăng xuất ở đáy: trên mobile mở menu ra là không
+     đăng xuất được. Thêm lớp nào mới thì khai báo ở đây, đừng viết số thẳng vào
+     component. */
+  --z-player-bar: 50;
+  --z-nav-backdrop: 60;
+  --z-nav-drawer: 70;
+  --z-nav-toggle: 80; /* phải trên drawer để còn bấm đóng được */
+  --z-now-playing: 90; /* overlay "Đang phát" toàn màn hình */
+  --z-dialog: 100; /* modal luôn trên tất cả */
+
+  /* Chiều cao thật của thanh phát. `AppShell` chừa chỗ theo biến này thay vì
+     đoán bằng `pb-28` cứng — thanh phát mobile từng xếp 3 hàng (~160px) trong
+     khi shell chỉ chừa 112px nên nội dung cuối trang bị cắt. */
+  --player-bar-h: 64px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --player-bar-h: 88px;
+  }
 }
 
 @theme inline {

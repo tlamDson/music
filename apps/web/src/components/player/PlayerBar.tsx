@@ -41,15 +41,26 @@ export default function PlayerBar() {
   return (
     <>
       <footer
-        className="fixed bottom-0 left-0 right-0 z-50 flex flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:gap-6"
+        className="fixed bottom-0 left-0 right-0 z-[var(--z-player-bar)] flex items-center gap-2 px-3 pb-[env(safe-area-inset-bottom)] md:gap-6 md:px-4"
         style={{
           backgroundColor: 'var(--color-muted)',
           borderTop: '1px solid var(--color-border)',
+          height: 'calc(var(--player-bar-h) + env(safe-area-inset-bottom))',
         }}
         aria-label="Trình phát nhạc"
       >
+        {/* Tiến trình trên mobile: một vạch mảnh ở mép trên thay cho thanh kéo —
+            kéo seek bằng ngón tay trên thanh 4px là bất khả thi, và thanh
+            `<input type="range">` chiếm hẳn một hàng. `aria-hidden` vì thanh
+            range thật (dưới đây) vẫn ở trong DOM và giữ role progressbar. */}
+        <div
+          aria-hidden="true"
+          className="md:hidden absolute top-0 left-0 h-0.5 transition-[width] duration-[var(--duration-fast)]"
+          style={{ width: `${progressPct}%`, backgroundColor: 'var(--color-accent)' }}
+        />
+
         {/* Bài đang phát */}
-        <div className="flex items-center gap-3 min-w-0 md:w-64">
+        <div className="flex items-center gap-3 min-w-0 flex-1 md:flex-none md:w-64">
           <CoverArt seed={current.id} label={current.title} size={44} />
           <div className="min-w-0">
             <MarqueeText text={current.title} className="text-sm font-medium" />
@@ -62,10 +73,13 @@ export default function PlayerBar() {
         </div>
 
         {/* Điều khiển + tiến trình */}
-        <div className="flex-1 flex flex-col gap-1 min-w-0">
+        <div className="flex-none flex flex-col gap-1 min-w-0 md:flex-1">
           <TransportControls />
 
-          <div className="flex items-center gap-3">
+          {/* Thanh kéo + mốc thời gian chỉ có từ `md` — dưới đó dùng vạch mảnh ở
+              trên. Ẩn bằng class responsive (không bỏ render) để vẫn còn đúng một
+              `progressbar` trong DOM ở mọi khổ màn hình. */}
+          <div className="hidden md:flex items-center gap-3">
             <span className="text-xs tabular-nums" style={{ color: MUTED_TEXT }}>
               {formatPosition(positionMs)}
             </span>
@@ -89,10 +103,10 @@ export default function PlayerBar() {
         </div>
 
         {/* Hàng chờ của quán + toàn màn hình + âm lượng */}
-        <div className="flex items-center justify-between gap-3 md:w-80 md:justify-end">
+        <div className="flex items-center gap-1 flex-none md:w-80 md:justify-end md:gap-3">
           {isStoreQueue && queue && (
             <span
-              className="text-xs px-2 py-1 rounded-full whitespace-nowrap"
+              className="hidden sm:inline-block text-xs px-2 py-1 rounded-full whitespace-nowrap"
               style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: 'var(--color-accent)' }}
             >
               Còn {queue.remaining} bài
@@ -109,7 +123,9 @@ export default function PlayerBar() {
             <ExpandIcon />
           </button>
 
-          <VolumeControl />
+          {/* Slider âm lượng vô dụng trên cảm ứng — âm lượng loa quán không do
+              tab này quyết định, và ngón tay không kéo nổi thanh 4px. */}
+          <VolumeControl className="hidden md:flex" />
         </div>
       </footer>
 

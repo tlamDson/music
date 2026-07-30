@@ -55,7 +55,7 @@ export default function Dialog({ open, onClose, ariaLabel, children }: DialogPro
       data-testid="dialog-backdrop"
       data-state={state}
       onClick={onClose}
-      className="dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="dialog-overlay fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center p-4"
       style={{
         ...exitDurationVar,
         backgroundColor: 'rgba(0,0,0,0.5)',

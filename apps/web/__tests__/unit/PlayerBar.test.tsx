@@ -389,6 +389,62 @@ describe('PlayerBar', () => {
     });
   });
 
+  // Bug QC: thanh phát mobile xếp 3 hàng (~160px) nhưng shell chỉ chừa 112px,
+  // và nó luôn nằm trên nên đè mất menu. Dưới `md` thu về một hàng gọn.
+  describe('mini-player trên mobile', () => {
+    it('cao đúng --player-bar-h và nằm ở lớp z của thanh phát', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      const bar = screen.getByRole('contentinfo', { name: 'Trình phát nhạc' });
+      expect(bar.className).toEqual(expect.stringContaining('z-[var(--z-player-bar)]'));
+      expect(bar.style.height).toEqual(expect.stringContaining('--player-bar-h'));
+      // Chừa vạch home của iPhone.
+      expect(bar.className).toEqual(expect.stringContaining('env(safe-area-inset-bottom)'));
+    });
+
+    it('ẩn thanh kéo seek và mốc thời gian dưới md nhưng vẫn giữ đúng một progressbar', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      // Vẫn đúng một progressbar ở mọi khổ màn hình — vạch mảnh mobile là
+      // aria-hidden, không sinh role thứ hai.
+      expect(screen.getAllByRole('progressbar')).toHaveLength(1);
+
+      const seekRow = screen.getByRole('progressbar').parentElement;
+      expect(seekRow?.className).toEqual(expect.stringContaining('hidden md:flex'));
+    });
+
+    it('ẩn cụm âm lượng dưới md', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      const volumeGroup = screen.getByRole('slider', { name: 'Âm lượng' }).parentElement;
+      expect(volumeGroup?.className).toEqual(expect.stringContaining('hidden md:flex'));
+      expect(volumeGroup?.className).not.toEqual(expect.stringMatching(/(^|\s)flex(\s|$)/));
+    });
+
+    it('vẫn giữ nút mở toàn màn hình trên mobile — đó là đường vào màn Đang phát', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      const expand = screen.getByRole('button', { name: 'Xem toàn màn hình' });
+      expect(expand.className).not.toEqual(expect.stringContaining('hidden'));
+    });
+
+    it('ẩn shuffle/repeat khỏi thanh phát dưới md, overlay vẫn hiện đủ', async () => {
+      renderBar();
+      await userEvent.click(screen.getByText('start'));
+
+      expect(screen.getByRole('button', { name: 'Phát ngẫu nhiên' }).className).toEqual(
+        expect.stringContaining('hidden md:inline-flex'),
+      );
+      expect(screen.getByRole('button', { name: /lặp lại/i }).className).toEqual(
+        expect.stringContaining('hidden md:inline-flex'),
+      );
+    });
+  });
+
   describe('volume control', () => {
     it('mutes and restores the previous volume level', async () => {
       renderBar();
