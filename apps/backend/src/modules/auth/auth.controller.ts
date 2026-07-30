@@ -1,6 +1,7 @@
 import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { loginIdentityTracker } from '../../common/throttler/client-ip.tracker';
 import { LoginSchema, RefreshTokenSchema } from '@cafe-music/shared';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
@@ -8,8 +9,12 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
-  // Siết chặt hơn mức mặc định toàn cục: chặn dò mật khẩu.
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  // Siết chặt hơn mức mặc định toàn cục: chặn dò mật khẩu. Đếm theo email đang
+  // bị dò chứ không theo IP — `req.ip` sau proxy của Railway không ổn định nên
+  // đếm theo nó thì brute-force lọt qua (xem `loginIdentityTracker`).
+  @Throttle({
+    default: { limit: 5, ttl: 60000, getTracker: loginIdentityTracker },
+  })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   login(
