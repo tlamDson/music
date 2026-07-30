@@ -78,6 +78,52 @@ function StartButton() {
       >
         start
       </button>
+      {/* Giữa hàng chờ — cả "Bài trước" lẫn "Bài kế tiếp" đều có chỗ để đi. */}
+      <button
+        onClick={() =>
+          player.playTrack(
+            {
+              id: 'track-2',
+              title: 'Bài giữa hàng chờ',
+              artist: 'Ai đó',
+              url: 'https://s3/2.mp3',
+              durationMs: 200_000,
+            },
+            {
+              mode: 'store',
+              storeId: 'store-1',
+              queue: { index: 1, total: 3, remaining: 1 },
+              repeat: 'OFF',
+              shuffle: false,
+            },
+          )
+        }
+      >
+        start-middle-track
+      </button>
+      {/* Bài cuối hàng chờ — không còn gì để chuyển tiếp. */}
+      <button
+        onClick={() =>
+          player.playTrack(
+            {
+              id: 'track-3',
+              title: 'Bài cuối hàng chờ',
+              artist: 'Ai đó',
+              url: 'https://s3/3.mp3',
+              durationMs: 200_000,
+            },
+            {
+              mode: 'store',
+              storeId: 'store-1',
+              queue: { index: 2, total: 3, remaining: 0 },
+              repeat: 'OFF',
+              shuffle: false,
+            },
+          )
+        }
+      >
+        start-last-track
+      </button>
       <button
         onClick={() =>
           player.playTrack(
@@ -180,7 +226,7 @@ describe('PlayerBar', () => {
     it('asks the server to skip to the previous track', async () => {
       mockApi.post.mockResolvedValue(undefined);
       renderBar();
-      await userEvent.click(screen.getByText('start'));
+      await userEvent.click(screen.getByText('start-middle-track'));
 
       await userEvent.click(await screen.findByRole('button', { name: 'Bài trước' }));
 
@@ -190,11 +236,53 @@ describe('PlayerBar', () => {
     it('asks the server to skip to the next track', async () => {
       mockApi.post.mockResolvedValue(undefined);
       renderBar();
-      await userEvent.click(screen.getByText('start'));
+      await userEvent.click(screen.getByText('start-middle-track'));
 
       await userEvent.click(await screen.findByRole('button', { name: 'Bài kế tiếp' }));
 
       expect(mockApi.post).toHaveBeenCalledWith('/sync/stores/store-1/next');
+    });
+
+    // QC: nút chuyển bài ở hai đầu hàng chờ đưa người dùng ra khỏi playlist —
+    // bấm "Bài kế tiếp" ở bài cuối làm server dừng hẳn và thanh phát biến mất.
+    // Không còn chỗ để đi thì không được có nút.
+    describe('hai đầu hàng chờ', () => {
+      it('không có nút "Bài trước" ở bài đầu', async () => {
+        renderBar();
+        await userEvent.click(screen.getByText('start'));
+
+        expect(await screen.findByRole('button', { name: 'Bài kế tiếp' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Bài trước' })).not.toBeInTheDocument();
+      });
+
+      it('không có nút "Bài kế tiếp" ở bài cuối', async () => {
+        renderBar();
+        await userEvent.click(screen.getByText('start-last-track'));
+
+        expect(await screen.findByRole('button', { name: 'Bài trước' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Bài kế tiếp' })).not.toBeInTheDocument();
+      });
+
+      it('có cả hai nút khi đang ở giữa hàng chờ', async () => {
+        renderBar();
+        await userEvent.click(screen.getByText('start-middle-track'));
+
+        expect(await screen.findByRole('button', { name: 'Bài trước' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Bài kế tiếp' })).toBeInTheDocument();
+      });
+
+      // `repeat: 'ALL'` thì hàng chờ thành vòng tròn — hai đầu vẫn đi được, nên
+      // cả hai nút phải quay lại.
+      it('hiện lại cả hai nút ở bài cuối khi server xác nhận lặp ALL', async () => {
+        renderBar();
+        await userEvent.click(screen.getByText('start-last-track'));
+        expect(screen.queryByRole('button', { name: 'Bài kế tiếp' })).not.toBeInTheDocument();
+
+        await userEvent.click(screen.getByText('simulate-repeat-all'));
+
+        expect(await screen.findByRole('button', { name: 'Bài kế tiếp' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Bài trước' })).toBeInTheDocument();
+      });
     });
 
     it('toggles shuffle for the store', async () => {

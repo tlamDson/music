@@ -343,17 +343,48 @@ describe('SyncService', () => {
       );
     });
 
-    it('hết hàng chờ thì dừng hẳn và dọn state', async () => {
+    // Bấm next ở bài cuối TỪNG gọi `stopStore` — xoá state Redis + broadcast
+    // `store-stopped`, nên UI mất luôn ngữ cảnh playlist ("tự out khỏi
+    // playlist" theo QC). Lệnh thủ công ở cuối hàng chờ phải là no-op: giữ
+    // nguyên bài đang phát, để người dùng còn thấy mình đang ở đâu.
+    it('ở bài cuối thì không làm gì, không dừng hẳn và không dọn state', async () => {
       redis.getStorePlayback.mockResolvedValue(playbackAt(1) as never);
 
       const result = await service.nextStore('store-1', orgAdminUser);
 
       expect(result.finished).toBe(true);
-      expect(redis.clearStorePlayback).toHaveBeenCalledWith('store-1');
-      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+      expect(redis.clearStorePlayback).not.toHaveBeenCalled();
+      expect(gateway.broadcastToStore).not.toHaveBeenCalledWith(
         'store-1',
         'store-stopped',
-        expect.objectContaining({ storeId: 'store-1' }),
+        expect.anything(),
+      );
+      // Không phát lại bài nào — nhạc đang chạy không bị cắt ngang.
+      expect(gateway.broadcastToStore).not.toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.anything(),
+      );
+    });
+
+    // `repeat: 'ALL'` thì cuối hàng chờ vẫn còn chỗ để đi — quay về bài đầu.
+    it('ở bài cuối mà lặp ALL thì quay về bài đầu', async () => {
+      redis.getStorePlayback.mockResolvedValue({
+        ...playbackAt(1),
+        repeat: 'ALL',
+      } as never);
+      prisma.track.findFirst.mockResolvedValue(trackA as never);
+
+      const result = await service.nextStore('store-1', orgAdminUser);
+
+      expect(result.finished).toBe(false);
+      expect(gateway.broadcastToStore).toHaveBeenCalledWith(
+        'store-1',
+        'store-now-playing',
+        expect.objectContaining({
+          trackId: trackA.id,
+          queue: { index: 0, total: 2, remaining: 1 },
+        }),
       );
     });
   });

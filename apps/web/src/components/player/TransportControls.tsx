@@ -23,10 +23,21 @@ export default function TransportControls({
   size?: 'sm' | 'lg';
   className?: string;
 }) {
-  const { isPlaying, mode, storeId, repeat, shuffle, toggle, togglePreviewRepeat } = usePlayer();
+  const { isPlaying, mode, storeId, queue, repeat, shuffle, toggle, togglePreviewRepeat } =
+    usePlayer();
 
   const isStoreMode = mode === 'store' && storeId !== null;
   const disabledTitle = isStoreMode ? undefined : PREVIEW_NO_QUEUE_TITLE;
+
+  // Hai đầu hàng chờ thì bỏ nút hẳn, không chỉ làm mờ: bấm "Bài kế tiếp" ở bài
+  // cuối từng khiến server dừng hẳn quán và thanh phát biến mất giữa lúc đang
+  // nghe (QC: "tự out khỏi playlist"). `repeat: 'ALL'` biến hàng chờ thành vòng
+  // tròn nên hai đầu lại đi được — nút quay lại.
+  // Nghe thử (`mode: 'preview'`) không có hàng chờ: vẫn render nhưng `disabled`
+  // kèm `title` giải thích, để người dùng hiểu vì sao bấm không được.
+  const atQueueEdge = isStoreMode && queue !== null && repeat !== 'ALL';
+  const showPrevious = !atQueueEdge || queue.index > 0;
+  const showNext = !atQueueEdge || queue.remaining > 0;
 
   const handleShuffle = async () => {
     if (!isStoreMode || !storeId) return;
@@ -93,16 +104,18 @@ export default function TransportControls({
         {shuffle && <ActiveDot />}
       </button>
 
-      <button
-        onClick={() => void handlePrevious()}
-        disabled={!isStoreMode}
-        title={disabledTitle}
-        aria-label="Bài trước"
-        className={buttonBase}
-        style={{ color: 'var(--color-foreground)' }}
-      >
-        <PreviousIcon className={iconSize} />
-      </button>
+      {showPrevious && (
+        <button
+          onClick={() => void handlePrevious()}
+          disabled={!isStoreMode}
+          title={disabledTitle}
+          aria-label="Bài trước"
+          className={buttonBase}
+          style={{ color: 'var(--color-foreground)' }}
+        >
+          <PreviousIcon className={iconSize} />
+        </button>
+      )}
 
       <button
         onClick={toggle}
@@ -113,16 +126,18 @@ export default function TransportControls({
         {isPlaying ? <PauseIcon className={playIconSize} /> : <PlayIcon className={playIconSize} />}
       </button>
 
-      <button
-        onClick={() => void handleNext()}
-        disabled={!isStoreMode}
-        title={disabledTitle}
-        aria-label="Bài kế tiếp"
-        className={buttonBase}
-        style={{ color: 'var(--color-foreground)' }}
-      >
-        <NextIcon className={iconSize} />
-      </button>
+      {showNext && (
+        <button
+          onClick={() => void handleNext()}
+          disabled={!isStoreMode}
+          title={disabledTitle}
+          aria-label="Bài kế tiếp"
+          className={buttonBase}
+          style={{ color: 'var(--color-foreground)' }}
+        >
+          <NextIcon className={iconSize} />
+        </button>
+      )}
 
       <button
         onClick={() => void handleRepeat()}

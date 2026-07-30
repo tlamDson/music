@@ -133,6 +133,15 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
 
   const nowPlaying = store.nowPlaying;
 
+  // Cùng luật với `TransportControls`: hết chỗ để đi thì bỏ nút hẳn. "Bài sau" ở
+  // bài cuối từng làm server dừng hẳn quán, admin mất luôn ngữ cảnh playlist.
+  // `repeat: 'ALL'` (đọc từ bridge WS, không có trong `nowPlaying`) biến hàng chờ
+  // thành vòng tròn nên hai đầu lại đi được.
+  const queue = nowPlaying?.queue ?? null;
+  const atQueueEdge = queue !== null && bridgeState.repeat !== 'ALL';
+  const showPrevious = !atQueueEdge || queue.index > 0;
+  const showNext = !atQueueEdge || queue.remaining > 0;
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
@@ -218,19 +227,40 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                 </button>
               )}
 
-              <button
-                onClick={() =>
-                  void run(() => api.post(`/sync/stores/${storeId}/next`), 'Đã chuyển bài')
-                }
-                className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
-                style={{
-                  backgroundColor: 'var(--color-primary)',
-                  color: 'var(--color-foreground)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                Bài sau
-              </button>
+              {showPrevious && (
+                <button
+                  onClick={() =>
+                    void run(
+                      () => api.post(`/sync/stores/${storeId}/previous`),
+                      'Đã quay lại bài trước',
+                    )
+                  }
+                  className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
+                  style={{
+                    backgroundColor: 'var(--color-primary)',
+                    color: 'var(--color-foreground)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  Bài trước
+                </button>
+              )}
+
+              {showNext && (
+                <button
+                  onClick={() =>
+                    void run(() => api.post(`/sync/stores/${storeId}/next`), 'Đã chuyển bài')
+                  }
+                  className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
+                  style={{
+                    backgroundColor: 'var(--color-primary)',
+                    color: 'var(--color-foreground)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  Bài sau
+                </button>
+              )}
 
               <button
                 onClick={() =>
