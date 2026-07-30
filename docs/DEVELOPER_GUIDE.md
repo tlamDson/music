@@ -96,7 +96,7 @@ Production (Railway) chạy `prisma migrate deploy` tự động lúc khởi đ�
 
 Backend **không có endpoint đăng ký công khai** (`/auth` chỉ có `login` + `refresh`), và tạo user qua `POST /users` lại yêu cầu sẵn một `ORG_ADMIN`. Nên tài khoản đầu tiên luôn phải sinh từ script.
 
-**Local & staging — `prisma:seed`** (dữ liệu demo: 1 org, 1 org admin, 3 store + 3 store admin cùng một sync group):
+**Local & staging — `prisma:seed`** (dữ liệu demo: 1 org, 1 org admin, 3 store + 3 store admin):
 
 ```bash
 pnpm --filter @cafe-music/backend prisma:seed
@@ -527,9 +527,9 @@ cafe-music/
 | Path                                 | Mô tả                                                                 |
 | ------------------------------------ | --------------------------------------------------------------------- |
 | `apps/backend/src/modules/`          | Mỗi domain một module NestJS (service, controller, test riêng)        |
-| `apps/backend/prisma/schema.prisma`  | Schema DB: org, store, playlist, track, sync group                    |
+| `apps/backend/prisma/schema.prisma`  | Schema DB: org, store, playlist, track, lịch phát                               |
 | `apps/web/src/app/player/`           | Trang phát nhạc tại quầy — kết nối WebSocket                          |
-| `apps/web/src/app/dashboard/`        | Admin điều khiển playlist, sync group                                 |
+| `apps/web/src/app/dashboard/`        | Admin điều khiển playlist, phát nhạc ra quán                                 |
 | `packages/shared/`                   | DTO Zod + TypeScript types dùng chung — đổi ở đây, BE và FE cùng sync |
 | `design-system/cafe-music/MASTER.md` | Nguồn sự thật UI — đọc trước khi code frontend                        |
 | `.cursor/rules/`                     | Quy tắc bắt buộc cho AI assistant trong Cursor                        |
