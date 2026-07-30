@@ -99,6 +99,16 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 
 `User.isActive` (`Boolean @default(true)`) được `AuthService` (`apps/backend/src/modules/auth/auth.service.ts`) check ở **3 chỗ**: `login`, `refreshTokens`, và `validateJwtPayload` (`JwtStrategy` gọi mỗi request có JWT — quan trọng nhất, vì access token đang còn hạn của tài khoản vừa bị vô hiệu hoá cũng bị từ chối ngay ở request tiếp theo, không cần token blocklist). ORG_ADMIN đổi trạng thái qua `PATCH /users/:id { isActive }` — dùng chung route CRUD user đã có (đã scope theo `organizationId`), không có route riêng `/deactivate`. Frontend (`apps/web/src/lib/api-client.ts`) tự xoá token + redirect `/login` khi gặp `401` ngoài `/auth/login`.
 
+## Rate limit — counter ở Redis, định danh client theo header của edge
+
+`ThrottlerModule` được cấu hình ở [app.module.ts](../../apps/backend/src/app.module.ts) qua `forRootAsync`, **không** dùng mặc định của `@nestjs/throttler`:
+
+- **Storage**: `RedisThrottlerStorage` (`src/common/throttler/`) — đếm bằng một script Lua `INCR` + `PEXPIRE` (chỉ đặt hạn ở hit đầu, nếu không cửa sổ bị đẩy lùi mãi và không bao giờ đóng), key prefix `throttle:` tách khỏi `store:*`. Mặc định của thư viện giữ counter trong `Map` của process → mất sạch mỗi lần Railway thay container và mỗi instance đếm riêng.
+- **Tracker**: `clientIpTracker` đọc `x-envoy-external-address` (edge của Railway đặt), fallback `req.ip`. **Không** đọc entry trái nhất của `X-Forwarded-For` — client gửi header đó lên được, xoay giá trị là thoát rate limit.
+- **Vì sao**: `main.ts` set `trust proxy: 1` nên Express suy `req.ip` bằng cách trừ **đúng một** hop khỏi XFF; chuỗi proxy của Railway không cố định độ dài nên cùng một client ra hai `req.ip` khác nhau → hai key → counter reset giữa chừng. Đo thật trên staging trước khi sửa: `X-RateLimit-Remaining` chạy 4,3,2,1 rồi **nhảy lại 4**, 8 lần login sai liên tiếp vẫn không ra `429`; `X-RateLimit-Reset` trả 38 rồi 39 — hai cửa sổ đếm song song cho cùng một client.
+- **Cách kiểm tra lại** (không cần deploy log tạm): curl `/auth/login` nhiều lần rồi đọc header `X-RateLimit-Remaining` — phải giảm đều tới 0 rồi `429`, không được nhảy ngược lên.
+- `blockDuration` cố tình không hiện thực hoá: repo chỉ dùng `ttl` + `limit`.
+
 ## Bản đồ API (`/api/v1`)
 
 | Nhóm     | Endpoint chính                                                                                                                                                                                                                                        |
