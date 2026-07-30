@@ -1,0 +1,45 @@
+name: Backup Database
+
+# Backup DB production lên Cloudflare R2 (off-site).
+#
+# Vì sao cần lớp này khi Railway đã có snapshot: snapshot của Railway nằm CÙNG
+# account với database. Mất quyền truy cập account/project là mất luôn backup.
+#
+# Chạy tay được (workflow_dispatch) — dùng cho bài test restore định kỳ và để
+# thử đường dây trên staging trước khi production tồn tại.
+on:
+  schedule:
+    # 18:00 UTC = 01:00 giờ VN, lúc quán đóng cửa.
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Môi trường cần backup
+        type: choice
+        options: [production, staging]
+        default: production
+
+jobs:
+  backup:
+    name: pg_dump → R2
+    runs-on: ubuntu-latest
+
+    # pg_dump PHẢI >= major version của server, nếu không nó từ chối dump.
+    # Railway đang chạy Postgres 18.x — kiểm tra lại bằng `show server_version;`
+    # trước khi đổi tag này.
+    container: postgres:18-alpine
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install aws CLI
+        run: apk add --no-cache aws-cli
+
+      - name: Run backup
+        env:
+          DATABASE_URL: ${{ inputs.environment == 'staging' && secrets.STAGING_DATABASE_URL || secrets.PROD_DATABASE_URL }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY: ${{ secrets.R2_BACKUP_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_BACKUP_SECRET_KEY }}
+        run: sh scripts/backup-db.sh "${{ inputs.environment || 'production' }}"
