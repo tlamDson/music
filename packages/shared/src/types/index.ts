@@ -160,6 +160,17 @@ export interface WsStoreModeChangedPayload {
 }
 
 /**
+ * Payload của `store-paused` / `store-stopped` — chỉ cần biết quán nào, lúc nào.
+ * Client **phải** đối chiếu `storeId` trước khi dừng thẻ audio: một tab có thể
+ * đang giữ socket của nhiều quán, nghe mà không lọc thì quán khác tạm dừng cũng
+ * tắt nhạc đang phát trong tab này.
+ */
+export interface WsStoreStatePayload {
+  storeId: string;
+  serverTs: number;
+}
+
+/**
  * Ảnh chụp "đang phát cái gì" lúc client mở trang. Broadcast WS là
  * fire-and-forget, không replay khi join room — thiếu cái này thì trang mở sau
  * lúc admin bấm phát sẽ trắng cho tới lần chuyển bài kế tiếp.

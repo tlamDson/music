@@ -135,6 +135,10 @@ function Harness({
       </button>
       <button onClick={() => player.toggle()}>toggle</button>
       <button onClick={() => player.stop()}>stop</button>
+      <button onClick={() => player.pauseStore('store-1')}>pause-store-1</button>
+      <button onClick={() => player.pauseStore('store-2')}>pause-store-2</button>
+      <button onClick={() => player.stopStore('store-1')}>stop-store-1</button>
+      <button onClick={() => player.stopStore('store-2')}>stop-store-2</button>
       <button onClick={() => player.setPlaybackMode({ repeat: 'ALL', shuffle: true })}>
         confirm-server-mode
       </button>
@@ -402,6 +406,62 @@ describe('PlayerProvider', () => {
 
     expect(screen.getByTestId('repeat')).toHaveTextContent('OFF');
     expect(currentAudio().loop).toBe(false);
+  });
+
+  // Bug QC: `pause`/`stop` trần không biết lệnh đến từ quán nào. Một tab giữ
+  // socket của nhiều quán thì quán B tạm dừng/dừng hẳn cũng tắt được nhạc quán A
+  // đang phát. Hai hàm scoped này phải tự no-op khi không đúng quán đang sở hữu
+  // thẻ audio.
+  describe('pauseStore / stopStore theo phạm vi quán', () => {
+    it('bỏ qua lệnh tạm dừng của quán khác', async () => {
+      renderHarness({ mode: 'store', storeId: 'store-1' });
+      await userEvent.click(screen.getByText('start'));
+      expect(screen.getByTestId('playing')).toHaveTextContent('true');
+
+      await userEvent.click(screen.getByText('pause-store-2'));
+
+      expect(screen.getByTestId('playing')).toHaveTextContent('true');
+      expect(currentAudio().paused).toBe(false);
+    });
+
+    it('tạm dừng khi đúng quán đang phát', async () => {
+      renderHarness({ mode: 'store', storeId: 'store-1' });
+      await userEvent.click(screen.getByText('start'));
+
+      await userEvent.click(screen.getByText('pause-store-1'));
+
+      expect(screen.getByTestId('playing')).toHaveTextContent('false');
+      expect(currentAudio().paused).toBe(true);
+    });
+
+    it('bỏ qua lệnh dừng hẳn của quán khác', async () => {
+      renderHarness({ mode: 'store', storeId: 'store-1' });
+      await userEvent.click(screen.getByText('start'));
+
+      await userEvent.click(screen.getByText('stop-store-2'));
+
+      expect(screen.getByTestId('title')).not.toHaveTextContent('idle');
+    });
+
+    it('dừng hẳn khi đúng quán đang phát', async () => {
+      renderHarness({ mode: 'store', storeId: 'store-1' });
+      await userEvent.click(screen.getByText('start'));
+
+      await userEvent.click(screen.getByText('stop-store-1'));
+
+      expect(screen.getByTestId('title')).toHaveTextContent('idle');
+    });
+
+    // Nghe thử (`mode: 'preview'`) không thuộc quán nào — lệnh WS của bất kỳ quán
+    // cũng không được cắt ngang bài đang nghe thử tại chỗ.
+    it('không đụng vào nhạc đang nghe thử', async () => {
+      renderHarness({ mode: 'preview', storeId: null });
+      await userEvent.click(screen.getByText('start'));
+
+      await userEvent.click(screen.getByText('stop-store-1'));
+
+      expect(screen.getByTestId('title')).not.toHaveTextContent('idle');
+    });
   });
 
   it('resets repeat/shuffle and audio.loop on stop', async () => {

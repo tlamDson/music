@@ -68,6 +68,15 @@ interface PlayerContextValue {
   seek: (positionMs: number) => void;
   changeVolume: (volume: number) => void;
   stop: () => void;
+  /**
+   * `pause`/`stop` nhưng chỉ khi thẻ audio đang thật sự phát nhạc CỦA quán đó.
+   * Lệnh từ WS luôn đi qua hai hàm này: một tab có thể đang mở socket của nhiều
+   * quán, và `pause`/`stop` trần thì quán nào bắn event cũng dừng được nhạc của
+   * quán khác đang phát trong tab (bug QC: store admin đổi bài làm cả chuỗi đổi
+   * theo).
+   */
+  pauseStore: (storeId: string) => void;
+  stopStore: (storeId: string) => void;
   /** Server xác nhận đổi repeat/shuffle (qua WS) — không đụng vào thẻ audio. */
   setPlaybackMode: (mode: { repeat?: StoreRepeatMode; shuffle?: boolean }) => void;
   /** Nghe thử: đổi cục bộ giữa lặp một bài (audio.loop) và không lặp. */
@@ -435,6 +444,31 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setShuffleState(false);
   }, [ensureAudio, positionStore]);
 
+  /** Thẻ audio hiện đang phát nhạc của đúng quán này? */
+  const ownsStore = useCallback(
+    (candidateStoreId: string) =>
+      modeRef.current === 'store' && storeIdRef.current === candidateStoreId,
+    [],
+  );
+
+  const pauseStore = useCallback(
+    (candidateStoreId: string) => {
+      if (!ownsStore(candidateStoreId)) return;
+      pause();
+    },
+    [ownsStore, pause],
+  );
+
+  const stopStore = useCallback(
+    (candidateStoreId: string) => {
+      if (!ownsStore(candidateStoreId)) return;
+      storeIdRef.current = null;
+      setStoreId(null);
+      stop();
+    },
+    [ownsStore, stop],
+  );
+
   // Server xác nhận đổi repeat/shuffle qua broadcast `store-mode-changed` (đổi
   // mode không làm gián đoạn nhạc) — chỉ cập nhật state hiển thị, không đụng gì
   // tới thẻ audio đang chạy.
@@ -475,6 +509,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       seek,
       changeVolume,
       stop,
+      pauseStore,
+      stopStore,
       setPlaybackMode,
       togglePreviewRepeat,
     }),
@@ -494,6 +530,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       seek,
       changeVolume,
       stop,
+      pauseStore,
+      stopStore,
       setPlaybackMode,
       togglePreviewRepeat,
     ],

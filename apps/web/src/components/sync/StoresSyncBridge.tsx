@@ -1,15 +1,10 @@
 'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { usePathname } from 'next/navigation';
 import { useSync } from '../../hooks/useSync';
 import { useClockOffset } from '../../hooks/useClockOffset';
-import { api } from '../../lib/api-client';
-import type {
-  ApiResponse,
-  Store,
-  WsStoreNowPlayingPayload,
-  StoreRepeatMode,
-} from '@cafe-music/shared';
+import type { WsStoreNowPlayingPayload, StoreRepeatMode } from '@cafe-music/shared';
 
 export interface StoreSyncSnapshot {
   isConnected: boolean;
@@ -80,10 +75,22 @@ export function useStoresSync(storeId: string | null): StoreSyncSnapshot {
   return all[storeId] ?? DEFAULT_SNAPSHOT;
 }
 
+/** Trang chi tiết quán — `/dashboard/stores/<id>` (và mọi route con của nó). */
+const STORE_DETAIL_PATH = /^\/dashboard\/stores\/([^/]+)/;
+
+/**
+ * Quán mà tab dashboard đang "mở", tức quán duy nhất được phép phát ra thẻ audio
+ * dùng chung. Danh sách `/dashboard/stores` (không có id) và mọi trang khác đều
+ * trả `null` — dashboard ở đó chỉ xem trạng thái, không phát tiếng.
+ */
+export function focusedStoreIdFrom(pathname: string | null): string | null {
+  return pathname?.match(STORE_DETAIL_PATH)?.[1] ?? null;
+}
+
 /** Không render gì — chỉ mở một socket sync cho một quán cụ thể, và báo cáo
- * trạng thái của nó lên external store theo đúng `storeId`. Tách riêng để
- * `StoresSyncBridge` dựng được nhiều instance (một cho mỗi quán) mà vẫn tuân
- * thủ rules of hooks — mỗi instance chỉ gọi `useSync` đúng một lần. */
+ * trạng thái của nó lên external store theo đúng `storeId`. Tách riêng khỏi
+ * `StoresSyncBridge` để `storeId` đổi là cả subscriber remount (qua `key`), nhờ
+ * đó `useSync` chạy cleanup dừng nhạc của quán cũ trước khi nghe quán mới. */
 function StoreSyncSubscriber({
   storeId,
   token,
@@ -108,39 +115,43 @@ function StoreSyncSubscriber({
 }
 
 /**
- * Không render gì — chỉ mở socket sync cho dashboard của ORG_ADMIN, để admin
- * bấm phát ở quán nào thì chính tab của mình cũng nghe được bài đó.
+ * Không render gì — mở socket sync cho **đúng một quán**: quán mà tab dashboard
+ * đang mở (`/dashboard/stores/<id>`). Admin bấm phát ở đó thì tự nghe được bài
+ * đang chạy, và trạng thái quán lên external store để `StoreDetail` đọc qua
+ * `useStoresSync(storeId)` mà không phải chờ lần poll 10 giây kế tiếp.
  *
- * Từng join theo sync group; giờ tầng nhóm đã bị bỏ nên subscribe theo **từng
- * quán** của tổ chức. Vẫn giữ nguyên bài học cũ: phải mở cho mọi quán chứ không
- * chỉ quán đầu tiên, nếu không bấm Play cho quán thứ hai trở đi vẫn trả 200
- * nhưng tab admin im lặng hoàn toàn.
+ * **Trước đây mở một socket cho MỌI quán của tổ chức** (fetch `GET /stores`) và
+ * tất cả đổ vào cùng một `PlayerProvider` — cả app chỉ có một thẻ audio, nên
+ * quán nào bắn `store-now-playing` cũng cướp được nó: một store admin đổi bài ở
+ * quán mình làm tab org admin nhảy sang bài đó (bug QC). Tệ hơn, nút "Bài kế
+ * tiếp" trên thanh phát bắn vào `usePlayer().storeId` = quán vừa bắn event gần
+ * nhất, nên org admin đang xem quán A có thể đổi bài thật của quán C. Việc thu về
+ * một socket cũng hết làm phồng `SyncGateway.countStoreClients` (mỗi tab
+ * dashboard từng cộng +1 "màn hình đang kết nối" cho mọi quán).
  *
- * Ngoài việc phát nhạc qua `PlayerProvider` chung, mỗi subscriber giờ còn báo
- * cáo trạng thái của quán mình lên một external store — đọc bằng
- * `useStoresSync(storeId)` ở bất kỳ đâu trong `/dashboard/**` (vd `StoreDetail`)
- * mà không cần bọc lại cây component bằng Context.Provider.
+ * Đổi lại: ở các trang dashboard khác (tổng quan, playlist, kho nhạc) tab admin
+ * không phát tiếng — đúng như rule "chỉ `/dashboard/stores/[id]` mới phát ra loa
+ * quán".
  */
 export default function StoresSyncBridge() {
+  const pathname = usePathname();
   const [token, setToken] = useState<string | null>(null);
-  const [storeIds, setStoreIds] = useState<string[]>([]);
   const { offset, measureOffset } = useClockOffset();
 
   useEffect(() => {
     setToken(localStorage.getItem('accessToken'));
     void measureOffset();
-
-    api
-      .get<ApiResponse<Store[]>>('/stores')
-      .then((res) => setStoreIds(res.data.map((store) => store.id)))
-      .catch(() => setStoreIds([]));
   }, [measureOffset]);
 
+  const focusedStoreId = focusedStoreIdFrom(pathname);
+  if (!focusedStoreId) return null;
+
   return (
-    <>
-      {storeIds.map((storeId) => (
-        <StoreSyncSubscriber key={storeId} storeId={storeId} token={token} clockOffset={offset} />
-      ))}
-    </>
+    <StoreSyncSubscriber
+      key={focusedStoreId}
+      storeId={focusedStoreId}
+      token={token}
+      clockOffset={offset}
+    />
   );
 }
