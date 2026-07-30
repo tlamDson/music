@@ -1,7 +1,7 @@
 # Production Readiness — Trạng thái & Bước tiếp theo
 
 > File này là **điểm bắt đầu** cho bất kỳ ai (người hoặc AI) tiếp tục việc đưa dự án lên production.
-> Cập nhật lần cuối: 2026-07-25 · Nhánh chuẩn: `develop`
+> Cập nhật lần cuối: 2026-07-30 · Nhánh chuẩn: `develop`
 
 ## TL;DR
 
@@ -11,9 +11,9 @@ Hạ tầng đích: **Vercel** (web) · **Railway** (backend + Postgres + Redis)
 | ----- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | **0** | Code readiness — vá blocker config/security, migration, Dockerfile, CI, health check, logging         | ✅ **Xong** (10 PR, #9–#18)                                           |
 | **1** | Staging — dựng Railway env `staging` + R2 bucket + Vercel preview, seed tài khoản, test tay           | ✅ **Live** (2026-07-25) — xem "Trạng thái staging hiện tại" bên dưới |
-| **2** | Production — provision prod, cắt release `v0.1.0` (tag + GitHub Release), bootstrap admin, smoke test | ⬜ Chưa bắt đầu                                                       |
+| **2** | Production — provision prod, cắt release `v0.1.0` (tag + GitHub Release), bootstrap admin, smoke test | 🔶 **Code đã sẵn sàng** — chờ provision hạ tầng, xem Phase 2 bên dưới |
 
-**Việc code còn nợ trước khi sang Phase 2:** bump `version` lên `0.1.0` ở 3 `package.json` (hiện đều là `0.0.1`) + viết `CHANGELOG.md`. Cố ý để dành đến khi test local xong để khỏi bump hai lần.
+**Việc code chặn launch đã xong hết:** rate limit login đã chặn thật (#68, #69 — đã verify trên staging), Sentry + backup + README deploy/rollback (#70), version bump `0.1.0` + `CHANGELOG.md`. Còn lại là **thao tác hạ tầng**, xem Phase 2.
 
 ---
 
@@ -123,7 +123,7 @@ Mô hình: `develop` → **staging**, `main` → **production**. Mỗi môi trư
 
 Đã verify end-to-end qua chrome-devtools MCP: login → vào đúng `/dashboard`, đúng role `ORG_ADMIN`. `/health` và `/health/ready` đều `up` (database + redis).
 
-**Nợ đã biết, chưa chặn launch:** rate limit `/auth/login` (`@Throttle({limit:5, ttl:60000})`) có hoạt động (`429` xuất hiện) nhưng **không nhất quán** khi test dồn dập trên Railway — có lúc 6+ request sai liên tiếp vẫn lọt qua trót lọt (401 thay vì 429), có lúc chặn rồi lại mở ra giữa chừng trong cùng cửa sổ 60s, dù cùng 1 deployment instance và cùng client IP (xác nhận qua `railway logs --http`). Nghi vấn: cơ chế lưu trạng thái in-memory của `@nestjs/throttler` có vấn đề timing/race trên môi trường Railway. **Cần điều tra thêm trước khi có user thật** (brute-force login có thể không bị chặn triệt để) — chưa xác định được có phải bug code hay đặc thù platform.
+**Nợ rate limit đã đóng (2026-07-30).** Nguyên nhân thật: đếm theo IP không dùng được trên Railway — edge round-robin qua nhiều địa chỉ nên `req.ip` (Express suy ra từ `X-Forwarded-For` với `trust proxy: 1`) của cùng một client không ổn định, mỗi key chỉ đếm được một phần request. Đo được bằng header `X-RateLimit-Remaining`: chạy 4,3,2,1 rồi **nhảy lại 4** và không bao giờ ra `429`. Chuyển counter sang Redis (#68) chưa đủ — pattern đổi thành 4,4,3,3,2,2, chứng minh vấn đề nằm ở **key** chứ không phải nơi lưu. Fix cuối (#69): `/auth/login` đếm theo **email đang bị dò**, miễn nhiễm với tầng mạng. Đã verify trên staging: 3/3 lượt đếm sạch 4,3,2,1,0 rồi `429` ở lần thứ 6, và tài khoản khác không bị khoá lây. **Giới hạn còn lại:** không chặn kiểu rải mật khẩu qua nhiều tài khoản; giới hạn 100 req/60s toàn cục vẫn theo IP nên vẫn best-effort.
 
 1. **Railway** — tạo environment `staging`, backend deploy từ nhánh `develop`, kèm Postgres + Redis riêng.
 2. **Cloudflare R2** — bucket `cafe-music-staging`, API token scope riêng, bật CORS cho origin web staging.
@@ -162,30 +162,79 @@ Generate secret: `node -e "console.log(require('crypto').randomBytes(64).toStrin
 ```bash
 cp scripts/staging.env.example .env.staging.local   # điền giá trị thật, file này bị .gitignore chặn
 railway login && railway link                        # chọn đúng project, environment "staging", service backend
-sh scripts/setup-railway-staging-env.sh
+sh scripts/setup-railway-env.sh staging
 ```
 
-Script tự sinh `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` nếu để trống (và ghi lại vào `.env.staging.local` để chạy lại không đổi secret), bỏ qua biến còn trống (vd `WEB_URL` trước khi có domain Vercel — điền rồi chạy lại), và **chặn cứng** nếu `railway status` cho thấy đang trỏ vào environment `production`.
+Script tự sinh `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` nếu để trống (và ghi lại vào `.env.staging.local` để chạy lại không đổi secret), bỏ qua biến còn trống (vd `WEB_URL` trước khi có domain Vercel — điền rồi chạy lại), và **chặn cứng** nếu `railway status` không khớp environment truyền vào (với `production` còn bắt gõ đúng chữ `production` để xác nhận).
 
 Biến của web (Vercel): `NEXT_PUBLIC_API_URL` (**có** `/api/v1`) và `NEXT_PUBLIC_WS_URL` (**không** có `/api/v1`).
 
 ---
 
-## Phase 2 — Production + release `v0.1.0` (chưa làm)
+## Phase 2 — Production + release `v0.1.0`
 
-1. Provision hạ tầng prod tách hẳn staging (secret generate mới).
-2. **Cắt release**: bump `version` → `0.1.0` ở 3 `package.json`, viết `CHANGELOG.md`, mở PR `develop → main` title `chore: release v0.1.0 to production`.
-   → **Chỉ chủ repo được merge vào `main`.**
-3. Sau khi merge: tạo tag + GitHub Release `v0.1.0` làm mốc rollback.
-4. **Bootstrap tài khoản đầu tiên** (KHÔNG seed demo lên prod):
-   ```bash
-   BOOTSTRAP_ADMIN_EMAIL=... BOOTSTRAP_ADMIN_PASSWORD=<>= 12 ký tự> \
-   pnpm --filter @cafe-music/backend prisma:bootstrap
-   ```
-   Idempotent. Xong thì đăng nhập, tạo store/user thật trên dashboard, rồi **xoá 2 biến bootstrap** khỏi env.
-5. Smoke test (dưới đây).
+Thứ tự dưới đây **quan trọng**: `NEXT_PUBLIC_*` của Vercel bake vào lúc build (cạm bẫy #11) và CORS backend chỉ nhận đúng một origin `WEB_URL`, nên cả hai domain phải biết trước khi merge release.
 
-### Smoke test checklist
+### 1. Provision hạ tầng (tách hẳn staging, secret generate mới)
+
+- [ ] **Cloudflare R2**: bucket `cafe-music-prod` (track) + `cafe-music-backups` (backup), **2 API token riêng** — token của app bị lộ thì không kéo được backup theo. Bật CORS của `cafe-music-prod` cho origin web production.
+- [ ] **Sentry**: 2 project free tier (`cafe-music-backend`, `cafe-music-web`), lấy DSN, bật alert mail khi có issue mới.
+- [ ] **Railway**: environment `production` trong project `awake-endurance`, **Postgres + Redis mới**, service `backend` deploy từ nhánh `main`, healthcheck `/api/v1/health` (**liveness**, không phải `/health/ready` — cạm bẫy #3), **bật Backups cho Postgres**.
+- [ ] **Vercel**: xác nhận Production Branch = `main` và domain production thật (Settings → Domains) — đừng đoán.
+
+⚠️ `main` đang **sau `develop` rất nhiều commit**. Deploy production đầu tiên sẽ build code cũ và có thể fail — bình thường, nó build lại đúng khi release PR merge. Muốn tránh log đỏ thì tạm tắt auto-deploy, bật lại trước bước 3.
+
+### 2. Set biến môi trường
+
+```bash
+cp scripts/production.env.example .env.production.local   # điền R2 + WEB_URL + SENTRY_DSN thật
+railway link --project <project-id> --environment production --service backend
+sh scripts/setup-railway-env.sh production                # bắt gõ đúng chữ "production" để xác nhận
+```
+
+JWT secret để **trống** cho script tự sinh — phải khác staging hoàn toàn.
+
+Vercel (scope **Production**, không phải Preview — cạm bẫy #11): `NEXT_PUBLIC_API_URL` (**có** `/api/v1`), `NEXT_PUBLIC_WS_URL` (**không** có), `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT=production`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`.
+
+GitHub secrets (cho workflow backup): `PROD_DATABASE_URL` (phải là `DATABASE_PUBLIC_URL`), `R2_ENDPOINT`, `R2_BACKUP_ACCESS_KEY`, `R2_BACKUP_SECRET_KEY`.
+
+### 3. Test restore — GATE, không pass thì không launch
+
+**Backup chưa test restore thì coi như chưa có backup.**
+
+- [ ] Chạy tay workflow `Backup Database` với environment `staging` (staging có data thật hơn prod lúc này).
+- [ ] Restore vào DB scratch cục bộ: `docker exec cafe_music_postgres createdb -U postgres cafe_music_restore_test` rồi `sh scripts/restore-db.sh "<scratch-url>"`.
+- [ ] Xác nhận bản restore **dùng được**, đừng dừng ở "lệnh chạy xong": `prisma migrate status` báo up to date, số row các bảng chính khớp nguồn, boot backend trỏ vào DB scratch và đăng nhập được.
+- [ ] Ghi ngày + kết quả vào `README.md`. Dọn DB scratch.
+
+### 4. Cắt release
+
+Version đã bump `0.1.0` và `CHANGELOG.md` đã viết. Mở PR `develop → main`, title `chore: release v0.1.0 to production`.
+
+→ **Chỉ chủ repo được merge vào `main`.** Merge xong: Railway build + tự chạy `prisma migrate deploy` qua entrypoint (cạm bẫy #15 — đừng chạy tay), Vercel build production.
+
+- [ ] Tạo tag + GitHub Release `v0.1.0` làm mốc rollback.
+
+### 5. Bootstrap tài khoản đầu tiên
+
+**KHÔNG seed demo lên prod** — `prisma:seed` tự từ chối khi `NODE_ENV=production`.
+
+Set `BOOTSTRAP_ADMIN_EMAIL` + `BOOTSTRAP_ADMIN_PASSWORD` (>= 12 ký tự) trên Railway rồi (gộp **một chuỗi** sau `--`, kèm `MSYS_NO_PATHCONV=1` vì path bắt đầu bằng `/` — cạm bẫy #14):
+
+```bash
+MSYS_NO_PATHCONV=1 railway ssh -- "cd /app/apps/backend && node node_modules/ts-node/dist/bin.js prisma/bootstrap-admin.ts"
+```
+
+Không chạy được `ts-node` trong image thì chạy từ máy mình qua `DATABASE_PUBLIC_URL` (**không** `railway run` — cạm bẫy #15):
+
+```bash
+DB_URL=$(railway variables --service Postgres --kv | grep '^DATABASE_PUBLIC_URL=' | cut -d= -f2-)
+DATABASE_URL="$DB_URL" BOOTSTRAP_ADMIN_EMAIL=... BOOTSTRAP_ADMIN_PASSWORD=...   pnpm --filter @cafe-music/backend prisma:bootstrap
+```
+
+Idempotent. Xong thì đăng nhập, tạo store/user thật trên dashboard, rồi **xoá 2 biến bootstrap** khỏi env Railway.
+
+### 6. Smoke test
 
 Phần tự động hoá được (health check + rate limit login) có sẵn ở `scripts/smoke-staging.sh`:
 
@@ -195,14 +244,21 @@ BASE_URL=https://<railway-backend-domain>/api/v1 sh scripts/smoke-staging.sh
 
 - [ ] `GET /api/v1/health` → 200; `GET /api/v1/health/ready` → 200 với `database` và `redis` đều `up`
 - [ ] Đăng nhập từ web production được
-- [ ] Sai mật khẩu 6 lần liên tiếp → **429** (rate limit 5/60s)
+- [ ] Sai mật khẩu 6 lần liên tiếp **cùng một email** → **429** (đếm theo tài khoản, không theo IP — đổi email giữa chừng là mỗi lần một counter)
+- [ ] Ngay sau đó đăng nhập sai bằng **email khác** → vẫn `401`, không bị khoá lây
 - [ ] Upload một file MP3 nhỏ → thấy object trong R2, phát được từ trình duyệt (kiểm chứng CORS của bucket)
-- [ ] Mở 2 trình duyệt cùng sync group → WS kết nối không lỗi CORS, play/pause đồng bộ
-- [ ] Tài khoản ngoài tổ chức thử `join-group` → bị từ chối
+- [ ] Mở 2 trình duyệt cùng **một quán** → WS kết nối không lỗi CORS, play/pause/next đồng bộ, số "màn hình đang kết nối" đúng
+- [ ] Tài khoản ngoài tổ chức thử `join-store` quán khác → bị từ chối
 - [ ] Log Railway ra JSON, có `req.id`, không chứa password/token
 - [ ] Domain + HTTPS hoạt động
+- [ ] Bắn một lỗi 5xx có chủ ý → issue hiện trong Sentry backend đúng `environment: production`, có mail alert
+- [ ] Gây lỗi client → issue trong Sentry web, stack trace **đã un-minify** (chứng minh source map upload chạy)
+- [ ] `curl -I` web production → security header của PR #15 còn nguyên sau khi bọc `withSentryConfig`
+- [ ] Kiểm request `/auth/login` trong Sentry: body phải là `[redacted]`
+- [ ] Workflow `Backup Database` chạy xanh với environment `production`, object mới nằm trong `cafe-music-backups`
+- [ ] Chạy lại test restore (bước 3) một lượt với dump **của production**
 
-**Rollback:** Railway redeploy image cũ từ history · Vercel instant rollback về deployment trước.
+**Rollback:** Railway redeploy image cũ từ history · Vercel instant rollback về deployment trước · tag `v0.1.0` làm mốc git · data hỏng thì restore bằng `scripts/restore-db.sh`. Rollback code **không** tự rollback database.
 
 ---
 
@@ -210,12 +266,12 @@ BASE_URL=https://<railway-backend-domain>/api/v1 sh scripts/smoke-staging.sh
 
 | Việc                                                   | Khi nào cần                                                                                                         |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| Socket.IO Redis adapter                                | **Bắt buộc** trước khi chạy ≥ 2 instance, nếu không sync group bị split-brain. 5 cửa hàng / 1 instance thì chưa cần |
+| Socket.IO Redis adapter                                | **Bắt buộc** trước khi chạy ≥ 2 instance, nếu không trạng thái phát của quán bị split-brain. 5 cửa hàng / 1 instance thì chưa cần |
 | Refresh token revocation                               | Token 7 ngày hiện không thu hồi được. Nên làm trước khi có user thật                                                |
 | Upload streaming lên R2                                | Hiện buffer tối đa 50MB vào RAM. Đủ dùng ở concurrency thấp                                                         |
 | Dùng `CDN_BASE_URL`                                    | Env đã có nhưng chưa consume — tối ưu chi phí/độ trễ                                                                |
 | Bật integration + E2E trong CI                         | Scaffolding đã có, CI mới chạy unit test                                                                            |
-| Điều tra rate limit login không nhất quán trên Railway | **Nên làm trước khi có user thật** — xem chi tiết ở Phase 1 mục "Trạng thái staging hiện tại"                       |
+| Chặn `durationMs = 0` lúc upload                        | DB prod còn trống nên fix lúc nào cũng không cần backfill; hiện quán kẹt "đang phát" vô hạn                         |
 
 ## Quyết định thiết kế đã chốt (đừng lật lại nếu không có lý do mới)
 

@@ -3,8 +3,8 @@
 # Usage: BASE_URL=https://<railway-backend-domain>/api/v1 sh scripts/smoke-staging.sh
 #
 # Chỉ kiểm tra được phần API tự động hoá được (health, rate limit).
-# Các mục còn lại trong checklist (login UI, upload R2, WS sync 2 tab,
-# log JSON) vẫn phải kiểm tra tay — xem docs/PRODUCTION_READINESS.md.
+# Các mục còn lại trong checklist (login UI, upload R2, WS sync 2 tab cùng
+# một quán, log JSON) vẫn phải kiểm tra tay — xem docs/PRODUCTION_READINESS.md.
 
 set -eu
 
@@ -35,7 +35,10 @@ check_status "GET /health" GET /health 200
 
 check_status "GET /health/ready" GET /health/ready 200
 
-echo "-- Rate limit /auth/login (5 req/60s) --"
+# Rate limit login đếm theo EMAIL đang bị dò, không theo IP — nên 6 lần dưới
+# BẮT BUỘC dùng cùng một email, đổi email giữa chừng là mỗi lần một counter và
+# không bao giờ ra 429.
+echo "-- Rate limit /auth/login (5 req/60s, đếm theo tài khoản) --"
 for i in 1 2 3 4 5 6; do
   code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/auth/login" \
     -H 'Content-Type: application/json' \
@@ -57,4 +60,5 @@ if [ "$fail" -ne 0 ]; then
 fi
 
 echo "== All automated checks passed =="
-echo "Nhớ kiểm tra tay: login UI, upload+play track qua R2, WS sync 2 tab, log JSON trên Railway."
+echo "Nhớ kiểm tra tay: login UI, upload+play track qua R2, mở 2 tab CÙNG MỘT QUÁN"
+echo "để kiểm WS sync, và log JSON trên Railway."
