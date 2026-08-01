@@ -27,6 +27,29 @@ RETENTION_DAYS="${RETENTION_DAYS:-30}"
 # Backup lỗi âm thầm là cái bẫy kinh điển — thà fail để job đỏ và có mail.
 MIN_BYTES="${MIN_BYTES:-2048}"
 
+# Chuẩn hoá endpoint TRƯỚC khi dump. `aws` báo đúng một câu "Invalid endpoint:
+# <giá trị>" cho mọi lỗi định dạng, mà trong GitHub Actions giá trị đó bị mask
+# thành *** nên không đoán được sai chỗ nào — và nó chỉ nổ SAU khi đã dump xong.
+# Hai lỗi vô hại dưới đây tự sửa được; lỗi thừa path bucket thì báo rõ ràng.
+R2_ENDPOINT=$(printf '%s' "$R2_ENDPOINT" | tr -d '\r\n' |
+  sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s#/*$##')
+
+case "$R2_ENDPOINT" in
+  http://* | https://*) ;;
+  # Dán từ dashboard Cloudflare rất dễ mất phần scheme.
+  *) R2_ENDPOINT="https://$R2_ENDPOINT" ;;
+esac
+
+# Phần sau host phải rỗng: tên bucket đã nằm ở R2_BUCKET, thêm vào endpoint nữa
+# thì đường dẫn thành .../<bucket>/<bucket>/<file>.
+endpoint_path=$(printf '%s' "$R2_ENDPOINT" | sed 's#^https\?://[^/]*##')
+if [ -n "$endpoint_path" ]; then
+  echo "DỪNG: R2_ENDPOINT không được chứa đường dẫn ('$endpoint_path')." >&2
+  echo "Chỉ dùng phần scheme + host, ví dụ: https://<account-id>.r2.cloudflarestorage.com" >&2
+  echo "Tên bucket đặt riêng ở R2_BUCKET (hiện tại: $R2_BUCKET)." >&2
+  exit 1
+fi
+
 stamp=$(date -u +%Y%m%d-%H%M)
 file="cafe-music-${ENV_NAME}-${stamp}.sql.gz"
 
