@@ -4,12 +4,10 @@ node_modules/
 .pnp.js
 
 # Environment files - KHÔNG BAO GIỜ commit
+# Chặn mọi biến thể .env (kể cả .env.production, .env.staging), chỉ chừa .example
 .env
-.env.local
-.env.*.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # Build outputs
 dist/
@@ -57,3 +55,14 @@ prisma/generated/
 
 # MinIO / S3 local data
 .minio/
+
+# AI tooling
+# CLAUDE.md + .claude/ được track để cả team dùng chung rule, agent, skill.
+# Chỉ ignore phần cấu hình riêng từng máy:
+CLAUDE.local.md
+.claude/settings.local.json
+.cursor/
+
+# Python bytecode
+__pycache__/
+*.pyc

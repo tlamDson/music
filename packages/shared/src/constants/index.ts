@@ -13,23 +13,21 @@ export const ROLES = {
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
-export const SYNC_MODES = {
-  TIGHT: 'TIGHT',
-  LOOSE: 'LOOSE',
+export const PLAYBACK_STATUSES = {
+  PLAYING: 'PLAYING',
+  PAUSED: 'PAUSED',
+  STOPPED: 'STOPPED',
 } as const;
 
 export const WS_EVENTS = {
-  NOW_PLAYING: 'now-playing',
-  PAUSED: 'paused',
-  STOPPED: 'stopped',
-  OVERRIDE: 'override',
-  REJOIN: 'rejoin',
+  STORE_NOW_PLAYING: 'store-now-playing',
+  STORE_PAUSED: 'store-paused',
+  STORE_STOPPED: 'store-stopped',
   CLOCK_SYNC: 'clock-sync',
   ERROR: 'error',
 } as const;
 
 export const WS_ROOMS = {
-  syncGroup: (groupId: string) => `sync-group:${groupId}`,
   store: (storeId: string) => `store:${storeId}`,
   org: (orgId: string) => `org:${orgId}`,
 } as const;

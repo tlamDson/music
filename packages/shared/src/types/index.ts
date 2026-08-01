@@ -33,35 +33,42 @@ export interface Store {
   id: string;
   name: string;
   organizationId: string;
-  syncGroupId: string | null;
+  status: PlaybackStatus;
+  currentTrackId: string | null;
+  trackIndex: number;
   createdAt: string;
   updatedAt: string;
 }
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
-export type SyncMode = 'TIGHT' | 'LOOSE';
+export type PlaybackStatus = 'PLAYING' | 'PAUSED' | 'STOPPED';
 
-export type SyncGroupStatus = 'PLAYING' | 'PAUSED' | 'STOPPED';
+/** `OFF` không lặp lại, `ALL` lặp lại cả playlist, `ONE` lặp lại đúng bài đang phát. */
+export type StoreRepeatMode = 'OFF' | 'ALL' | 'ONE';
 
-export interface SyncGroupState {
-  groupId: string;
-  playlistId: string | null;
-  trackId: string | null;
+/**
+ * Trạng thái phát của một quán. Quán là đơn vị phát duy nhất — tầng
+ * `SyncGroup` đã bị bỏ vì trùng chức năng, nên cũng không còn khái niệm
+ * "tách khỏi nhóm" hay "quay lại nhóm".
+ */
+export interface StorePlaybackState {
+  storeId: string;
+  playlistId: string;
+  /** Luôn giữ đúng thứ tự playlist gốc — không đảo khi bật shuffle. */
+  trackIds: string[];
+  /**
+   * Hoán vị chỉ số vào `trackIds`. `trackIndex` là vị trí trong `order`, không
+   * phải chỉ số trực tiếp vào `trackIds` — nhờ vậy tắt shuffle là quay lại thứ
+   * tự gốc ngay, không phải gọi lại DB.
+   */
+  order: number[];
   trackIndex: number;
   positionMs: number;
-  startedAtServerTs: number | null;
+  startedAtServerTs: number;
   isPlaying: boolean;
-  mode: SyncMode;
-  status: SyncGroupStatus;
-}
-
-export interface StoreOverride {
-  storeId: string;
-  isOverridden: boolean;
-  overrideTrackId: string | null;
-  overridePlaylistId: string | null;
-  overriddenAt: string | null;
+  repeat: StoreRepeatMode;
+  shuffle: boolean;
 }
 
 // ─── Playlist / Track ─────────────────────────────────────────────────────────
@@ -106,21 +113,80 @@ export interface Track {
 // ─── WebSocket Events ─────────────────────────────────────────────────────────
 
 export type WsEventName =
-  | 'now-playing'
-  | 'paused'
-  | 'stopped'
-  | 'override'
-  | 'rejoin'
+  | 'store-now-playing'
+  | 'store-paused'
+  | 'store-stopped'
+  | 'store-mode-changed'
   | 'clock-sync'
   | 'error';
 
-export interface WsNowPlayingPayload {
-  groupId: string;
+/**
+ * Đủ để client dựng thanh phát mà không phải gọi thêm API. Trước đây payload
+ * chỉ có `trackId` nên màn kiosk in thẳng cuid ra TV.
+ */
+export interface WsTrackMeta {
+  id: string;
+  title: string;
+  artist: string | null;
+  durationMs: number;
+}
+
+export interface WsQueueInfo {
+  index: number;
+  total: number;
+  remaining: number;
+}
+
+export interface WsStoreNowPlayingPayload {
+  storeId: string;
   trackId: string;
-  trackUrl: string;
+  track: WsTrackMeta;
+  trackUrl: string | null;
   positionMs: number;
   serverTs: number;
-  mode: SyncMode;
+  queue: WsQueueInfo;
+  repeat: StoreRepeatMode;
+  shuffle: boolean;
+}
+
+/**
+ * Đổi repeat/shuffle không làm gián đoạn nhạc đang phát — broadcast riêng để
+ * client cập nhật UI mà không phải reload thanh phát.
+ */
+export interface WsStoreModeChangedPayload {
+  storeId: string;
+  repeat: StoreRepeatMode;
+  shuffle: boolean;
+}
+
+/**
+ * Payload của `store-paused` / `store-stopped` — chỉ cần biết quán nào, lúc nào.
+ * Client **phải** đối chiếu `storeId` trước khi dừng thẻ audio: một tab có thể
+ * đang giữ socket của nhiều quán, nghe mà không lọc thì quán khác tạm dừng cũng
+ * tắt nhạc đang phát trong tab này.
+ */
+export interface WsStoreStatePayload {
+  storeId: string;
+  serverTs: number;
+}
+
+/**
+ * Ảnh chụp "đang phát cái gì" lúc client mở trang. Broadcast WS là
+ * fire-and-forget, không replay khi join room — thiếu cái này thì trang mở sau
+ * lúc admin bấm phát sẽ trắng cho tới lần chuyển bài kế tiếp.
+ */
+export interface NowPlayingSnapshot {
+  storeId: string;
+  playlistId: string;
+  track: WsTrackMeta;
+  trackUrl: string | null;
+  /** Đã cộng thời gian đã trôi kể từ `startedAtServerTs`. */
+  positionMs: number;
+  serverTs: number;
+  isPlaying: boolean;
+  queue: WsQueueInfo | null;
+  repeat: StoreRepeatMode;
+  shuffle: boolean;
 }
 
 export interface WsClockSyncPayload {

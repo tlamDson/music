@@ -31,7 +31,6 @@ export type CreateOrganizationDto = z.infer<typeof CreateOrganizationSchema>;
 
 export const CreateStoreSchema = z.object({
   name: z.string().min(2).max(100),
-  syncGroupId: z.string().uuid().optional(),
 });
 
 export const UpdateStoreSchema = CreateStoreSchema.partial();
@@ -43,9 +42,9 @@ export type UpdateStoreDto = z.infer<typeof UpdateStoreSchema>;
 
 export const CreatePlaylistSchema = z.object({
   name: z.string().min(1).max(100),
-  folderId: z.string().uuid().optional(),
+  folderId: z.string().min(1).optional(),
   scope: z.enum(['ORG', 'STORE']),
-  storeId: z.string().uuid().optional(),
+  storeId: z.string().min(1).optional(),
 });
 
 export const UpdatePlaylistSchema = CreatePlaylistSchema.partial();
@@ -58,31 +57,33 @@ export type UpdatePlaylistDto = z.infer<typeof UpdatePlaylistSchema>;
 export const CreateTrackMetaSchema = z.object({
   title: z.string().min(1).max(200),
   artist: z.string().max(200).optional(),
-  folderId: z.string().uuid().optional(),
+  folderId: z.string().min(1).optional(),
+  // Trình duyệt đo bằng HTMLAudioElement trước khi upload (multipart nên là
+  // chuỗi → coerce). Thiếu thì service để 0 và UI hiện "--:--" thay vì chặn
+  // upload — optional chứ không default để client cũ vẫn upload được.
+  durationMs: z.coerce.number().int().min(0).max(86_400_000).optional(),
 });
 
 export type CreateTrackMetaDto = z.infer<typeof CreateTrackMetaSchema>;
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
-export const PlayGroupSchema = z.object({
-  playlistId: z.string().uuid(),
+export const StorePlaySchema = z.object({
+  playlistId: z.string().min(1),
   trackIndex: z.number().int().min(0).default(0),
-  mode: z.enum(['TIGHT', 'LOOSE']).default('LOOSE'),
 });
 
-export const SetSyncModeSchema = z.object({
-  mode: z.enum(['TIGHT', 'LOOSE']),
+export type StorePlayDto = z.infer<typeof StorePlaySchema>;
+
+// `.default()` biến field thành bắt buộc trong type sau `z.infer` — dùng
+// `.optional()` + fallback trong service để client cũ chỉ gửi một trong hai
+// field (repeat hoặc shuffle) vẫn hợp lệ.
+export const PlaybackModeSchema = z.object({
+  repeat: z.enum(['OFF', 'ALL', 'ONE']).optional(),
+  shuffle: z.boolean().optional(),
 });
 
-export const OverrideSchema = z.object({
-  trackId: z.string().uuid().optional(),
-  playlistId: z.string().uuid().optional(),
-});
-
-export type PlayGroupDto = z.infer<typeof PlayGroupSchema>;
-export type SetSyncModeDto = z.infer<typeof SetSyncModeSchema>;
-export type OverrideDto = z.infer<typeof OverrideSchema>;
+export type PlaybackModeDto = z.infer<typeof PlaybackModeSchema>;
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
@@ -92,3 +93,14 @@ export const PaginationSchema = z.object({
 });
 
 export type PaginationDto = z.infer<typeof PaginationSchema>;
+
+// ─── Playlist query ───────────────────────────────────────────────────────────
+
+/** Chip lọc + ô tìm kiếm của trang duyệt playlist. */
+export const PlaylistQuerySchema = PaginationSchema.extend({
+  scope: z.enum(['ORG', 'STORE']).optional(),
+  q: z.string().trim().min(1).max(100).optional(),
+  sort: z.enum(['recent', 'name']).default('recent'),
+});
+
+export type PlaylistQueryDto = z.infer<typeof PlaylistQuerySchema>;

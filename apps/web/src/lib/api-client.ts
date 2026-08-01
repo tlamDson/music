@@ -1,60 +1,68 @@
-/**
- * Type-safe API client dùng fetch với base URL từ env
- */
-import { ApiResponse, ApiError } from '@cafe-music/shared';
+import { resolveApiBaseUrl } from './env';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const BASE_URL = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
 
-class ApiClient {
-  private baseUrl: string;
-  private accessToken: string | null = null;
-
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
-  }
-
-  setToken(token: string | null) {
-    this.accessToken = token;
-  }
-
-  private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
-      ...init?.headers,
-    };
-
-    const res = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
-
-    if (!res.ok) {
-      const err = (await res.json()) as ApiError;
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
-    }
-
-    return res.json() as Promise<T>;
-  }
-
-  get<T>(path: string) {
-    return this.request<ApiResponse<T>>(path, { method: 'GET' });
-  }
-
-  post<T>(path: string, body: unknown) {
-    return this.request<ApiResponse<T>>(path, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-  }
-
-  patch<T>(path: string, body: unknown) {
-    return this.request<ApiResponse<T>>(path, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    });
-  }
-
-  delete<T>(path: string) {
-    return this.request<ApiResponse<T>>(path, { method: 'DELETE' });
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+    public data?: unknown,
+  ) {
+    super(message);
   }
 }
 
-export const apiClient = new ApiClient(API_BASE);
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+
+  if (!res.ok) {
+    // 401 ngoài /auth/login nghĩa là phiên đã hết hạn hoặc tài khoản vừa bị
+    // vô hiệu hoá giữa chừng — đăng xuất sạch thay vì để lỗi rải rác trên UI.
+    // Không áp dụng cho /auth/login vì đó là sai mật khẩu, LoginForm tự xử lý.
+    if (res.status === 401 && path !== '/auth/login' && typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.href = '/login';
+    }
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, (data as { message?: string }).message ?? res.statusText, data);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+export const api = {
+  get: <T>(path: string) => request<T>(path),
+  post: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
+  patch: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  postMultipart: <T>(path: string, formData: FormData) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    return fetch(`${BASE_URL}${path}`, {
+      method: 'POST',
+      body: formData,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then(async (res) => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new ApiError(
+          res.status,
+          (data as { message?: string }).message ?? res.statusText,
+          data,
+        );
+      }
+      return res.json() as Promise<T>;
+    });
+  },
+};

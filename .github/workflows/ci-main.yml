@@ -26,6 +26,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Bắt buộc trước lint/typecheck/test: các file này dùng type của @prisma/client
+      - name: Generate Prisma Client
+        run: pnpm --filter @cafe-music/backend prisma:generate
+
+      - name: Lint
+        run: pnpm turbo lint
+        env:
+          CI: true
+
+      - name: Typecheck
+        run: pnpm turbo typecheck
+        env:
+          CI: true
+
+      - name: Build
+        run: pnpm turbo build
+        env:
+          CI: true
+
       - name: Unit Tests
         run: pnpm turbo test:unit
         env:

@@ -1,26 +1,235 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+@import 'tailwindcss';
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-primary: #1e1b4b;
+  --color-on-primary: #ffffff;
+  --color-secondary: #4338ca;
+  --color-accent: #22c55e;
+  --color-background: #0f0f23;
+  --color-foreground: #f8fafc;
+  --color-muted: #27273b;
+  --color-border: #312e81;
+  --color-destructive: #ef4444;
+  --color-ring: #1e1b4b;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+
+  /* Motion tokens — nguồn duy nhất cho mọi transition/animation trong app.
+     Giữ trong khoảng 150–300ms đã chốt ở design-system/cafe-music/MASTER.md. */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --ease-standard: ease;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Thang z-index — nguồn duy nhất cho mọi lớp nổi. Trước đây mỗi file tự chọn
+     z-30/40/50 nên drawer nav (z-40) nằm DƯỚI thanh phát (z-50) và bị nó che
+     mất khối email/vai trò/nút Đăng xuất ở đáy: trên mobile mở menu ra là không
+     đăng xuất được. Thêm lớp nào mới thì khai báo ở đây, đừng viết số thẳng vào
+     component. */
+  --z-player-bar: 50;
+  --z-nav-backdrop: 60;
+  --z-nav-drawer: 70;
+  --z-nav-toggle: 80; /* phải trên drawer để còn bấm đóng được */
+  --z-now-playing: 90; /* overlay "Đang phát" toàn màn hình */
+  --z-dialog: 100; /* modal luôn trên tất cả */
+
+  /* Chiều cao thật của thanh phát. `AppShell` chừa chỗ theo biến này thay vì
+     đoán bằng `pb-28` cứng — thanh phát mobile từng xếp 3 hàng (~160px) trong
+     khi shell chỉ chừa 112px nên nội dung cuối trang bị cắt. */
+  --player-bar-h: 64px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@media (min-width: 768px) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --player-bar-h: 88px;
   }
 }
 
+@theme inline {
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-foreground);
+  --font-sans: 'Fira Sans', sans-serif;
+  --font-mono: 'Fira Code', monospace;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: 'Fira Sans', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Focus visible ring */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Reduced motion — tắt cả duration lẫn delay. `.animate-stagger-item` bắt đầu
+   ở opacity:0 rồi chờ `animation-delay: calc(var(--i) * 40ms)` mới chạy; nếu
+   chỉ ép duration về gần 0 mà bỏ quên delay, item index lớn (tới 280ms) vẫn
+   phải chờ hết delay đó mới bật animation gần-tức-thời lên opacity:1 — trong
+   lúc chờ, nội dung coi như biến mất với người dùng bật giảm chuyển động. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+
+/* Dialog enter/exit — dùng bởi components/ui/Dialog.tsx.
+   Thời lượng đọc từ biến `--dialog-exit-ms` mà Dialog.tsx set inline theo
+   hằng số JS `EXIT_ANIMATION_MS` (giá trị fallback 180ms chỉ dùng nếu class
+   này lỡ được gắn ở nơi khác chưa set biến) — một nguồn duy nhất, JS và CSS
+   không còn phải đồng bộ tay hai con số. */
+.dialog-overlay {
+  transition: opacity var(--dialog-exit-ms, 180ms) var(--ease-standard);
+}
+.dialog-overlay[data-state='closed'] {
+  opacity: 0;
+}
+.dialog-overlay[data-state='open'] {
+  opacity: 1;
+}
+
+.dialog-panel {
+  transition:
+    opacity var(--dialog-exit-ms, 180ms) var(--ease-standard),
+    transform var(--dialog-exit-ms, 180ms) var(--ease-standard);
+}
+.dialog-panel[data-state='closed'] {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.dialog-panel[data-state='open'] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Fade-in nhẹ khi chuyển route — dùng bởi components/layout/AppShell.tsx */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fade-in var(--duration-base) var(--ease-standard);
+}
+
+/* Backdrop menu mobile — dùng bởi components/layout/AppShell.tsx, cùng
+   pattern data-state với .dialog-overlay ở trên (render thêm một nhịp sau
+   khi đóng để animation exit chạy hết trước khi unmount). */
+.mobile-nav-backdrop {
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+.mobile-nav-backdrop[data-state='closed'] {
+  opacity: 0;
+}
+.mobile-nav-backdrop[data-state='open'] {
+  opacity: 1;
+}
+
+/* Icon hamburger/close crossfade — dùng bởi components/layout/AppShell.tsx.
+   Hai <path> chồng lên nhau, mờ/xoay chéo nhau trong --duration-fast thay vì
+   đổi thẳng thuộc tính `d` (snap cứng vì hai hình không cùng số điểm). */
+.menu-icon-path {
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+  transform-origin: center;
+}
+
+/* Enter animation dạng trượt lên — dùng cho panel/overlay cần vào từ dưới
+   lên (khác .dialog-panel là scale). Các PR sau (list mới thêm, toast, menu
+   thả xuống...) dùng class này thay vì tự viết keyframe riêng. */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-slide-up {
+  animation: slide-up var(--duration-base) var(--ease-out);
+}
+
+/* Stagger cho danh sách (card playlist, track, item sidebar...) — mỗi item
+   truyền index qua CSS variable `--i` (inline style `{ '--i': index }`) để
+   animation-delay dãn ra dần, tránh cả list bật lên cùng lúc. */
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-stagger-item {
+  --i: 0;
+  opacity: 0;
+  animation: stagger-in var(--duration-base) var(--ease-out) forwards;
+  animation-delay: calc(var(--i) * 40ms);
+}
+
+/* Khung xương shimmer — thay cho chữ "Đang tải..." ở mọi nơi đang fetch dữ
+   liệu. Thời lượng dài hơn khoảng 150–300ms vì đây là animation lặp vô hạn
+   báo trạng thái đang tải, không phải transition phản hồi tương tác. */
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-muted) 25%,
+    rgba(248, 250, 252, 0.08) 50%,
+    var(--color-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Nhấn xuống nhẹ khi bấm — dùng cho nút/card cần phản hồi rõ lúc :active,
+   bổ sung cho transition hover/focus đã khai báo riêng theo property cụ thể
+   ở từng component (transition-opacity/transition-colors/transition-[filter]...). */
+.press {
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+.press:active {
+  transform: scale(0.97);
 }

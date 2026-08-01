@@ -2,9 +2,20 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# import-in-the-middle 3.3.x khai báo phụ thuộc `es-module-lexer: ^2.2.0` —
+# một version CHƯA TỪNG được publish (mới nhất là 2.1.0), nên cây phụ thuộc của
+# @sentry/* không cài được. 3.2.0 là bản cuối không dính lỗi này và vẫn nằm
+# trong range `^3.0.0` mà @opentelemetry/instrumentation khai báo.
+# Gỡ override khi upstream sửa lại range.
+overrides:
+  import-in-the-middle: 3.2.0
+
 allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
+  # Tải binary sentry-cli lúc cài — cần để upload source map khi build web,
+  # nếu không stack trace trên Sentry là code minified gần như vô dụng.
+  '@sentry/cli': true
   bcrypt: true
   msw: true
   prisma: true
