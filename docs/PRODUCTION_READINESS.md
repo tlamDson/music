@@ -105,6 +105,12 @@ Hạ tầng đích: **Vercel** (web) · **Railway** (backend + Postgres + Redis)
       docker exec -i cafe_music_postgres psql "$DB_URL" -t -A -c "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY started_at;"
       ```
 
+16. **"Generate Domain" trên Railway: port nhập vào KHÔNG tự đồng bộ nếu sửa lại sau đó.** Backend production sau khi merge PR release deploy "Online" nhưng `/api/v1/health` trả `502 Application failed to respond` — log cho thấy app bind đúng port Dockerfile expose (log `Backend listening on port 8080`) nhưng Railway proxy route vào port khác. Đã thử `railway domain update --port 4000` (đổi target port của domain) rồi `railway redeploy` — **không đủ**, app vẫn tự nhận `PORT=8080` từ biến do Railway tiêm lúc "Generate Domain" lần đầu (biến này không hiện trong `railway variables`, không tự cập nhật theo target port sửa sau). Cách sửa chắc chắn: set thẳng biến `PORT` bằng giá trị Dockerfile expose (ở đây là `4000`):
+    ```bash
+    railway variables --set "PORT=4000" -s <service> -e production
+    ```
+    Set biến tự trigger redeploy. Verify lại bằng `railway logs | grep "listening on port"` phải khớp con số vừa set, rồi `curl .../health` phải `200`.
+
 ---
 
 ## Phase 1 — Staging
