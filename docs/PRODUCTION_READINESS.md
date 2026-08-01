@@ -106,10 +106,22 @@ Hạ tầng đích: **Vercel** (web) · **Railway** (backend + Postgres + Redis)
       ```
 
 16. **"Generate Domain" trên Railway: port nhập vào KHÔNG tự đồng bộ nếu sửa lại sau đó.** Backend production sau khi merge PR release deploy "Online" nhưng `/api/v1/health` trả `502 Application failed to respond` — log cho thấy app bind đúng port Dockerfile expose (log `Backend listening on port 8080`) nhưng Railway proxy route vào port khác. Đã thử `railway domain update --port 4000` (đổi target port của domain) rồi `railway redeploy` — **không đủ**, app vẫn tự nhận `PORT=8080` từ biến do Railway tiêm lúc "Generate Domain" lần đầu (biến này không hiện trong `railway variables`, không tự cập nhật theo target port sửa sau). Cách sửa chắc chắn: set thẳng biến `PORT` bằng giá trị Dockerfile expose (ở đây là `4000`):
+
     ```bash
     railway variables --set "PORT=4000" -s <service> -e production
     ```
+
     Set biến tự trigger redeploy. Verify lại bằng `railway logs | grep "listening on port"` phải khớp con số vừa set, rồi `curl .../health` phải `200`.
+
+17. **`DATABASE_PUBLIC_URL` có host RỖNG cho tới khi bật TCP Proxy.** Postgres mới thêm vào một environment chưa có proxy công khai thì biến này resolve thành `postgresql://postgres:***@:/railway` — thiếu hẳn host và port, nhưng Railway **không báo lỗi**, chỉ trả chuỗi rỗng ở chỗ đó. Prisma báo `empty host in database URL`, còn nếu lỡ copy vào GitHub Secrets thì job backup chết ở bước dump với thông báo chẳng liên quan.
+    - Bật bằng CLI (một proxy cho mỗi service): `railway tcp-proxy create --port 5432 --service <postgres-service> --environment production`
+    - Xong thì `railway variables --service <postgres-service> --kv | grep DATABASE_PUBLIC_URL` phải thấy host thật (dạng `*.proxy.rlwy.net:<port>`).
+    - ⚠️ **Việc này phải làm TRƯỚC khi set secret `PROD_DATABASE_URL`** — set trước thì giá trị lưu lại là bản rỗng host và phải quay lại sửa tay.
+
+18. **Tên service Postgres/Redis trên environment mới KHÔNG trùng với staging.** Railway tự thêm hậu tố ngẫu nhiên (`Postgres-g7te`, `Redis-eEFb`) khi add plugin, nên `${{Postgres.DATABASE_URL}}` copy từ mẫu staging trỏ vào service không tồn tại → Railway resolve thành **chuỗi rỗng**, lại không báo lỗi. Backend boot lên rồi chết ở query đầu tiên. Lấy tên thật bằng `railway status` (mục _All resources → Databases_) rồi sửa reference trong `.env.<env>.local` trước khi chạy `setup-railway-env.sh`. Kiểm chứng sau khi set: `railway variables --kv | grep -E '^(DATABASE|REDIS)_URL='` phải ra connection string đầy đủ, không phải dòng trống.
+
+19. **`aws` báo đúng một câu "Invalid endpoint" cho mọi lỗi định dạng, và GitHub Actions mask giá trị thành `\***`.** Thiếu `https://`, thừa `/`cuối, lẫn`\n`khi dán vào Secrets, hay thừa path bucket — tất cả ra cùng một dòng log vô dụng, lại chỉ nổ **sau khi** đã dump xong nên mỗi lần thử tốn một lượt dump.`scripts/backup-db.sh` giờ tự chuẩn hoá 3 lỗi đầu và chặn sớm (trước khi dump) với thông báo rõ cho lỗi thừa path.
+    - ⚠️ **Cron hàng đêm chạy từ default branch (`main`), không phải `develop`.** Fix script nằm ở `develop` thì backup tự động vẫn dùng bản cũ trên `main` cho tới lần release kế. Thử bằng `workflow_dispatch` với `ref: main` để biết chắc cron đêm nay chạy được.
 
 ---
 
