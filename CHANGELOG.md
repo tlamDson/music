@@ -2,7 +2,7 @@
 
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/); phiên bản theo [Semantic Versioning](https://semver.org/lang/vi/).
 
-## [0.1.0] — chưa phát hành
+## [0.1.0] — 2026-08-01
 
 Bản phát hành production đầu tiên.
 
