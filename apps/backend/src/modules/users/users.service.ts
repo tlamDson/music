@@ -2,10 +2,19 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  UnauthorizedException,
+  BadRequestException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { JwtPayload } from '@cafe-music/shared';
+import { RedisThrottlerStorage } from '../../common/throttler/redis-throttler.storage';
+import {
+  JwtPayload,
+  UpdateProfileDto,
+  ChangePasswordDto,
+} from '@cafe-music/shared';
 import { z } from 'zod';
 
 export const CreateUserSchema = z.object({
@@ -28,7 +37,10 @@ export type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private redisThrottler: RedisThrottlerStorage,
+  ) {}
 
   async findAll(user: JwtPayload) {
     const users = await this.prisma.user.findMany({
@@ -101,5 +113,111 @@ export class UsersService {
         isActive: true,
       },
     });
+  }
+
+  /**
+   * Hồ sơ của chính người gọi — tra theo `user.email`, không bao giờ từ tham
+   * số. **Không dùng `user.sub`**: `@CurrentUser()` được khai kiểu `JwtPayload`
+   * nhưng `JwtStrategy.validate()` trả thẳng bản ghi Prisma `User` (qua
+   * `AuthService.validateJwtPayload`), không phải payload JWT gốc — object đó
+   * có `id`, không có `sub`. Hai field trùng tên (`role`/`organizationId`/
+   * `storeId`/`email`) nên chỗ khác không lộ ra; `sub` là field duy nhất tồn
+   * tại trên `JwtPayload` mà không tồn tại trên `User`, và tra bằng nó luôn ra
+   * `undefined` → Prisma ném lỗi thiếu `where`. `email` vừa có trong kiểu khai
+   * báo vừa có thật trên object runtime nên tra theo nó thì đúng ở cả hai phía.
+   */
+  async getProfile(user: JwtPayload) {
+    const record = await this.prisma.user.findUnique({
+      where: { email: user.email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        storeId: true,
+        isActive: true,
+        createdAt: true,
+        store: { select: { name: true } },
+      },
+    });
+    if (!record) throw new NotFoundException('User not found');
+    return record;
+  }
+
+  /**
+   * Chỉ ghi `name` — schema chỉ có field này, nhưng vẫn chọn tường minh thay
+   * vì `...dto` để field lạ (role/storeId/isActive) không lọt qua nếu schema
+   * đổi sau này. Cho tự đổi role là leo thang đặc quyền, cho tự đổi isActive
+   * là tự bật lại tài khoản vừa bị vô hiệu hoá.
+   */
+  async updateProfile(user: JwtPayload, dto: UpdateProfileDto) {
+    return this.prisma.user.update({
+      where: { email: user.email },
+      data: { name: dto.name },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        storeId: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  /**
+   * Điểm dò mật khẩu thứ hai sau /auth/login. Đếm trực tiếp qua
+   * `RedisThrottlerStorage` (không phải `@Throttle` decorator) vì
+   * `ThrottlerGuard` toàn cục chạy trước `JwtAuthGuard` của route này nên
+   * `req.user` chưa có lúc tracker của decorator chạy — key theo `user.email`
+   * chỉ lấy được ở đây, sau khi JwtAuthGuard đã xác thực xong. (Không dùng
+   * `user.sub` — xem chú thích ở `getProfile`.)
+   */
+  async changePassword(user: JwtPayload, dto: ChangePasswordDto) {
+    const { isBlocked } = await this.redisThrottler.increment(
+      `me-password:${user.email}`,
+      60_000,
+      5,
+      0,
+      'default',
+    );
+    if (isBlocked) {
+      throw new HttpException(
+        'Too many attempts, try again later',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const record = await this.prisma.user.findUnique({
+      where: { email: user.email },
+    });
+    if (!record) throw new NotFoundException('User not found');
+
+    const matches = await bcrypt.compare(
+      dto.currentPassword,
+      record.passwordHash,
+    );
+    if (!matches) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const samePassword = await bcrypt.compare(
+      dto.newPassword,
+      record.passwordHash,
+    );
+    if (samePassword) {
+      throw new BadRequestException(
+        'New password must be different from the current one',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.user.update({
+      where: { email: user.email },
+      data: { passwordHash },
+    });
+
+    return { message: 'Password updated' };
   }
 }
