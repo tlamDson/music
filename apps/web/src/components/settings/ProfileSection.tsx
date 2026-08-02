@@ -16,8 +16,8 @@ interface Profile {
   store?: { name: string } | null;
 }
 
-const FIELD_LABEL_STYLE = { color: 'rgba(248,250,252,0.7)' };
-const MUTED_TEXT_STYLE = { color: 'rgba(248,250,252,0.5)' };
+const FIELD_LABEL_STYLE = { color: 'var(--color-foreground-70)' };
+const MUTED_TEXT_STYLE = { color: 'var(--color-foreground-50)' };
 
 /** Sửa Họ tên (PATCH /me); Email/Vai trò/Quán chỉ đọc — chỉ ORG_ADMIN đổi được qua trang Người dùng. */
 export default function ProfileSection() {

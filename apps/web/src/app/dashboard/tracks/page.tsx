@@ -18,7 +18,7 @@ export default function TracksPage() {
         >
           Kho nhạc
         </h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
           Nhạc dùng chung cho cả chuỗi
         </p>
       </div>

@@ -216,7 +216,7 @@ export default function PlaylistDetail({
           <div className="min-w-0 pb-1">
             <p
               className="text-xs uppercase tracking-wide"
-              style={{ color: 'rgba(248,250,252,0.6)' }}
+              style={{ color: 'var(--color-foreground-60)' }}
             >
               {playlist.scope === 'ORG' ? 'Danh sách phát của chuỗi' : 'Danh sách phát của quán'}
             </p>
@@ -226,7 +226,7 @@ export default function PlaylistDetail({
             >
               {playlist.name}
             </h1>
-            <p className="text-sm mt-3" style={{ color: 'rgba(248,250,252,0.6)' }}>
+            <p className="text-sm mt-3" style={{ color: 'var(--color-foreground-60)' }}>
               {rows.length} bài · {formatTotalDurationExact(totalDurationMs)}
             </p>
           </div>
@@ -276,7 +276,7 @@ export default function PlaylistDetail({
           }}
         >
           {trackTableRows.length === 0 ? (
-            <p className="text-sm p-8 text-center" style={{ color: 'rgba(248,250,252,0.5)' }}>
+            <p className="text-sm p-8 text-center" style={{ color: 'var(--color-foreground-50)' }}>
               Chưa có bài nào — bấm &quot;Thêm bài hát&quot; hoặc kéo từ kho nhạc vào đây.
             </p>
           ) : (
@@ -310,7 +310,7 @@ export default function PlaylistDetail({
                 {current.title}
               </p>
               {current.artist && (
-                <p className="text-xs mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-foreground-50)' }}>
                   {current.artist}
                 </p>
               )}
@@ -322,7 +322,7 @@ export default function PlaylistDetail({
             )}
           </>
         ) : (
-          <p className="text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
             Chưa phát bài nào.
           </p>
         )}

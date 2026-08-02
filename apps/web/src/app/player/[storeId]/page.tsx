@@ -70,7 +70,7 @@ export default function PlayerPage() {
           <span
             className="text-xs px-2 py-1 rounded-full"
             style={{
-              backgroundColor: isConnected ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+              backgroundColor: isConnected ? 'var(--color-accent-soft-bg)' : 'rgba(239,68,68,0.15)',
               color: isConnected ? 'var(--color-accent)' : 'var(--color-destructive)',
             }}
           >
@@ -89,7 +89,7 @@ export default function PlayerPage() {
           <p className="text-sm font-medium" style={{ color: 'var(--color-foreground)' }}>
             {current ? current.title : 'Chưa phát bài nào'}
           </p>
-          <p className="text-xs mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-xs mt-1" style={{ color: 'var(--color-foreground-50)' }}>
             {storeQueue
               ? `Còn ${storeQueue.remaining} bài trong hàng chờ`
               : isPlaying
@@ -132,7 +132,7 @@ export default function PlayerPage() {
           </div>
           <div
             className="flex justify-between text-xs tabular-nums"
-            style={{ color: 'rgba(248,250,252,0.5)' }}
+            style={{ color: 'var(--color-foreground-50)' }}
           >
             <span>{formatPosition(positionMs)}</span>
             <span>{formatPosition(durationMs)}</span>

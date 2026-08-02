@@ -59,7 +59,7 @@ export default function TrackMetaDialog({
           <label
             htmlFor="track-meta-title"
             className="text-sm"
-            style={{ color: 'rgba(248,250,252,0.7)' }}
+            style={{ color: 'var(--color-foreground-70)' }}
           >
             Tên bài hát
           </label>
@@ -83,7 +83,7 @@ export default function TrackMetaDialog({
           <label
             htmlFor="track-meta-artist"
             className="text-sm"
-            style={{ color: 'rgba(248,250,252,0.7)' }}
+            style={{ color: 'var(--color-foreground-70)' }}
           >
             Ca sĩ
           </label>

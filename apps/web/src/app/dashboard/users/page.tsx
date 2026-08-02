@@ -83,7 +83,7 @@ export default function UsersPage() {
           >
             Người dùng
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
             Quản lý tài khoản trong chuỗi
           </p>
         </div>
@@ -129,13 +129,13 @@ export default function UsersPage() {
                   <p className="font-medium" style={{ color: 'var(--color-foreground)' }}>
                     {u.name}
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-foreground-50)' }}>
                     {u.email}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   {u.storeId && (
-                    <span className="text-xs" style={{ color: 'rgba(248,250,252,0.4)' }}>
+                    <span className="text-xs" style={{ color: 'var(--color-foreground-40)' }}>
                       {stores.find((s) => s.id === u.storeId)?.name ?? u.storeId.slice(0, 8)}
                     </span>
                   )}

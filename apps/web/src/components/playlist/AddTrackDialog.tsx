@@ -90,7 +90,7 @@ export default function AddTrackDialog({
             <span className="sr-only">Đang tải kho nhạc...</span>
           </div>
         ) : visible.length === 0 ? (
-          <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
             Không có bài nào khớp.
           </p>
         ) : (
@@ -119,7 +119,7 @@ export default function AddTrackDialog({
                     >
                       {track.title}
                     </p>
-                    <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                    <p className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
                       {[track.artist, formatDuration(track.durationMs)].filter(Boolean).join(' · ')}
                     </p>
                   </div>

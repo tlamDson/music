@@ -17,7 +17,7 @@ export default function LoginPage() {
           >
             Cafe Music
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
             Sign in to your account
           </p>
         </div>

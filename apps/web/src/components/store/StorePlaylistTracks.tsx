@@ -77,7 +77,7 @@ export default function StorePlaylistTracks({
 
   if (!playlist || playlist.playlistTracks.length === 0) {
     return (
-      <p className="text-sm p-4" style={{ color: 'rgba(248,250,252,0.5)' }}>
+      <p className="text-sm p-4" style={{ color: 'var(--color-foreground-50)' }}>
         Playlist chưa có bài nào.
       </p>
     );
@@ -91,7 +91,7 @@ export default function StorePlaylistTracks({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs px-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+      <p className="text-xs px-1" style={{ color: 'var(--color-foreground-50)' }}>
         {rows.length} bài · {formatTotalDurationExact(totalDurationMs)}
       </p>
       <TrackTable

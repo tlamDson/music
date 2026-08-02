@@ -36,6 +36,10 @@ Layout lấy cảm hứng từ Spotify (sidebar thư viện, hàng card cuộn n
 
 Thay chữ "Đang tải..." bằng class `.skeleton` có sẵn trong `globals.css` (PR #56) — khối `<div className="skeleton h-* w-*" />` phỏng theo hình dạng nội dung sắp hiện (vd `h-40 w-full` cho khối bảng, `h-6 w-64` cho tiêu đề), không dùng text thuần.
 
+## Màu luôn qua token semantic, không viết `rgba()` thẳng trong component
+
+`globals.css` có thang `--color-foreground-90/70/60/50/40/25/08` (chữ mờ dần trên `--color-foreground`) và `--color-accent-soft-bg` / `--color-secondary-soft-bg` (nền pill/badge tô nhạt) — đây là nguồn duy nhất cho các màu này (PR #10, dọn dẹp 94 chỗ `rgba(248,250,252,*)`/`rgba(34,197,94,0.15)`/`rgba(67,56,202,0.25)` từng viết tay rải rác). Cần thêm mức mờ mới thì khai báo token ở `:root`, đừng viết `rgba(...)` thẳng vào `style` của component — bảng màu sáng (`:root[data-theme='light']`, PR #11) chỉ cần đổi giá trị token ở một chỗ, không phải rà lại từng file.
+
 ## Checklist pre-delivery cho mọi UI
 
 - Không dùng emoji làm icon; dùng SVG (Heroicons/Lucide).

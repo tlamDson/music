@@ -88,7 +88,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
         >
           {status?.name ?? 'Quán của tôi'}
         </h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
           Lệch đồng hồ với máy chủ: {offset > 0 ? '+' : ''}
           {offset}ms
         </p>
@@ -114,7 +114,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
                 ? current.title
                 : 'Đã kết nối máy chủ'}
           </p>
-          <p className="text-xs mt-0.5 truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-foreground-50)' }}>
             {current
               ? `${isPlaying ? 'Đang phát' : 'Tạm dừng'} tại quán`
               : 'Quán đang im lặng — chọn playlist bên dưới để phát'}
@@ -124,7 +124,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
         {storeQueue && (
           <span
             className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
-            style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: 'var(--color-accent)' }}
+            style={{ backgroundColor: 'var(--color-accent-soft-bg)', color: 'var(--color-accent)' }}
           >
             Còn {storeQueue.remaining} bài trong hàng chờ
           </span>
@@ -160,7 +160,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
         </h2>
 
         {playlists.length === 0 ? (
-          <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
             Chưa có playlist nào.
           </p>
         ) : (
@@ -197,7 +197,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
                             <span
                               className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
                               style={{
-                                backgroundColor: 'rgba(34,197,94,0.15)',
+                                backgroundColor: 'var(--color-accent-soft-bg)',
                                 color: 'var(--color-accent)',
                               }}
                             >
@@ -205,7 +205,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
                             </span>
                           )}
                         </p>
-                        <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                        <p className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
                           {playlist._count?.playlistTracks ?? 0} bài ·{' '}
                           {formatTotalDuration(playlist.totalDurationMs)} ·{' '}
                           {playlist.scope === 'ORG' ? 'của chuỗi' : 'của quán'}

@@ -78,18 +78,18 @@ export default function TrackTable({
         <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
           <th
             className="w-10 px-2 py-2 text-xs font-normal md:w-12 md:px-4"
-            style={{ color: 'rgba(248,250,252,0.5)' }}
+            style={{ color: 'var(--color-foreground-50)' }}
           >
             #
           </th>
-          <th className="px-2 py-2 text-xs font-normal" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <th className="px-2 py-2 text-xs font-normal" style={{ color: 'var(--color-foreground-50)' }}>
             Tiêu đề
           </th>
           {extraColumns.map((column) => (
             <th
               key={column.key}
               className={`hidden md:table-cell ${column.headerClassName ?? 'px-4 py-2 text-xs font-normal'}`}
-              style={{ color: 'rgba(248,250,252,0.5)' }}
+              style={{ color: 'var(--color-foreground-50)' }}
             >
               {column.header}
             </th>
@@ -97,14 +97,14 @@ export default function TrackTable({
           {showAddedAt && (
             <th
               className="hidden whitespace-nowrap px-4 py-2 text-xs font-normal md:table-cell md:w-32"
-              style={{ color: 'rgba(248,250,252,0.5)' }}
+              style={{ color: 'var(--color-foreground-50)' }}
             >
               Ngày thêm
             </th>
           )}
           <th
             className="w-16 px-2 py-2 text-right text-xs font-normal md:w-24 md:px-4"
-            style={{ color: 'rgba(248,250,252,0.5)' }}
+            style={{ color: 'var(--color-foreground-50)' }}
           >
             <svg
               viewBox="0 0 24 24"

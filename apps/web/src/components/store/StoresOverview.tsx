@@ -61,7 +61,7 @@ export default function StoresOverview() {
 
   if (rows.length === 0) {
     return (
-      <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+      <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
         Chưa có quán nào.
       </p>
     );
@@ -91,7 +91,7 @@ export default function StoresOverview() {
               >
                 {row.name}
               </p>
-              <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+              <p className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
                 {row.connectedScreens > 0
                   ? `${row.connectedScreens} màn hình đang kết nối`
                   : 'Chưa có màn hình nào'}
@@ -103,11 +103,11 @@ export default function StoresOverview() {
             <span
               className="w-2 h-2 rounded-full flex-shrink-0"
               style={{
-                backgroundColor: row.isPlaying ? 'var(--color-accent)' : 'rgba(248,250,252,0.25)',
+                backgroundColor: row.isPlaying ? 'var(--color-accent)' : 'var(--color-foreground-25)',
               }}
               aria-hidden="true"
             />
-            <span className="text-xs" style={{ color: 'rgba(248,250,252,0.6)' }}>
+            <span className="text-xs" style={{ color: 'var(--color-foreground-60)' }}>
               {row.isPlaying ? 'Đang phát' : row.status === 'PAUSED' ? 'Tạm dừng' : 'Đang im lặng'}
             </span>
           </div>
@@ -115,7 +115,7 @@ export default function StoresOverview() {
           {row.queueRemaining !== null && (
             <span
               className="text-xs px-2 py-1 rounded-full self-start"
-              style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: 'var(--color-accent)' }}
+              style={{ backgroundColor: 'var(--color-accent-soft-bg)', color: 'var(--color-accent)' }}
             >
               Còn {row.queueRemaining} bài trong hàng chờ
             </span>

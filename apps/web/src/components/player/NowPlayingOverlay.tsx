@@ -9,7 +9,7 @@ import VolumeControl from './VolumeControl';
 import { formatDuration, formatPosition } from '../../lib/format';
 import { CloseIcon } from './icons';
 
-const MUTED_TEXT = 'rgba(248,250,252,0.6)';
+const MUTED_TEXT = 'var(--color-foreground-60)';
 
 interface NowPlayingOverlayProps {
   onClose: () => void;

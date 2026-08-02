@@ -80,7 +80,7 @@ export default function PlaylistCard({
         {playlist.name}
       </Link>
 
-      <p className="text-xs mt-1 truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+      <p className="text-xs mt-1 truncate" style={{ color: 'var(--color-foreground-50)' }}>
         {trackCount} bài · {formatTotalDuration(playlist.totalDurationMs)}
       </p>
 

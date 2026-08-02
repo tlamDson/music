@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { api, ApiError } from '../../lib/api-client';
 
-const FIELD_LABEL_STYLE = { color: 'rgba(248,250,252,0.7)' };
+const FIELD_LABEL_STYLE = { color: 'var(--color-foreground-70)' };
 
 /**
  * Đổi mật khẩu qua PATCH /me/password. Sai mật khẩu hiện tại trả 401 — đây là

@@ -81,7 +81,7 @@ export default function CreateUserDialog({
             <label
               htmlFor={field.id}
               className="text-sm"
-              style={{ color: 'rgba(248,250,252,0.7)' }}
+              style={{ color: 'var(--color-foreground-70)' }}
             >
               {field.label}
             </label>
@@ -107,7 +107,7 @@ export default function CreateUserDialog({
             <label
               htmlFor="create-role"
               className="text-sm"
-              style={{ color: 'rgba(248,250,252,0.7)' }}
+              style={{ color: 'var(--color-foreground-70)' }}
             >
               Vai trò
             </label>
@@ -133,7 +133,7 @@ export default function CreateUserDialog({
               <label
                 htmlFor="create-store"
                 className="text-sm"
-                style={{ color: 'rgba(248,250,252,0.7)' }}
+                style={{ color: 'var(--color-foreground-70)' }}
               >
                 Gán vào quán
               </label>

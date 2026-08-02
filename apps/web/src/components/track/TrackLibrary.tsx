@@ -164,7 +164,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
           style={{
             border: `1px dashed ${dragOver ? 'var(--color-accent)' : 'var(--color-border)'}`,
             backgroundColor: dragOver ? 'rgba(34,197,94,0.05)' : 'transparent',
-            color: 'rgba(248,250,252,0.5)',
+            color: 'var(--color-foreground-50)',
           }}
         >
           hoặc kéo file vào đây · MP3, M4A, WAV, FLAC, OGG · tối đa 50MB
@@ -199,7 +199,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
       </div>
 
       {isStore && (
-        <p className="text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
           Nhạc bạn tải lên chỉ quán bạn nghe được; nhạc của chuỗi thì mọi quán dùng chung.
         </p>
       )}
@@ -211,7 +211,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
           <div className="skeleton h-12 w-full" />
         </div>
       ) : visible.length === 0 ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
           Chưa có bài hát nào.
         </p>
       ) : (
@@ -236,8 +236,8 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
                       className="text-xs px-2 py-1 rounded-full whitespace-nowrap"
                       style={{
                         backgroundColor: rowStoreId
-                          ? 'rgba(67,56,202,0.25)'
-                          : 'rgba(34,197,94,0.15)',
+                          ? 'var(--color-secondary-soft-bg)'
+                          : 'var(--color-accent-soft-bg)',
                         color: rowStoreId ? 'var(--color-secondary)' : 'var(--color-accent)',
                       }}
                     >

@@ -173,13 +173,13 @@ export default function AppShell({
         <div className="mt-6 flex-1 min-h-0 overflow-y-auto">
           <p
             className="px-3 pb-2 text-xs uppercase tracking-wide"
-            style={{ color: 'rgba(248,250,252,0.4)' }}
+            style={{ color: 'var(--color-foreground-40)' }}
           >
             Thư viện
           </p>
 
           {playlists.length === 0 ? (
-            <p className="px-3 text-xs" style={{ color: 'rgba(248,250,252,0.4)' }}>
+            <p className="px-3 text-xs" style={{ color: 'var(--color-foreground-40)' }}>
               Chưa có playlist nào
             </p>
           ) : (
@@ -203,7 +203,7 @@ export default function AppShell({
                       </span>
                       <span
                         className="block text-xs truncate"
-                        style={{ color: 'rgba(248,250,252,0.5)' }}
+                        style={{ color: 'var(--color-foreground-50)' }}
                       >
                         {playlist.scope === 'ORG' ? 'Playlist của chuỗi' : 'Playlist của quán'}
                       </span>
@@ -225,7 +225,7 @@ export default function AppShell({
         >
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+              <p className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
                 {user.email}
               </p>
               <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--color-accent)' }}>

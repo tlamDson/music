@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePlayer } from './PlayerProvider';
 import { VolumeLoudIcon, VolumeLowIcon, VolumeMutedIcon } from './icons';
 
-const MUTED_TEXT = 'rgba(248,250,252,0.6)';
+const MUTED_TEXT = 'var(--color-foreground-60)';
 
 /**
  * Nút loa giờ bấm được (trước đây chỉ là hình trang trí): tắt/bật tiếng, nhớ
