@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { toast } from 'sonner';
 import { api } from '../../../lib/api-client';
 import CoverArt from '../../../components/media/CoverArt';
+import CreateStoreDialog from '../../../components/store/CreateStoreDialog';
 
 interface StoreRow {
   id: string;
@@ -27,8 +27,8 @@ const STATUS_COLOR: Record<StoreRow['status'], string> = {
 export default function StoresPage() {
   const [stores, setStores] = useState<StoreRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [newStoreName, setNewStoreName] = useState('');
+  const [search, setSearch] = useState('');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const fetchStores = () => {
     api
@@ -44,21 +44,9 @@ export default function StoresPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStoreName.trim()) return;
-    setCreating(true);
-    try {
-      await api.post('/stores', { name: newStoreName });
-      setNewStoreName('');
-      fetchStores();
-      toast.success(`Đã tạo quán "${newStoreName}"`);
-    } catch (err) {
-      toast.error(err instanceof Error && err.message ? err.message : 'Tạo quán thất bại');
-    } finally {
-      setCreating(false);
-    }
-  };
+  const visible = stores.filter((store) =>
+    store.name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -74,37 +62,34 @@ export default function StoresPage() {
         </p>
       </div>
 
-      <form
-        onSubmit={(e) => void handleCreate(e)}
-        className="flex flex-col sm:flex-row gap-3"
-        aria-label="Tạo quán"
-      >
+      <div className="flex flex-col sm:flex-row gap-3">
         <input
-          type="text"
-          value={newStoreName}
-          onChange={(e) => setNewStoreName(e.target.value)}
-          placeholder="Tên quán mới..."
+          id="store-search"
+          name="store-search"
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Tìm quán..."
+          aria-label="Tìm quán"
           className="flex-1 px-4 py-2 rounded-lg text-sm outline-none"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-foreground)',
             border: '1px solid var(--color-border)',
           }}
-          aria-label="Tên quán"
         />
         <button
-          type="submit"
-          disabled={creating}
+          type="button"
+          onClick={() => setShowCreateDialog(true)}
           className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
           style={{
             backgroundColor: 'var(--color-accent)',
             color: 'white',
-            opacity: creating ? 0.7 : 1,
           }}
         >
-          {creating ? 'Đang tạo...' : 'Thêm quán'}
+          Thêm quán
         </button>
-      </form>
+      </div>
 
       {loading ? (
         <div className="grid gap-3" role="status" aria-label="Đang tải danh sách quán">
@@ -117,9 +102,13 @@ export default function StoresPage() {
         <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
           Chưa có quán nào.
         </p>
+      ) : visible.length === 0 ? (
+        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          Không tìm thấy quán nào khớp.
+        </p>
       ) : (
         <div className="grid gap-3">
-          {stores.map((store, index) => (
+          {visible.map((store, index) => (
             <Link
               key={store.id}
               href={`/dashboard/stores/${store.id}`}
@@ -165,6 +154,15 @@ export default function StoresPage() {
           ))}
         </div>
       )}
+
+      <CreateStoreDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onCreated={() => {
+          setShowCreateDialog(false);
+          fetchStores();
+        }}
+      />
     </div>
   );
 }
