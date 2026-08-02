@@ -21,6 +21,9 @@ interface PlaylistCardProps {
   onDelete?: () => void;
   /** Thứ tự trong danh sách — chỉ 8 card đầu được stagger lúc vào, xem globals.css `.animate-stagger-item`. */
   index?: number;
+  /** Độ rộng card — mặc định `w-44 flex-shrink-0` cho rail ngang, trang dùng
+   * grid truyền `w-full` để card giãn theo cột thay vì giữ bề ngang cố định. */
+  className?: string;
 }
 
 export default function PlaylistCard({
@@ -30,13 +33,14 @@ export default function PlaylistCard({
   onPlay,
   onDelete,
   index,
+  className = 'w-44 flex-shrink-0',
 }: PlaylistCardProps) {
   const trackCount = playlist._count?.playlistTracks ?? 0;
   const staggered = typeof index === 'number' && index < 8;
 
   return (
     <div
-      className={`group relative w-44 flex-shrink-0 p-3 rounded-xl shadow-[var(--shadow-md)] transition-[transform,box-shadow] duration-[var(--duration-base)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)] ${
+      className={`group relative ${className} p-3 rounded-xl shadow-[var(--shadow-md)] transition-[transform,box-shadow] duration-[var(--duration-base)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)] ${
         staggered ? 'animate-stagger-item' : ''
       }`}
       style={{
