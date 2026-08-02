@@ -39,3 +39,8 @@ export function storeNavItems(): NavItem[] {
 export function homePathFor(role: UserRole): string {
   return role === 'STORE_ADMIN' ? '/store' : '/dashboard';
 }
+
+/** Trang Cài đặt cá nhân — không thêm vào nav chính, vào từ khối tài khoản ở đáy sidebar. */
+export function settingsPathFor(role: UserRole): string {
+  return role === 'STORE_ADMIN' ? '/store/settings' : '/dashboard/settings';
+}

@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
 import AppShell from '../../components/layout/AppShell';
 import StoreSyncProvider from '../../components/sync/StoreSyncProvider';
-import { storeNavItems } from '../../lib/nav';
+import { storeNavItems, settingsPathFor } from '../../lib/nav';
+import type { UserRole } from '@cafe-music/shared';
 
 /**
  * Console của quán: cùng khung với `/dashboard` nhưng nav không có Sync
@@ -40,6 +41,7 @@ export default function StoreLayout({ children }: { children: React.ReactNode })
     <AppShell
       navItems={storeNavItems()}
       user={{ email: user.email, role: user.role }}
+      settingsHref={settingsPathFor(user.role as UserRole)}
       onLogout={() => {
         logout();
         router.push('/login');

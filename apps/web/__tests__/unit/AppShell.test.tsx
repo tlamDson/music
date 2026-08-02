@@ -142,6 +142,29 @@ describe('AppShell', () => {
     expect(screen.getByRole('button', { name: 'Đóng menu điều hướng' })).toBeInTheDocument();
   });
 
+  it('shows a settings link in the account block when settingsHref is provided', () => {
+    render(
+      <AppShell
+        navItems={dashboardNavItems('ORG_ADMIN')}
+        user={{ email: 'admin@cafe.com', role: 'ORG_ADMIN' }}
+        settingsHref="/dashboard/settings"
+      >
+        <p>nội dung trang</p>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Cài đặt' })).toHaveAttribute(
+      'href',
+      '/dashboard/settings',
+    );
+  });
+
+  it('does not render a settings link when settingsHref is not provided', () => {
+    renderShell('ORG_ADMIN');
+
+    expect(screen.queryByRole('link', { name: 'Cài đặt' })).not.toBeInTheDocument();
+  });
+
   it('closes the mobile sidebar when the backdrop is clicked', () => {
     renderShell('ORG_ADMIN');
 

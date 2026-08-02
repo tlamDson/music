@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
 import AppShell from '../../components/layout/AppShell';
 import StoresSyncBridge from '../../components/sync/StoresSyncBridge';
-import { dashboardNavItems } from '../../lib/nav';
+import { dashboardNavItems, settingsPathFor } from '../../lib/nav';
 import type { UserRole } from '@cafe-music/shared';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -46,6 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <AppShell
       navItems={dashboardNavItems(user.role as UserRole)}
       user={{ email: user.email, role: user.role }}
+      settingsHref={settingsPathFor(user.role as UserRole)}
       onLogout={() => {
         logout();
         router.push('/login');

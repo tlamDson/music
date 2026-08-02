@@ -27,8 +27,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     // 401 ngoài /auth/login nghĩa là phiên đã hết hạn hoặc tài khoản vừa bị
     // vô hiệu hoá giữa chừng — đăng xuất sạch thay vì để lỗi rải rác trên UI.
-    // Không áp dụng cho /auth/login vì đó là sai mật khẩu, LoginForm tự xử lý.
-    if (res.status === 401 && path !== '/auth/login' && typeof window !== 'undefined') {
+    // Không áp dụng cho /auth/login (sai mật khẩu, LoginForm tự xử lý) và
+    // /me/password (sai mật khẩu HIỆN TẠI lúc đổi mật khẩu — 401 hợp lệ,
+    // không phải phiên hết hạn; PasswordSection tự hiện lỗi tại chỗ. Thiếu
+    // ngoại lệ này thì gõ sai mật khẩu cũ một lần là bị đá thẳng ra /login).
+    if (
+      res.status === 401 &&
+      path !== '/auth/login' &&
+      path !== '/me/password' &&
+      typeof window !== 'undefined'
+    ) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       window.location.href = '/login';
