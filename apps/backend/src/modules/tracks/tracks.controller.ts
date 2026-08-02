@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Param,
   Query,
@@ -20,6 +21,9 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   CreateTrackMetaSchema,
+  CreateTrackMetaDto,
+  UpdateTrackMetaSchema,
+  UpdateTrackMetaDto,
   PaginationSchema,
   JwtPayload,
 } from '@cafe-music/shared';
@@ -36,7 +40,7 @@ export class TracksController {
   @UseInterceptors(FileInterceptor('file', AUDIO_UPLOAD_OPTIONS))
   create(
     @Body(new ZodValidationPipe(CreateTrackMetaSchema))
-    dto: { title: string; artist?: string },
+    dto: CreateTrackMetaDto,
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: JwtPayload,
   ) {
@@ -55,6 +59,19 @@ export class TracksController {
   @Get(':id/stream-url')
   getStreamUrl(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tracksService.getStreamUrl(id, user);
+  }
+
+  // Sửa tên bài/ca sĩ sau khi upload — trước đây không có, tên bài lỡ lấy
+  // thẳng từ tên file là chịu vĩnh viễn.
+  @Patch(':id')
+  @Roles('ORG_ADMIN', 'STORE_ADMIN')
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateTrackMetaSchema))
+    dto: UpdateTrackMetaDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tracksService.update(id, dto, user);
   }
 
   @Delete(':id')
