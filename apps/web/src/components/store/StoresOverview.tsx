@@ -47,12 +47,12 @@ export default function StoresOverview() {
   if (loading) {
     return (
       <div
-        className="flex gap-4 overflow-x-auto pb-2"
+        className="flex flex-col gap-3 md:flex-row md:gap-4 md:overflow-x-auto md:pb-2"
         role="status"
         aria-label="Đang tải trạng thái các quán"
       >
         {[0, 1, 2].map((i) => (
-          <div key={i} className="skeleton w-64 h-28 flex-shrink-0" />
+          <div key={i} className="skeleton h-28 w-full md:w-64 md:flex-shrink-0" />
         ))}
         <span className="sr-only">Đang tải trạng thái các quán...</span>
       </div>
@@ -68,12 +68,12 @@ export default function StoresOverview() {
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-2">
+    <div className="flex flex-col gap-3 md:flex-row md:gap-4 md:overflow-x-auto md:pb-2">
       {rows.map((row, index) => (
         <Link
           key={row.storeId}
           href={`/dashboard/stores/${row.storeId}`}
-          className={`w-64 flex-shrink-0 p-4 rounded-xl flex flex-col gap-3 cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none focus-visible:brightness-125 ${
+          className={`w-full md:w-64 md:flex-shrink-0 p-4 rounded-xl flex flex-col gap-3 cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none focus-visible:brightness-125 ${
             index < 8 ? 'animate-stagger-item' : ''
           }`}
           style={{
