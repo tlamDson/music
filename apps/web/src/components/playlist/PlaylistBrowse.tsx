@@ -7,6 +7,7 @@ import { usePlayer } from '../player/PlayerProvider';
 import { readRecentPlaylists, rememberRecentPlaylist } from '../../lib/recent-playlists';
 import { formatTotalDuration } from '../../lib/format';
 import PlaylistCard, { type BrowsePlaylist } from './PlaylistCard';
+import CreatePlaylistDialog from './CreatePlaylistDialog';
 import CoverArt from '../media/CoverArt';
 import type { ApiResponse, UserRole } from '@cafe-music/shared';
 
@@ -30,8 +31,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
   const [scope, setScope] = useState<ScopeFilter>('ALL');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [recentIds, setRecentIds] = useState<string[]>([]);
 
   const { current, isPlaying, queue, playTrack } = usePlayer();
@@ -111,25 +111,19 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
     toast.success(`Nghe thử "${playlist.name}"`);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
-
-    setCreating(true);
+  const handleCreate = async (name: string) => {
     try {
       await api.post('/playlists', {
-        name: newName.trim(),
+        name,
         // Quán chỉ tạo được playlist của chính mình
         scope: isStore ? 'STORE' : 'ORG',
         ...(isStore && storeId ? { storeId } : {}),
       });
-      toast.success(`Đã tạo playlist "${newName.trim()}"`);
-      setNewName('');
+      toast.success(`Đã tạo playlist "${name}"`);
+      setShowCreateDialog(false);
       await fetchPlaylists();
     } catch {
       toast.error('Tạo playlist thất bại');
-    } finally {
-      setCreating(false);
     }
   };
 
@@ -190,36 +184,19 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
               border: '1px solid var(--color-border)',
             }}
           />
-        </div>
 
-        {/* Tạo playlist */}
-        <form onSubmit={(e) => void handleCreate(e)} className="flex gap-3">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Tên playlist mới (VD: Ballad, V-Pop)..."
-            aria-label="Tên playlist"
-            className="flex-1 px-4 py-2 rounded-lg text-sm outline-none"
-            style={{
-              backgroundColor: 'var(--color-primary)',
-              color: 'var(--color-foreground)',
-              border: '1px solid var(--color-border)',
-            }}
-          />
           <button
-            type="submit"
-            disabled={creating}
+            type="button"
+            onClick={() => setShowCreateDialog(true)}
             className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
             style={{
               backgroundColor: 'var(--color-accent)',
               color: 'white',
-              opacity: creating ? 0.7 : 1,
             }}
           >
-            {creating ? 'Đang tạo...' : 'Tạo playlist'}
+            Tạo playlist
           </button>
-        </form>
+        </div>
 
         {loading ? (
           <div
@@ -312,6 +289,12 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
           </p>
         </div>
       </aside>
+
+      <CreatePlaylistDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onCreate={handleCreate}
+      />
     </div>
   );
 }
