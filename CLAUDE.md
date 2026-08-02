@@ -81,7 +81,7 @@ Nợ đã biết (không đổi): chưa có bảng `Artist` nên không có cộ
 
 **Bài học chung của đợt QC playback:** ba trong bốn lỗi QC là **lỗi phạm vi/lớp, không phải lỗi logic** — một thẻ audio dùng chung mà nhiều nguồn ghi vào, một lệnh không mang `storeId`, một z-index chọn tuỳ file. Khi thêm nguồn sự kiện hay lớp nổi mới, hỏi trước: _ai sở hữu tài nguyên này, và ai được phép ghi vào nó?_
 
-**PR #79–#90 (QC responsive iPhone + kho nhạc + trang Cài đặt, 10/12 PR) đã merge vào `develop`:**
+**PR #79–#92 (QC responsive iPhone + kho nhạc + trang Cài đặt, 11/12 PR) đã merge vào `develop`:**
 
 Xuất phát từ QC log trên iPhone 14 Pro Max: trang Users còn tiếng Anh và hai nút lệch cao, ô input trang Quán/Playlist bị hiểu nhầm là ô lọc trong khi thực chất là form tạo mới, kho nhạc tràn ngang vì tên bài dài, dashboard quán chạy ngang trên mobile.
 
@@ -94,7 +94,9 @@ Xuất phát từ QC log trên iPhone 14 Pro Max: trang Users còn tiếng Anh v
 - **#89 — trang Cài đặt (`/dashboard/settings`, `/store/settings`), lộ ra một bug thật thứ hai:** `api-client.ts` tự đăng xuất + redirect `/login` trên **mọi** `401` ngoài `/auth/login` — nhưng `PATCH /me/password` trả `401` hợp lệ khi gõ sai mật khẩu hiện tại, không phải phiên hết hạn. Thiếu ngoại lệ thì gõ sai mật khẩu cũ một lần là bị đá thẳng ra màn login thay vì thấy lỗi tại chỗ. Thêm `/me/password` vào danh sách loại trừ, cùng chỗ với `/auth/login`.
 - **#90 — rút 94 chỗ `rgba(248,250,252,*)`/`rgba(34,197,94,0.15)`/`rgba(67,56,202,0.25)` viết tay rải rác ở 34 file ra token semantic** (`--color-foreground-90/70/60/50/40/25/08`, `--color-accent-soft-bg`, `--color-secondary-soft-bg` trong `globals.css`). Thuần refactor, không đổi pixel nào — chuẩn bị cho PR light theme chỉ cần đổi giá trị token ở `:root[data-theme='light']` thay vì rà lại từng file.
 
-**Còn 2/12 PR chưa xong:** PR light theme **đang chờ** người dùng tải bộ color token mã nguồn mở (Radix Colors/Catppuccin/Base16 — đã chốt không tự bịa hay bê theme Notion/Spotify) vào một thư mục trong repo. PR i18n Anh/Việt **đã khảo sát xong nhưng chưa viết code** — phạm vi thật (150+ chuỗi ở ~40 file, nhiều chuỗi nội suy ở console quán chưa có test) lớn hơn ước tính ban đầu, đã ghi chi tiết vào memory thay vì code vội. Cả hai xem [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) và kế hoạch gốc trước khi làm tiếp.
+- **#92 — i18n song ngữ vi/en cho toàn bộ `apps/web`** (`next-intl`, locale qua cookie `NEXT_LOCALE`, mặc định `vi`, đổi ở trang Cài đặt qua `LanguageSection.tsx` — ghi cookie + `router.refresh()`, không reload cứng). ~40 file / 150+ chuỗi được chuyển sang `useTranslations()`; các hàm thuần không gọi được hook (`lib/nav.ts`, `lib/roles.ts`, `lib/format.ts`) nhận `Translator` làm tham số thay vì tự đọc `messages`. `messages/vi.json` copy nguyên văn chuỗi cũ nên 33 file test hiện có không cần sửa assertion, chỉ 3 file cần sửa vì đổi chữ ký hàm (`nav.test.ts`, `AppShell.test.tsx`) hoặc vì nội dung thật đổi từ tiếng Anh sang tiếng Việt (`LoginForm.test.tsx`). `app/global-error.tsx` **cố tình** giữ tiếng Việt hardcode — là Client Component đứng ngoài layout gốc, không đọc được cookie locale. Chi tiết đầy đủ (namespace, `formatPlaylistMeta`, cạm bẫy approximate-vs-exact duration) ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _i18n — song ngữ vi/en_.
+
+**Còn 1/12 PR chưa xong:** PR light theme **đang chờ** người dùng tải bộ color token mã nguồn mở (Radix Colors/Catppuccin/Base16 — đã chốt không tự bịa hay bê theme Notion/Spotify) vào một thư mục trong repo. Xem kế hoạch gốc khi bắt tay vào.
 
 ## MCP Servers
 
