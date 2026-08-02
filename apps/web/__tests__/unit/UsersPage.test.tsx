@@ -4,7 +4,7 @@ import UsersPage from '../../src/app/dashboard/users/page';
 import { api } from '../../src/lib/api-client';
 
 jest.mock('../../src/lib/api-client', () => ({
-  api: { get: jest.fn(), post: jest.fn(), patch: jest.fn() },
+  api: { get: jest.fn(), post: jest.fn(), patch: jest.fn(), delete: jest.fn() },
 }));
 
 jest.mock('../../src/hooks/useAuth', () => ({
@@ -67,6 +67,37 @@ describe('UsersPage', () => {
       if (url === '/stores') return Promise.resolve({ data: stores });
       return Promise.reject(new Error(`unexpected GET ${url}`));
     });
+  });
+
+  it('renders the page fully in Vietnamese', async () => {
+    render(<UsersPage />);
+
+    expect(await screen.findByRole('heading', { name: 'Người dùng' })).toBeInTheDocument();
+    expect(screen.getByText('Quản lý tài khoản trong chuỗi')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Thêm người dùng' })).toBeInTheDocument();
+
+    const row = await screen.findByTestId('user-row-user-assigned');
+    expect(within(row).getByText('Quản lý quán')).toBeInTheDocument();
+  });
+
+  it('opens the create user dialog and creates a user', async () => {
+    mockApi.post.mockResolvedValue({ id: 'new-user' });
+    render(<UsersPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: '+ Thêm người dùng' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Thêm người dùng' });
+    await userEvent.type(within(dialog).getByLabelText('Họ tên'), 'Người mới');
+    await userEvent.type(within(dialog).getByLabelText('Email'), 'moi@cafe.com');
+    await userEvent.type(within(dialog).getByLabelText('Mật khẩu'), 'mat-khau-12');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tạo tài khoản' }));
+
+    await waitFor(() =>
+      expect(mockApi.post).toHaveBeenCalledWith(
+        '/users',
+        expect.objectContaining({ name: 'Người mới', email: 'moi@cafe.com' }),
+      ),
+    );
   });
 
   it('shows an Edit button even for a store admin with no store assigned', async () => {
