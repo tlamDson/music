@@ -99,6 +99,26 @@ DB cũ từng tạo bằng `db push` → chạy một lần: `prisma migrate res
 
 `User.isActive` (`Boolean @default(true)`) được `AuthService` (`apps/backend/src/modules/auth/auth.service.ts`) check ở **3 chỗ**: `login`, `refreshTokens`, và `validateJwtPayload` (`JwtStrategy` gọi mỗi request có JWT — quan trọng nhất, vì access token đang còn hạn của tài khoản vừa bị vô hiệu hoá cũng bị từ chối ngay ở request tiếp theo, không cần token blocklist). ORG_ADMIN đổi trạng thái qua `PATCH /users/:id { isActive }` — dùng chung route CRUD user đã có (đã scope theo `organizationId`), không có route riêng `/deactivate`. Frontend (`apps/web/src/lib/api-client.ts`) tự xoá token + redirect `/login` khi gặp `401` ngoài `/auth/login`.
 
+### `@CurrentUser()` khai kiểu `JwtPayload` nhưng runtime là bản ghi Prisma `User`
+
+**Cạm bẫy khi thêm code mới đọc `@CurrentUser()`:** kiểu khai báo (`JwtPayload`, có field `sub`) **không khớp** giá trị thật lúc chạy. `JwtStrategy.validate()` (`apps/backend/src/modules/auth/strategies/jwt.strategy.ts`) trả thẳng kết quả của `AuthService.validateJwtPayload(payload)` — hàm này trả **bản ghi Prisma `User`** (có `id`, không có `sub`), không phải payload JWT gốc. Passport gán y nguyên giá trị `validate()` trả về vào `req.user`.
+
+Mọi chỗ dùng `@CurrentUser()` trong repo từ trước tới giờ chỉ đọc `role`/`organizationId`/`storeId`/`email` — bốn field này **trùng tên và trùng giá trị** ở cả hai phía (`JwtPayload` lẫn `User`) nên không ai va phải. `sub` là field duy nhất tồn tại trên `JwtPayload` nhưng **không tồn tại** trên `User` — đọc `user.sub` luôn ra `undefined`, và dùng nó làm `where: { id: undefined }` cho Prisma sẽ ném lỗi runtime "needs at least one of `id` or `email`" (phát hiện khi build `/me`, PR #8 — không lộ ra qua unit test vì mock không phân biệt hai shape).
+
+**Cách né:** không đọc `user.sub`. Nếu cần định danh user, dùng `user.email` (có thật ở cả hai phía, unique trong DB) hoặc field khác đã dùng sẵn (`role`/`organizationId`/`storeId`). Muốn sửa tận gốc (đổi `JwtStrategy`/`AuthService.validateJwtPayload` để trả đúng `JwtPayload`) thì phải rà lại toàn bộ chỗ dùng `@CurrentUser()` xem có nơi nào lỡ dựa vào field riêng của Prisma `User` (`id`, `name`, `passwordHash`, `updatedAt`) không — chưa làm vì rủi ro cao hơn lợi ích lúc này.
+
+## `/me` — hồ sơ và mật khẩu tự phục vụ
+
+`apps/backend/src/modules/users/me.controller.ts`, `@Controller('me')` + `@UseGuards(JwtAuthGuard)` (**không** `@Roles` — mọi vai trò đã đăng nhập đều gọi được). Tách prefix tĩnh riêng khỏi `UsersController` (`/users`) vì hai lý do: `UsersController` khoá `@Roles('ORG_ADMIN')` ở cấp class nên `STORE_ADMIN` không gọi được gì trong đó, và nó đã có `@Patch(':id')` — thêm `/users/me` vào cùng chỗ sẽ vướng đúng cạm bẫy route tĩnh bị `:id` nuốt đã ghi ở mục _Cạm bẫy hay gặp_.
+
+- `GET /me` — hồ sơ (không bao giờ trả `passwordHash`).
+- `PATCH /me { name }` — **chỉ nhận `name`**. Zod schema (`UpdateProfileSchema`) không có field khác, và service chọn field tường minh (không `...dto`) — cho tự đổi `role`/`storeId` là leo thang đặc quyền, cho tự đổi `isActive` là tự bật lại tài khoản vừa bị vô hiệu hoá.
+- `PATCH /me/password { currentPassword, newPassword }` — so `currentPassword` bằng bcrypt trước khi đổi; `newPassword` trùng mật khẩu cũ thì 400. Rate limit **không** qua decorator `@Throttle` (xem lý do dưới) mà gọi thẳng `RedisThrottlerStorage.increment('me-password:<email>', 60000, 5, 0, 'default')` trong service — 5 lần/phút theo từng user, dùng chung hạ tầng Redis với rate limit login.
+
+**Vì sao không dùng `@Throttle` + `getTracker` như `/auth/login`:** `ThrottlerGuard` được đăng ký `APP_GUARD` (toàn cục) trong `app.module.ts`, nên nó chạy **trước** `JwtAuthGuard` cục bộ của `MeController` — lúc tracker của `@Throttle` thực thi, request chưa được xác thực nên `req.user` chưa tồn tại, không có gì để khoá theo user. Gọi thẳng `RedisThrottlerStorage` bên trong service (sau khi `JwtAuthGuard` đã chạy xong) né được vấn đề thứ tự guard này.
+
+**Giới hạn đã biết (ghi rõ để không tưởng nhầm là đã kín): đổi mật khẩu không thu hồi phiên cũ.** Access/refresh token đang còn hạn ở thiết bị khác vẫn dùng được tới khi hết hạn tự nhiên — repo không có bảng `RefreshToken` (token là JWT stateless) nên thu hồi ngay cần thêm cột `passwordChangedAt` trên `User` + check trong `validateJwtPayload` (giống cách `isActive` đang làm) và một migration. Chưa làm ở đợt này, để lại cho đợt sau nếu cần.
+
 ## Rate limit — counter ở Redis, định danh client theo header của edge
 
 `ThrottlerModule` được cấu hình ở [app.module.ts](../../apps/backend/src/app.module.ts) qua `forRootAsync`, **không** dùng mặc định của `@nestjs/throttler`:
