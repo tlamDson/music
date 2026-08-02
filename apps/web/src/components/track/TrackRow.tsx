@@ -13,6 +13,8 @@ interface TrackRowProps {
   onPlay: (row: TrackTableRow, index: number) => void;
   onRemove?: (row: TrackTableRow, index: number) => void;
   canRemove: (row: TrackTableRow) => boolean;
+  onEdit?: (row: TrackTableRow, index: number) => void;
+  canEdit: (row: TrackTableRow) => boolean;
   draggable: boolean;
   isDragging: boolean;
   onDragStart: (index: number) => void;
@@ -30,6 +32,8 @@ export default function TrackRow({
   onPlay,
   onRemove,
   canRemove,
+  onEdit,
+  canEdit,
   draggable,
   isDragging,
   onDragStart,
@@ -37,6 +41,7 @@ export default function TrackRow({
 }: TrackRowProps) {
   const { track } = row;
   const showRemove = Boolean(onRemove) && canRemove(row);
+  const showEdit = Boolean(onEdit) && canEdit(row);
 
   return (
     <tr
@@ -61,7 +66,7 @@ export default function TrackRow({
         ...(index < 8 ? ({ '--i': index } as React.CSSProperties) : {}),
       }}
     >
-      <td className="w-12 px-4 py-3 text-sm">
+      <td className="w-10 px-2 py-3 text-sm md:w-12 md:px-4">
         <div className="relative flex h-4 w-4 items-center justify-center">
           {isCurrent ? (
             <>
@@ -133,12 +138,17 @@ export default function TrackRow({
           <div className="min-w-0">
             <p
               className="truncate text-sm font-medium"
+              title={track.title}
               style={{ color: isCurrent ? 'var(--color-accent)' : 'var(--color-foreground)' }}
             >
               {track.title}
             </p>
             {track.artist && (
-              <p className="truncate text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
+              <p
+                className="truncate text-xs"
+                title={track.artist}
+                style={{ color: 'rgba(248,250,252,0.5)' }}
+              >
                 {track.artist}
               </p>
             )}
@@ -149,7 +159,7 @@ export default function TrackRow({
       {extraColumns.map((column) => (
         <td
           key={column.key}
-          className={column.cellClassName ?? 'px-4 py-3 text-sm'}
+          className={`hidden md:table-cell ${column.cellClassName ?? 'px-4 py-3 text-sm'}`}
           style={{ color: 'rgba(248,250,252,0.5)' }}
         >
           {column.render(row, index)}
@@ -158,7 +168,7 @@ export default function TrackRow({
 
       {showAddedAt && (
         <td
-          className="whitespace-nowrap px-4 py-3 text-sm tabular-nums"
+          className="hidden whitespace-nowrap px-4 py-3 text-sm tabular-nums md:table-cell"
           style={{ color: 'rgba(248,250,252,0.5)' }}
         >
           {formatAddedAt(row.addedAt)}
@@ -166,18 +176,40 @@ export default function TrackRow({
       )}
 
       <td
-        className="whitespace-nowrap px-4 py-3 text-sm text-right tabular-nums"
+        className="whitespace-nowrap px-2 py-3 text-sm text-right tabular-nums md:px-4"
         style={{ color: 'rgba(248,250,252,0.5)' }}
       >
         {formatDuration(track.durationMs)}
       </td>
 
-      <td className="px-4 py-3">
+      <td className="px-2 py-3 md:px-4">
         <div className="flex items-center justify-end gap-1">
+          {showEdit && (
+            <button
+              onClick={() => onEdit?.(row, index)}
+              className="rounded p-2 opacity-100 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none md:opacity-0 md:group-hover:opacity-100"
+              style={{ color: 'var(--color-foreground)' }}
+              aria-label={`Sửa ${track.title}`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.5-9.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
+                />
+              </svg>
+            </button>
+          )}
           {showRemove && (
             <button
               onClick={() => onRemove?.(row, index)}
-              className="rounded p-2 opacity-0 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100"
+              className="rounded p-2 opacity-100 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none md:opacity-0 md:group-hover:opacity-100"
               style={{ color: 'var(--color-destructive)' }}
               aria-label={`Xóa ${track.title}`}
             >
