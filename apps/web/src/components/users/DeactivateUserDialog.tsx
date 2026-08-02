@@ -45,17 +45,17 @@ export default function DeactivateUserDialog({
         Vô hiệu hoá tài khoản
       </h2>
 
-      <p className="text-sm" style={{ color: 'rgba(248,250,252,0.7)' }}>
+      <p className="text-sm" style={{ color: 'var(--color-foreground-70)' }}>
         Tài khoản <strong>{user.name}</strong> sẽ không đăng nhập được nữa cho tới khi kích hoạt
         lại.
       </p>
 
       {storeName ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.7)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-foreground-70)' }}>
           Gõ đúng tên quán <strong>{storeName}</strong> để xác nhận.
         </p>
       ) : (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.7)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-foreground-70)' }}>
           Người dùng này chưa được gán vào quán nào — gõ tên người dùng <strong>{user.name}</strong>{' '}
           để xác nhận.
         </p>
@@ -65,7 +65,7 @@ export default function DeactivateUserDialog({
         <label
           htmlFor="deactivate-confirm-input"
           className="text-sm"
-          style={{ color: 'rgba(248,250,252,0.7)' }}
+          style={{ color: 'var(--color-foreground-70)' }}
         >
           Gõ để xác nhận
         </label>

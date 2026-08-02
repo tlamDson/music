@@ -11,7 +11,7 @@ import VolumeControl from './VolumeControl';
 import NowPlayingOverlay from './NowPlayingOverlay';
 import { ExpandIcon } from './icons';
 
-const MUTED_TEXT = 'rgba(248,250,252,0.6)';
+const MUTED_TEXT = 'var(--color-foreground-60)';
 
 /**
  * Thanh phát cố định dưới cùng, hiện xuyên suốt mọi trang. Ẩn hẳn khi chưa có
@@ -107,7 +107,7 @@ export default function PlayerBar() {
           {isStoreQueue && queue && (
             <span
               className="hidden sm:inline-block text-xs px-2 py-1 rounded-full whitespace-nowrap"
-              style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: 'var(--color-accent)' }}
+              style={{ backgroundColor: 'var(--color-accent-soft-bg)', color: 'var(--color-accent)' }}
             >
               Còn {queue.remaining} bài
             </span>

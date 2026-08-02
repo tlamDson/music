@@ -53,7 +53,7 @@ export default function CreateStoreDialog({ open, onClose, onCreated }: CreateSt
           <label
             htmlFor="new-store-name"
             className="text-sm"
-            style={{ color: 'rgba(248,250,252,0.7)' }}
+            style={{ color: 'var(--color-foreground-70)' }}
           >
             Tên quán
           </label>

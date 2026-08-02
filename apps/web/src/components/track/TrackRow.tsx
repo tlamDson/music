@@ -113,7 +113,7 @@ export default function TrackRow({
             <>
               <span
                 className="tabular-nums transition-opacity duration-[var(--duration-fast)] group-hover:opacity-0 group-focus-within:opacity-0"
-                style={{ color: 'rgba(248,250,252,0.5)' }}
+                style={{ color: 'var(--color-foreground-50)' }}
               >
                 {index + 1}
               </span>
@@ -147,7 +147,7 @@ export default function TrackRow({
               <p
                 className="truncate text-xs"
                 title={track.artist}
-                style={{ color: 'rgba(248,250,252,0.5)' }}
+                style={{ color: 'var(--color-foreground-50)' }}
               >
                 {track.artist}
               </p>
@@ -160,7 +160,7 @@ export default function TrackRow({
         <td
           key={column.key}
           className={`hidden md:table-cell ${column.cellClassName ?? 'px-4 py-3 text-sm'}`}
-          style={{ color: 'rgba(248,250,252,0.5)' }}
+          style={{ color: 'var(--color-foreground-50)' }}
         >
           {column.render(row, index)}
         </td>
@@ -169,7 +169,7 @@ export default function TrackRow({
       {showAddedAt && (
         <td
           className="hidden whitespace-nowrap px-4 py-3 text-sm tabular-nums md:table-cell"
-          style={{ color: 'rgba(248,250,252,0.5)' }}
+          style={{ color: 'var(--color-foreground-50)' }}
         >
           {formatAddedAt(row.addedAt)}
         </td>
@@ -177,7 +177,7 @@ export default function TrackRow({
 
       <td
         className="whitespace-nowrap px-2 py-3 text-sm text-right tabular-nums md:px-4"
-        style={{ color: 'rgba(248,250,252,0.5)' }}
+        style={{ color: 'var(--color-foreground-50)' }}
       >
         {formatDuration(track.durationMs)}
       </td>

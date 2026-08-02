@@ -51,7 +51,7 @@ export default function CreatePlaylistDialog({
           <label
             htmlFor="new-playlist-name"
             className="text-sm"
-            style={{ color: 'rgba(248,250,252,0.7)' }}
+            style={{ color: 'var(--color-foreground-70)' }}
           >
             Tên playlist
           </label>

@@ -158,7 +158,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
         >
           {store.name}
         </h1>
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
           {store.connectedScreens > 0
             ? `${store.connectedScreens} màn hình đang kết nối`
             : 'Chưa có màn hình nào kết nối — mở màn chiếu để nghe được nhạc'}
@@ -185,7 +185,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                 >
                   {nowPlaying.track.title}
                 </p>
-                <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                <p className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
                   {nowPlaying.track.artist ?? 'Chưa rõ nghệ sĩ'}
                   {nowPlaying.queue
                     ? ` · còn ${nowPlaying.queue.remaining} bài trong hàng chờ`
@@ -295,7 +295,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
             </div>
           </>
         ) : (
-          <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
             Quán đang im lặng — chọn một playlist bên dưới để phát.
           </p>
         )}
@@ -308,7 +308,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
         </h2>
 
         {playlists.length === 0 ? (
-          <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
             Chưa có playlist nào.
           </p>
         ) : (
@@ -345,7 +345,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                             <span
                               className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
                               style={{
-                                backgroundColor: 'rgba(34,197,94,0.15)',
+                                backgroundColor: 'var(--color-accent-soft-bg)',
                                 color: 'var(--color-accent)',
                               }}
                             >
@@ -353,7 +353,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                             </span>
                           )}
                         </p>
-                        <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                        <p className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
                           {playlist._count?.playlistTracks ?? 0} bài ·{' '}
                           {formatTotalDuration(playlist.totalDurationMs)} ·{' '}
                           {playlist.scope === 'ORG' ? 'của chuỗi' : 'của quán'}

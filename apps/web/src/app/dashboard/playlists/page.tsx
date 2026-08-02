@@ -18,7 +18,7 @@ export default function PlaylistsPage() {
         >
           Playlists
         </h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
           Nghe thử tại chỗ. Muốn phát ra loa quán thì vào trang Quán.
         </p>
       </div>

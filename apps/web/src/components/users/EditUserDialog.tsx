@@ -68,7 +68,7 @@ export default function EditUserDialog({
         </h2>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="edit-name" className="text-sm" style={{ color: 'rgba(248,250,252,0.7)' }}>
+          <label htmlFor="edit-name" className="text-sm" style={{ color: 'var(--color-foreground-70)' }}>
             Họ tên
           </label>
           <input
@@ -91,7 +91,7 @@ export default function EditUserDialog({
             <label
               htmlFor="edit-role"
               className="text-sm"
-              style={{ color: 'rgba(248,250,252,0.7)' }}
+              style={{ color: 'var(--color-foreground-70)' }}
             >
               Vai trò
             </label>
@@ -116,7 +116,7 @@ export default function EditUserDialog({
               <label
                 htmlFor="edit-store"
                 className="text-sm"
-                style={{ color: 'rgba(248,250,252,0.7)' }}
+                style={{ color: 'var(--color-foreground-70)' }}
               >
                 Quán
               </label>

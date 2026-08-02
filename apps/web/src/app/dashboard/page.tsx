@@ -13,7 +13,7 @@ export default function DashboardPage() {
         >
           Tổng quan
         </h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
           Nhạc đang chạy ở từng quán trong chuỗi
         </p>
       </div>
@@ -39,7 +39,7 @@ export default function DashboardPage() {
         <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
           Bắt đầu phát
         </h2>
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
           Bấm vào một quán ở trên để chọn nhạc và phát ra loa quán đó. Trang{' '}
           <Link
             href="/dashboard/playlists"

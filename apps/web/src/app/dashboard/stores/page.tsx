@@ -23,7 +23,7 @@ const STATUS_LABEL: Record<StoreRow['status'], string> = {
 const STATUS_COLOR: Record<StoreRow['status'], string> = {
   PLAYING: 'var(--color-accent)',
   PAUSED: '#EAB308',
-  STOPPED: 'rgba(248,250,252,0.25)',
+  STOPPED: 'var(--color-foreground-25)',
 };
 
 export default function StoresPage() {
@@ -60,7 +60,7 @@ export default function StoresPage() {
         >
           Quán
         </h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
           Bấm vào một quán để chọn nhạc và điều khiển phát cho quán đó
         </p>
       </div>
@@ -105,11 +105,11 @@ export default function StoresPage() {
           <span className="sr-only">Đang tải danh sách quán...</span>
         </div>
       ) : stores.length === 0 ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
           Chưa có quán nào.
         </p>
       ) : visible.length === 0 ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
           Không tìm thấy quán nào khớp.
         </p>
       ) : view === 'grid' ? (
@@ -138,7 +138,7 @@ export default function StoresPage() {
                     style={{ backgroundColor: STATUS_COLOR[store.status] }}
                     aria-hidden="true"
                   />
-                  <span className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                  <span className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
                     {STATUS_LABEL[store.status]}
                   </span>
                 </span>
@@ -173,7 +173,7 @@ export default function StoresPage() {
                       style={{ backgroundColor: STATUS_COLOR[store.status] }}
                       aria-hidden="true"
                     />
-                    <span className="text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                    <span className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
                       {STATUS_LABEL[store.status]}
                     </span>
                   </span>

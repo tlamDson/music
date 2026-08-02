@@ -19,7 +19,7 @@ export default function SettingsSections() {
         >
           Cài đặt
         </h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
           Thông tin tài khoản và mật khẩu đăng nhập
         </p>
       </div>

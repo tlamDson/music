@@ -55,7 +55,7 @@ function PlaylistListRow({ playlist, href, isPlaying, onPlay, onDelete }: Playli
           <p className="truncate text-sm font-medium" style={{ color: 'var(--color-foreground)' }}>
             {playlist.name}
           </p>
-          <p className="truncate text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="truncate text-xs" style={{ color: 'var(--color-foreground-50)' }}>
             {trackCount} bài · {formatTotalDuration(playlist.totalDurationMs)}
           </p>
         </div>
@@ -292,7 +292,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
             <span className="sr-only">Đang tải...</span>
           </div>
         ) : playlists.length === 0 ? (
-          <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
             Không có playlist nào khớp.
           </p>
         ) : (
@@ -365,7 +365,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
                 {current.title}
               </p>
               {current.artist && (
-                <p className="text-xs mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-foreground-50)' }}>
                   {current.artist}
                 </p>
               )}
@@ -377,13 +377,13 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
             )}
           </>
         ) : (
-          <p className="text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
             Chưa phát bài nào. Bấm nút phát trên một playlist để bắt đầu.
           </p>
         )}
 
         <div className="pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
-          <p className="text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
+          <p className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
             {playlists.length} playlist ·{' '}
             {formatTotalDuration(
               playlists.reduce((sum, playlist) => sum + (playlist.totalDurationMs ?? 0), 0),
