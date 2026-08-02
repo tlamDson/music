@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
@@ -15,6 +16,7 @@ interface TrackLibraryProps {
 }
 
 export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
+  const t = useTranslations('track.library');
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -51,13 +53,13 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
 
       await api.postMultipart('/tracks', formData);
       fetchTracks();
-      toast.success(`Đã tải lên "${title}"`);
+      toast.success(t('uploaded', { title }));
       setPendingFile(null);
     } catch (err) {
       toast.error(
         err instanceof Error && err.message
-          ? `Tải lên thất bại: ${err.message}`
-          : 'Tải lên thất bại',
+          ? t('uploadFailedWithReason', { reason: err.message })
+          : t('uploadFailed'),
       );
     } finally {
       setSaving(false);
@@ -76,13 +78,17 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
     try {
       await api.patch(`/tracks/${editingTrack.id}`, { title, artist: artist || null });
       setTracks((prev) =>
-        prev.map((t) => (t.id === editingTrack.id ? { ...t, title, artist: artist || null } : t)),
+        prev.map((row) =>
+          row.id === editingTrack.id ? { ...row, title, artist: artist || null } : row,
+        ),
       );
-      toast.success('Đã lưu thay đổi');
+      toast.success(t('saved'));
       setEditingTrack(null);
     } catch (err) {
       toast.error(
-        err instanceof Error && err.message ? `Lưu thất bại: ${err.message}` : 'Lưu thất bại',
+        err instanceof Error && err.message
+          ? t('saveFailedWithReason', { reason: err.message })
+          : t('saveFailed'),
       );
     } finally {
       setSaving(false);
@@ -92,10 +98,10 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
   const handleDelete = async (track: Track) => {
     try {
       await api.delete(`/tracks/${track.id}`);
-      setTracks((prev) => prev.filter((t) => t.id !== track.id));
-      toast.success('Đã xóa bài hát');
+      setTracks((prev) => prev.filter((row) => row.id !== track.id));
+      toast.success(t('deleted'));
     } catch {
-      toast.error('Xóa thất bại');
+      toast.error(t('deleteFailed'));
     }
   };
 
@@ -118,7 +124,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
         { mode: 'preview' },
       );
     } catch {
-      toast.error(`Không phát được "${track.title}"`);
+      toast.error(t('playFailed', { title: track.title }));
     }
   };
 
@@ -145,7 +151,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
             opacity: uploading ? 0.7 : 1,
           }}
         >
-          {uploading ? 'Đang tải lên...' : 'Tải bài hát lên'}
+          {uploading ? t('uploading') : t('uploadButton')}
         </button>
 
         <div
@@ -167,7 +173,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
             color: 'var(--color-foreground-50)',
           }}
         >
-          hoặc kéo file vào đây · MP3, M4A, WAV, FLAC, OGG · tối đa 50MB
+          {t('dropHint')}
         </div>
 
         <input
@@ -175,7 +181,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
           type="file"
           accept="audio/*"
           className="hidden"
-          aria-label="Chọn file nhạc"
+          aria-label={t('filePickerLabel')}
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handlePickFile(file);
@@ -187,8 +193,8 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm bài hát..."
-          aria-label="Tìm bài hát"
+          placeholder={t('searchPlaceholder')}
+          aria-label={t('searchAriaLabel')}
           className="flex-1 min-w-48 px-4 py-2 rounded-full text-sm outline-none"
           style={{
             backgroundColor: 'var(--color-muted)',
@@ -200,19 +206,19 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
 
       {isStore && (
         <p className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
-          Nhạc bạn tải lên chỉ quán bạn nghe được; nhạc của chuỗi thì mọi quán dùng chung.
+          {t('storeUploadNote')}
         </p>
       )}
 
       {loading ? (
-        <div className="flex flex-col gap-2" aria-label="Đang tải kho nhạc">
+        <div className="flex flex-col gap-2" aria-label={t('loadingLabel')}>
           <div className="skeleton h-12 w-full" />
           <div className="skeleton h-12 w-full" />
           <div className="skeleton h-12 w-full" />
         </div>
       ) : visible.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
-          Chưa có bài hát nào.
+          {t('empty')}
         </p>
       ) : (
         <div className="rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
@@ -226,7 +232,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
             extraColumns={[
               {
                 key: 'scope',
-                header: 'Phạm vi',
+                header: t('scopeHeader'),
                 headerClassName: 'w-32 px-4 py-2 text-xs font-normal',
                 cellClassName: 'px-4 py-3',
                 render: (row) => {
@@ -241,7 +247,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
                         color: rowStoreId ? 'var(--color-secondary)' : 'var(--color-accent)',
                       }}
                     >
-                      {rowStoreId ? 'Của quán' : 'Của chuỗi'}
+                      {rowStoreId ? t('scopeStore') : t('scopeOrg')}
                     </span>
                   );
                 },

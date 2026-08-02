@@ -23,7 +23,7 @@ describe('LoginForm', () => {
     render(<LoginForm />);
 
     await userEvent.type(screen.getByLabelText(/email/i), 'store1@cafe.com');
-    await userEvent.type(screen.getByLabelText(/password/i), 'Store@123456');
+    await userEvent.type(screen.getByLabelText('Mật khẩu'), 'Store@123456');
     fireEvent.submit(screen.getByRole('form'));
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/store'));
@@ -34,7 +34,7 @@ describe('LoginForm', () => {
     render(<LoginForm />);
 
     await userEvent.type(screen.getByLabelText(/email/i), 'admin@cafe.com');
-    await userEvent.type(screen.getByLabelText(/password/i), 'Admin@123456');
+    await userEvent.type(screen.getByLabelText('Mật khẩu'), 'Admin@123456');
     fireEvent.submit(screen.getByRole('form'));
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/dashboard'));
@@ -43,7 +43,7 @@ describe('LoginForm', () => {
   it('should render email and password fields', () => {
     render(<LoginForm />);
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Mật khẩu')).toBeInTheDocument();
   });
 
   it('should call login with valid credentials on submit', async () => {
@@ -51,7 +51,7 @@ describe('LoginForm', () => {
     render(<LoginForm />);
 
     await userEvent.type(screen.getByLabelText(/email/i), 'admin@cafe.com');
-    await userEvent.type(screen.getByLabelText(/password/i), 'Admin@123456');
+    await userEvent.type(screen.getByLabelText('Mật khẩu'), 'Admin@123456');
     fireEvent.submit(screen.getByRole('form'));
 
     await waitFor(() => {
@@ -67,7 +67,7 @@ describe('LoginForm', () => {
     render(<LoginForm />);
 
     await userEvent.type(screen.getByLabelText(/email/i), 'wrong@cafe.com');
-    await userEvent.type(screen.getByLabelText(/password/i), 'WrongPass123');
+    await userEvent.type(screen.getByLabelText('Mật khẩu'), 'WrongPass123');
     fireEvent.submit(screen.getByRole('form'));
 
     await waitFor(() => {

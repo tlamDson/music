@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api-client';
 import { formatDuration } from '../../lib/format';
@@ -24,6 +25,7 @@ export default function AddTrackDialog({
   onAdd,
   onClose,
 }: AddTrackDialogProps) {
+  const t = useTranslations('playlist.addTrackDialog');
   const [tracks, setTracks] = useState<Track[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -44,16 +46,16 @@ export default function AddTrackDialog({
   );
 
   return (
-    <Dialog open={open} onClose={onClose} ariaLabel="Thêm bài hát vào playlist">
+    <Dialog open={open} onClose={onClose} ariaLabel={t('dialogTitle')}>
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-          Thêm bài hát
+          {t('heading')}
         </h2>
         <button
           onClick={onClose}
           className="p-2 rounded cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none"
           style={{ color: 'var(--color-foreground)' }}
-          aria-label="Đóng"
+          aria-label={t('close')}
         >
           <svg
             viewBox="0 0 24 24"
@@ -71,8 +73,8 @@ export default function AddTrackDialog({
         type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Tìm trong kho nhạc..."
-        aria-label="Tìm bài hát"
+        placeholder={t('searchPlaceholder')}
+        aria-label={t('searchAriaLabel')}
         className="px-4 py-2 rounded-lg text-sm outline-none"
         style={{
           backgroundColor: 'var(--color-muted)',
@@ -83,15 +85,15 @@ export default function AddTrackDialog({
 
       <div className="flex-1 overflow-y-auto flex flex-col gap-2">
         {loading ? (
-          <div className="flex flex-col gap-2" role="status" aria-label="Đang tải kho nhạc">
+          <div className="flex flex-col gap-2" role="status" aria-label={t('loadingLabel')}>
             <div className="skeleton h-14 w-full" />
             <div className="skeleton h-14 w-full" />
             <div className="skeleton h-14 w-full" />
-            <span className="sr-only">Đang tải kho nhạc...</span>
+            <span className="sr-only">{t('loadingText')}</span>
           </div>
         ) : visible.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
-            Không có bài nào khớp.
+            {t('noMatches')}
           </p>
         ) : (
           visible.map((track) => {
@@ -127,14 +129,14 @@ export default function AddTrackDialog({
 
                 {added ? (
                   <span className="text-xs px-2" style={{ color: 'var(--color-accent)' }}>
-                    Đã thêm
+                    {t('added')}
                   </span>
                 ) : (
                   <button
                     onClick={() => onAdd(track.id, track.title)}
                     className="p-2 rounded cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
                     style={{ color: 'var(--color-accent)' }}
-                    aria-label={`Thêm ${track.title}`}
+                    aria-label={t('addAriaLabel', { title: track.title })}
                   >
                     <svg
                       viewBox="0 0 24 24"

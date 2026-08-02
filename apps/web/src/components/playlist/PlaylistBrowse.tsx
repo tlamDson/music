@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -23,12 +24,6 @@ interface PlaylistBrowseProps {
   basePath: string;
 }
 
-const CHIPS: Array<{ value: ScopeFilter; label: string }> = [
-  { value: 'ALL', label: 'Tất cả' },
-  { value: 'ORG', label: 'Chuỗi' },
-  { value: 'STORE', label: 'Quán' },
-];
-
 interface PlaylistListRowProps {
   playlist: BrowsePlaylist;
   href: string;
@@ -39,6 +34,8 @@ interface PlaylistListRowProps {
 
 /** Hàng gọn cho chế độ danh sách — cùng thông tin với `PlaylistCard`, khác cách trình bày. */
 function PlaylistListRow({ playlist, href, isPlaying, onPlay, onDelete }: PlaylistListRowProps) {
+  const t = useTranslations('playlist.card');
+  const tCommon = useTranslations('common');
   const trackCount = playlist._count?.playlistTracks ?? 0;
 
   return (
@@ -56,7 +53,8 @@ function PlaylistListRow({ playlist, href, isPlaying, onPlay, onDelete }: Playli
             {playlist.name}
           </p>
           <p className="truncate text-xs" style={{ color: 'var(--color-foreground-50)' }}>
-            {trackCount} bài · {formatTotalDuration(playlist.totalDurationMs)}
+            {tCommon('playlistMeta.trackCount', { count: trackCount })} ·{' '}
+            {formatTotalDuration(playlist.totalDurationMs, tCommon)}
           </p>
         </div>
       </Link>
@@ -65,7 +63,7 @@ function PlaylistListRow({ playlist, href, isPlaying, onPlay, onDelete }: Playli
         onClick={onPlay}
         className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
         style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-        aria-label={`Phát ${playlist.name}`}
+        aria-label={t('play', { name: playlist.name })}
       >
         {isPlaying ? (
           <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
@@ -84,7 +82,7 @@ function PlaylistListRow({ playlist, href, isPlaying, onPlay, onDelete }: Playli
           onClick={onDelete}
           className="flex-shrink-0 p-2 rounded opacity-0 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100"
           style={{ color: 'var(--color-destructive)' }}
-          aria-label={`Xóa ${playlist.name}`}
+          aria-label={t('delete', { name: playlist.name })}
         >
           <svg
             viewBox="0 0 24 24"
@@ -106,6 +104,13 @@ function PlaylistListRow({ playlist, href, isPlaying, onPlay, onDelete }: Playli
 }
 
 export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrowseProps) {
+  const t = useTranslations('playlist.browse');
+  const tCommon = useTranslations('common');
+  const CHIPS: Array<{ value: ScopeFilter; label: string }> = [
+    { value: 'ALL', label: t('chipAll') },
+    { value: 'ORG', label: t('chipOrg') },
+    { value: 'STORE', label: t('chipStore') },
+  ];
   const [playlists, setPlaylists] = useState<BrowsePlaylist[]>([]);
   const [scope, setScope] = useState<ScopeFilter>('ALL');
   const [search, setSearch] = useState('');
@@ -152,21 +157,21 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
     try {
       if (isStore) {
         if (!storeId) {
-          toast.error('Tài khoản chưa gắn với quán nào');
+          toast.error(t('storeNotAssigned'));
           return;
         }
         await api.post(`/sync/stores/${storeId}/play`, {
           playlistId: playlist.id,
           trackIndex: 0,
         });
-        toast.success(`Đang phát "${playlist.name}" tại quán`);
+        toast.success(t('playingAtStore', { name: playlist.name }));
       } else {
         await previewFirstTrack(playlist);
       }
 
       setRecentIds(rememberRecentPlaylist(playlist.id));
     } catch (err) {
-      toast.error(err instanceof Error && err.message ? err.message : 'Phát playlist thất bại');
+      toast.error(err instanceof Error && err.message ? err.message : t('playFailed'));
     }
   };
 
@@ -179,7 +184,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
 
     const first = detail.playlistTracks[0]?.track;
     if (!first) {
-      toast.error(`"${playlist.name}" chưa có bài nào`);
+      toast.error(t('emptyPlaylist', { name: playlist.name }));
       return;
     }
 
@@ -188,7 +193,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
       { id: first.id, title: first.title, artist: first.artist, url, durationMs: first.durationMs },
       { mode: 'preview' },
     );
-    toast.success(`Nghe thử "${playlist.name}"`);
+    toast.success(t('previewing', { name: playlist.name }));
   };
 
   const handleCreate = async (name: string) => {
@@ -199,11 +204,11 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
         scope: isStore ? 'STORE' : 'ORG',
         ...(isStore && storeId ? { storeId } : {}),
       });
-      toast.success(`Đã tạo playlist "${name}"`);
+      toast.success(t('created', { name }));
       setShowCreateDialog(false);
       await fetchPlaylists();
     } catch {
-      toast.error('Tạo playlist thất bại');
+      toast.error(t('createFailed'));
     }
   };
 
@@ -211,9 +216,9 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
     try {
       await api.delete(`/playlists/${playlist.id}`);
       setPlaylists((prev) => prev.filter((p) => p.id !== playlist.id));
-      toast.success('Đã xóa playlist');
+      toast.success(t('deleted'));
     } catch {
-      toast.error('Xóa playlist thất bại');
+      toast.error(t('deleteFailed'));
     }
   };
 
@@ -224,9 +229,9 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
     .filter((playlist): playlist is BrowsePlaylist => Boolean(playlist));
 
   const rows: Array<{ title: string; items: BrowsePlaylist[] }> = [
-    { title: 'Gần đây', items: recent },
-    { title: 'Playlist của chuỗi', items: playlists.filter((p) => p.scope === 'ORG') },
-    { title: 'Playlist của quán', items: playlists.filter((p) => p.scope === 'STORE') },
+    { title: t('sectionRecent'), items: recent },
+    { title: t('sectionOrgPlaylists'), items: playlists.filter((p) => p.scope === 'ORG') },
+    { title: t('sectionStorePlaylists'), items: playlists.filter((p) => p.scope === 'STORE') },
   ];
 
   return (
@@ -255,8 +260,8 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Bạn muốn phát nội dung gì?"
-            aria-label="Tìm playlist"
+            placeholder={t('searchPlaceholder')}
+            aria-label={t('searchAriaLabel')}
             className="flex-1 min-w-48 px-4 py-2 rounded-full text-sm outline-none transition-shadow duration-[var(--duration-fast)]"
             style={{
               backgroundColor: 'var(--color-muted)',
@@ -276,7 +281,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
               color: 'white',
             }}
           >
-            Tạo playlist
+            {t('createButton')}
           </button>
         </div>
 
@@ -284,16 +289,16 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
           <div
             className="flex gap-4 overflow-x-auto pb-2"
             role="status"
-            aria-label="Đang tải playlist"
+            aria-label={t('loadingLabel')}
           >
             {[0, 1, 2, 3, 4].map((i) => (
               <div key={i} className="skeleton w-44 h-44 flex-shrink-0" />
             ))}
-            <span className="sr-only">Đang tải...</span>
+            <span className="sr-only">{t('loadingText')}</span>
           </div>
         ) : playlists.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
-            Không có playlist nào khớp.
+            {t('noMatches')}
           </p>
         ) : (
           rows
@@ -351,10 +356,10 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
       <aside
         className="hidden xl:flex w-72 flex-shrink-0 flex-col gap-4 p-4 rounded-xl h-fit"
         style={{ backgroundColor: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
-        aria-label="Đang phát"
+        aria-label={t('nowPlaying')}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--color-foreground)' }}>
-          Đang phát
+          {t('nowPlaying')}
         </h2>
 
         {current ? (
@@ -372,22 +377,25 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
             </div>
             {queue && (
               <p className="text-xs" style={{ color: 'var(--color-accent)' }}>
-                Còn {queue.remaining} bài trong hàng chờ
+                {tCommon('queueRemaining', { count: queue.remaining })}
               </p>
             )}
           </>
         ) : (
           <p className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
-            Chưa phát bài nào. Bấm nút phát trên một playlist để bắt đầu.
+            {t('noQueueHint')}
           </p>
         )}
 
         <div className="pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
           <p className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
-            {playlists.length} playlist ·{' '}
-            {formatTotalDuration(
-              playlists.reduce((sum, playlist) => sum + (playlist.totalDurationMs ?? 0), 0),
-            )}
+            {t('summary', {
+              count: playlists.length,
+              duration: formatTotalDuration(
+                playlists.reduce((sum, playlist) => sum + (playlist.totalDurationMs ?? 0), 0),
+                tCommon,
+              ),
+            })}
           </p>
         </div>
       </aside>

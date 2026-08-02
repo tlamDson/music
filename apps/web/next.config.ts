@@ -1,5 +1,8 @@
 import type { NextConfig } from 'next';
 import { withSentryConfig } from '@sentry/nextjs';
+import createNextIntlPlugin from 'next-intl/plugin';
+
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig: NextConfig = {
   async headers() {
@@ -28,7 +31,7 @@ const nextConfig: NextConfig = {
  * Không có `SENTRY_AUTH_TOKEN` (local, CI, PR preview) thì bước upload source
  * map tự bỏ qua và build vẫn chạy — chỉ Vercel production mới cần token.
  */
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withNextIntl(nextConfig), {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,

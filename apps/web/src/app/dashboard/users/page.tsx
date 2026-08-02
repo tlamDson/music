@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api-client';
 import { useAuth } from '../../../hooks/useAuth';
@@ -30,6 +31,8 @@ const ROW_ACTION_CLASS =
   'flex-1 sm:flex-none min-h-9 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40';
 
 export default function UsersPage() {
+  const t = useTranslations('dashboard.users');
+  const tCommon = useTranslations('common');
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
@@ -68,7 +71,7 @@ export default function UsersPage() {
       setDeactivatingUser(null);
       fetchData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Vô hiệu hoá tài khoản thất bại');
+      setError(err instanceof Error ? err.message : t('deactivateFailed'));
       setDeactivatingUser(null);
     }
   };
@@ -81,10 +84,10 @@ export default function UsersPage() {
             className="text-2xl font-bold"
             style={{ fontFamily: 'Fira Code, monospace', color: 'var(--color-foreground)' }}
           >
-            Người dùng
+            {t('title')}
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
-            Quản lý tài khoản trong chuỗi
+            {t('subtitle')}
           </p>
         </div>
         <button
@@ -92,7 +95,7 @@ export default function UsersPage() {
           className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity hover:opacity-90"
           style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
         >
-          + Thêm người dùng
+          {t('addUser')}
         </button>
       </div>
 
@@ -104,11 +107,11 @@ export default function UsersPage() {
 
       {/* Danh sách người dùng */}
       {loading ? (
-        <div className="flex flex-col gap-2" role="status" aria-label="Đang tải người dùng">
+        <div className="flex flex-col gap-2" role="status" aria-label={t('loadingUsersLabel')}>
           <div className="skeleton h-16 w-full" />
           <div className="skeleton h-16 w-full" />
           <div className="skeleton h-16 w-full" />
-          <span className="sr-only">Đang tải người dùng...</span>
+          <span className="sr-only">{t('loadingUsersText')}</span>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -146,14 +149,14 @@ export default function UsersPage() {
                       color: 'white',
                     }}
                   >
-                    {roleLabel(u.role)}
+                    {roleLabel(u.role, tCommon)}
                   </span>
                   {!u.isActive && (
                     <span
                       className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
                       style={{ backgroundColor: 'var(--color-destructive)', color: 'white' }}
                     >
-                      Đã vô hiệu hoá
+                      {t('deactivatedBadge')}
                     </span>
                   )}
 
@@ -167,7 +170,7 @@ export default function UsersPage() {
                       border: '1px solid var(--color-border)',
                     }}
                   >
-                    Sửa
+                    {t('edit')}
                   </button>
 
                   {u.isActive ? (
@@ -181,7 +184,7 @@ export default function UsersPage() {
                         border: '1px solid var(--color-border)',
                       }}
                     >
-                      Vô hiệu hoá
+                      {t('deactivate')}
                     </button>
                   ) : (
                     <button
@@ -193,7 +196,7 @@ export default function UsersPage() {
                         border: '1px solid var(--color-border)',
                       }}
                     >
-                      Kích hoạt lại
+                      {t('reactivate')}
                     </button>
                   )}
                 </div>

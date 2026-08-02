@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
@@ -36,6 +37,8 @@ interface SuggestedPlaylist {
  * playlist chưa phát bung được tại chỗ để chọn bài bắt đầu.
  */
 export default function StoreHome({ storeId }: { storeId: string }) {
+  const t = useTranslations('store.home');
+  const tCommon = useTranslations('common');
   const [status, setStatus] = useState<StoreStatus | null>(null);
   const [playlists, setPlaylists] = useState<SuggestedPlaylist[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -73,9 +76,9 @@ export default function StoreHome({ storeId }: { storeId: string }) {
         trackIndex,
       });
       await refreshStatus();
-      toast.success(`Đang phát "${name}" tại quán`);
+      toast.success(t('playingToast', { name }));
     } catch (err) {
-      toast.error(err instanceof Error && err.message ? err.message : 'Phát thất bại');
+      toast.error(err instanceof Error && err.message ? err.message : t('playFailed'));
     }
   };
 
@@ -86,11 +89,10 @@ export default function StoreHome({ storeId }: { storeId: string }) {
           className="text-2xl font-bold"
           style={{ fontFamily: 'Fira Code, monospace', color: 'var(--color-foreground)' }}
         >
-          {status?.name ?? 'Quán của tôi'}
+          {status?.name ?? t('fallbackTitle')}
         </h1>
         <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
-          Lệch đồng hồ với máy chủ: {offset > 0 ? '+' : ''}
-          {offset}ms
+          {t('clockOffset', { offset: `${offset > 0 ? '+' : ''}${offset}` })}
         </p>
       </div>
 
@@ -108,16 +110,14 @@ export default function StoreHome({ storeId }: { storeId: string }) {
         />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate" style={{ color: 'var(--color-foreground)' }}>
-            {!isConnected
-              ? 'Mất kết nối máy chủ — đang thử lại'
-              : current
-                ? current.title
-                : 'Đã kết nối máy chủ'}
+            {!isConnected ? t('disconnected') : current ? current.title : t('connected')}
           </p>
           <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-foreground-50)' }}>
             {current
-              ? `${isPlaying ? 'Đang phát' : 'Tạm dừng'} tại quán`
-              : 'Quán đang im lặng — chọn playlist bên dưới để phát'}
+              ? t('playingAtStoreLine', {
+                  status: isPlaying ? tCommon('status.playing') : tCommon('status.paused'),
+                })
+              : t('silentHint')}
           </p>
         </div>
 
@@ -126,7 +126,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
             className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
             style={{ backgroundColor: 'var(--color-accent-soft-bg)', color: 'var(--color-accent)' }}
           >
-            Còn {storeQueue.remaining} bài trong hàng chờ
+            {tCommon('queueRemaining', { count: storeQueue.remaining })}
           </span>
         )}
       </div>
@@ -136,7 +136,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
       {playlistId && (
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-            Đang phát
+            {t('nowPlayingHeading')}
           </h2>
           <div
             className="rounded-xl overflow-hidden py-2"
@@ -156,12 +156,12 @@ export default function StoreHome({ storeId }: { storeId: string }) {
       {/* Playlist bấm phát nhanh */}
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-          Phát tại quán
+          {t('playAtStoreHeading')}
         </h2>
 
         {playlists.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
-            Chưa có playlist nào.
+            {t('noPlaylists')}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -201,14 +201,21 @@ export default function StoreHome({ storeId }: { storeId: string }) {
                                 color: 'var(--color-accent)',
                               }}
                             >
-                              Đang phát
+                              {t('currentBadge')}
                             </span>
                           )}
                         </p>
-                        <p className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
-                          {playlist._count?.playlistTracks ?? 0} bài ·{' '}
-                          {formatTotalDuration(playlist.totalDurationMs)} ·{' '}
-                          {playlist.scope === 'ORG' ? 'của chuỗi' : 'của quán'}
+                        <p
+                          className="text-xs truncate"
+                          style={{ color: 'var(--color-foreground-50)' }}
+                        >
+                          {tCommon('playlistMeta.trackCount', {
+                            count: playlist._count?.playlistTracks ?? 0,
+                          })}{' '}
+                          · {formatTotalDuration(playlist.totalDurationMs, tCommon)} ·{' '}
+                          {playlist.scope === 'ORG'
+                            ? tCommon('playlistMeta.scopeOrg')
+                            : tCommon('playlistMeta.scopeStore')}
                         </p>
                       </div>
                     </div>
@@ -221,8 +228,8 @@ export default function StoreHome({ storeId }: { storeId: string }) {
                           style={{ color: 'var(--color-foreground)' }}
                           aria-label={
                             isExpanded
-                              ? `Thu gọn danh sách bài của ${playlist.name}`
-                              : `Xem danh sách bài của ${playlist.name}`
+                              ? t('collapseAriaLabel', { name: playlist.name })
+                              : t('expandAriaLabel', { name: playlist.name })
                           }
                           aria-expanded={isExpanded}
                         >
@@ -244,7 +251,7 @@ export default function StoreHome({ storeId }: { storeId: string }) {
                         onClick={() => void playFrom(playlist.id, 0, playlist.name)}
                         className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-[filter] duration-[var(--duration-base)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                         style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-                        aria-label={`Phát ${playlist.name}`}
+                        aria-label={t('playAriaLabel', { name: playlist.name })}
                       >
                         <svg
                           viewBox="0 0 24 24"

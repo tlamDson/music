@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 export type ViewMode = 'list' | 'grid';
 
 interface ViewToggleProps {
@@ -16,18 +18,20 @@ const BUTTON_CLASS =
  * `useViewMode`, không tự lưu ở đây.
  */
 export default function ViewToggle({ value, onChange }: ViewToggleProps) {
+  const t = useTranslations('common.viewToggle');
+
   return (
     <div
       className="flex items-center gap-1 rounded-lg p-1"
       style={{ border: '1px solid var(--color-border)' }}
       role="group"
-      aria-label="Chế độ xem"
+      aria-label={t('groupLabel')}
     >
       <button
         type="button"
         onClick={() => onChange('list')}
         aria-pressed={value === 'list'}
-        aria-label="Xem dạng danh sách"
+        aria-label={t('listView')}
         className={BUTTON_CLASS}
         style={{
           backgroundColor: value === 'list' ? 'var(--color-accent)' : 'transparent',
@@ -48,7 +52,7 @@ export default function ViewToggle({ value, onChange }: ViewToggleProps) {
         type="button"
         onClick={() => onChange('grid')}
         aria-pressed={value === 'grid'}
-        aria-label="Xem dạng lưới"
+        aria-label={t('gridView')}
         className={BUTTON_CLASS}
         style={{
           backgroundColor: value === 'grid' ? 'var(--color-accent)' : 'transparent',

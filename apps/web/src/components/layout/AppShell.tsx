@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api-client';
 import type { NavItem } from '../../lib/nav';
@@ -41,6 +42,7 @@ export default function AppShell({
   settingsHref,
   children,
 }: AppShellProps) {
+  const t = useTranslations('nav');
   const pathname = usePathname();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -93,7 +95,7 @@ export default function AppShell({
         onClick={() => setMobileNavOpen((v) => !v)}
         className="md:hidden fixed top-4 left-4 z-[var(--z-nav-toggle)] p-2 rounded-lg cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
         style={{ backgroundColor: 'var(--color-primary)', border: '1px solid var(--color-border)' }}
-        aria-label={mobileNavOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
+        aria-label={mobileNavOpen ? t('closeMenu') : t('openMenu')}
         aria-expanded={mobileNavOpen}
       >
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -142,7 +144,7 @@ export default function AppShell({
           backgroundColor: 'var(--color-primary)',
           borderRight: '1px solid var(--color-border)',
         }}
-        aria-label="Điều hướng chính"
+        aria-label={t('mainNav')}
       >
         <h2
           className="text-lg font-bold px-3 py-2 mb-2"
@@ -175,12 +177,12 @@ export default function AppShell({
             className="px-3 pb-2 text-xs uppercase tracking-wide"
             style={{ color: 'var(--color-foreground-40)' }}
           >
-            Thư viện
+            {t('library')}
           </p>
 
           {playlists.length === 0 ? (
             <p className="px-3 text-xs" style={{ color: 'var(--color-foreground-40)' }}>
-              Chưa có playlist nào
+              {t('noPlaylists')}
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
@@ -205,7 +207,7 @@ export default function AppShell({
                         className="block text-xs truncate"
                         style={{ color: 'var(--color-foreground-50)' }}
                       >
-                        {playlist.scope === 'ORG' ? 'Playlist của chuỗi' : 'Playlist của quán'}
+                        {playlist.scope === 'ORG' ? t('playlistScopeOrg') : t('playlistScopeStore')}
                       </span>
                     </span>
                   </Link>
@@ -235,7 +237,7 @@ export default function AppShell({
             {settingsHref && (
               <Link
                 href={settingsHref}
-                aria-label="Cài đặt"
+                aria-label={t('settings')}
                 className="flex-shrink-0 p-2 rounded-lg cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 focus-visible:outline-none"
                 style={{ color: 'var(--color-foreground)' }}
               >
@@ -263,7 +265,7 @@ export default function AppShell({
               className="mt-2 text-xs underline cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 focus-visible:outline-none"
               style={{ color: 'var(--color-secondary)' }}
             >
-              Đăng xuất
+              {t('logout')}
             </button>
           )}
         </div>
