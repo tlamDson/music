@@ -6,6 +6,10 @@ jest.mock('../../src/lib/api-client', () => ({
   api: { get: jest.fn(), patch: jest.fn() },
 }));
 
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: jest.fn() }),
+}));
+
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
 
 const mockApi = api as jest.Mocked<typeof api>;

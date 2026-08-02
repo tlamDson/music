@@ -18,6 +18,7 @@
     "@cafe-music/shared": "workspace:*",
     "@sentry/nextjs": "^10.69.0",
     "next": "15.3.9",
+    "next-intl": "^4.13.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "socket.io-client": "^4.8.1",

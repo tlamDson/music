@@ -1,9 +1,9 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { api } from '../../lib/api-client';
 import Dialog from '../ui/Dialog';
-import { ROLE_LABELS } from '../../lib/roles';
 
 interface Store {
   id: string;
@@ -37,6 +37,8 @@ export default function CreateUserDialog({
   onClose,
   onCreated,
 }: CreateUserDialogProps) {
+  const t = useTranslations('dashboard.users');
+  const tCommon = useTranslations('common');
   const [form, setForm] = useState(emptyForm);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
@@ -59,23 +61,28 @@ export default function CreateUserDialog({
       setForm(emptyForm);
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Tạo người dùng thất bại');
+      setError(err instanceof Error ? err.message : t('createDialog.failed'));
     } finally {
       setCreating(false);
     }
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} ariaLabel="Thêm người dùng">
+    <Dialog open={open} onClose={handleClose} ariaLabel={t('createDialog.title')}>
       <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-          Thêm người dùng
+          {t('createDialog.title')}
         </h2>
 
         {[
-          { id: 'create-name', label: 'Họ tên', type: 'text', key: 'name' as const },
-          { id: 'create-email', label: 'Email', type: 'email', key: 'email' as const },
-          { id: 'create-password', label: 'Mật khẩu', type: 'password', key: 'password' as const },
+          { id: 'create-name', label: t('fields.fullName'), type: 'text', key: 'name' as const },
+          { id: 'create-email', label: t('fields.email'), type: 'email', key: 'email' as const },
+          {
+            id: 'create-password',
+            label: t('fields.password'),
+            type: 'password',
+            key: 'password' as const,
+          },
         ].map((field) => (
           <div key={field.id} className="flex flex-col gap-1">
             <label
@@ -109,7 +116,7 @@ export default function CreateUserDialog({
               className="text-sm"
               style={{ color: 'var(--color-foreground-70)' }}
             >
-              Vai trò
+              {t('fields.role')}
             </label>
             <select
               id="create-role"
@@ -121,10 +128,10 @@ export default function CreateUserDialog({
                 color: 'var(--color-foreground)',
                 border: '1px solid var(--color-border)',
               }}
-              aria-label="Vai trò"
+              aria-label={t('fields.role')}
             >
-              <option value="STORE_ADMIN">{ROLE_LABELS.STORE_ADMIN}</option>
-              <option value="ORG_ADMIN">{ROLE_LABELS.ORG_ADMIN}</option>
+              <option value="STORE_ADMIN">{tCommon('roles.storeAdmin')}</option>
+              <option value="ORG_ADMIN">{tCommon('roles.orgAdmin')}</option>
             </select>
           </div>
 
@@ -135,7 +142,7 @@ export default function CreateUserDialog({
                 className="text-sm"
                 style={{ color: 'var(--color-foreground-70)' }}
               >
-                Gán vào quán
+                {t('createDialog.assignStoreLabel')}
               </label>
               <select
                 id="create-store"
@@ -147,9 +154,9 @@ export default function CreateUserDialog({
                   color: 'var(--color-foreground)',
                   border: '1px solid var(--color-border)',
                 }}
-                aria-label="Quán"
+                aria-label={t('fields.store')}
               >
-                <option value="">— Chưa gán quán —</option>
+                <option value="">{t('noStoreOption')}</option>
                 {stores.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -173,7 +180,7 @@ export default function CreateUserDialog({
             className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
             style={{ color: 'var(--color-foreground)' }}
           >
-            Huỷ
+            {tCommon('cancel')}
           </button>
           <button
             type="submit"
@@ -185,7 +192,7 @@ export default function CreateUserDialog({
               opacity: creating ? 0.7 : 1,
             }}
           >
-            {creating ? 'Đang tạo...' : 'Tạo tài khoản'}
+            {creating ? t('createDialog.creating') : t('createDialog.submit')}
           </button>
         </div>
       </form>

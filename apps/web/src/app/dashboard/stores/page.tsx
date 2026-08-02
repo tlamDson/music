@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '../../../lib/api-client';
@@ -14,12 +15,6 @@ interface StoreRow {
   status: 'PLAYING' | 'PAUSED' | 'STOPPED';
 }
 
-const STATUS_LABEL: Record<StoreRow['status'], string> = {
-  PLAYING: 'Đang phát',
-  PAUSED: 'Tạm dừng',
-  STOPPED: 'Đang im lặng',
-};
-
 const STATUS_COLOR: Record<StoreRow['status'], string> = {
   PLAYING: 'var(--color-accent)',
   PAUSED: '#EAB308',
@@ -27,6 +22,13 @@ const STATUS_COLOR: Record<StoreRow['status'], string> = {
 };
 
 export default function StoresPage() {
+  const t = useTranslations('dashboard.stores');
+  const tCommon = useTranslations('common');
+  const statusLabel: Record<StoreRow['status'], string> = {
+    PLAYING: tCommon('status.playing'),
+    PAUSED: tCommon('status.paused'),
+    STOPPED: tCommon('status.stopped'),
+  };
   const [stores, setStores] = useState<StoreRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -58,10 +60,10 @@ export default function StoresPage() {
           className="text-2xl font-bold"
           style={{ fontFamily: 'Fira Code, monospace', color: 'var(--color-foreground)' }}
         >
-          Quán
+          {t('title')}
         </h1>
         <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
-          Bấm vào một quán để chọn nhạc và điều khiển phát cho quán đó
+          {t('subtitle')}
         </p>
       </div>
 
@@ -72,8 +74,8 @@ export default function StoresPage() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm quán..."
-          aria-label="Tìm quán"
+          placeholder={t('searchPlaceholder')}
+          aria-label={t('searchAriaLabel')}
           className="flex-1 px-4 py-2 rounded-lg text-sm outline-none"
           style={{
             backgroundColor: 'var(--color-primary)',
@@ -92,25 +94,25 @@ export default function StoresPage() {
               color: 'white',
             }}
           >
-            Thêm quán
+            {t('createDialog.title')}
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="grid gap-3" role="status" aria-label="Đang tải danh sách quán">
+        <div className="grid gap-3" role="status" aria-label={t('loadingLabel')}>
           {[0, 1, 2].map((i) => (
             <div key={i} className="skeleton h-20" />
           ))}
-          <span className="sr-only">Đang tải danh sách quán...</span>
+          <span className="sr-only">{t('loadingText')}</span>
         </div>
       ) : stores.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
-          Chưa có quán nào.
+          {t('empty')}
         </p>
       ) : visible.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
-          Không tìm thấy quán nào khớp.
+          {t('noMatches')}
         </p>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -138,8 +140,11 @@ export default function StoresPage() {
                     style={{ backgroundColor: STATUS_COLOR[store.status] }}
                     aria-hidden="true"
                   />
-                  <span className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
-                    {STATUS_LABEL[store.status]}
+                  <span
+                    className="text-xs truncate"
+                    style={{ color: 'var(--color-foreground-50)' }}
+                  >
+                    {statusLabel[store.status]}
                   </span>
                 </span>
               </div>
@@ -174,7 +179,7 @@ export default function StoresPage() {
                       aria-hidden="true"
                     />
                     <span className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
-                      {STATUS_LABEL[store.status]}
+                      {statusLabel[store.status]}
                     </span>
                   </span>
                 </div>
@@ -188,7 +193,7 @@ export default function StoresPage() {
                   border: '1px solid var(--color-border)',
                 }}
               >
-                Chọn nhạc →
+                {t('selectMusic')}
               </span>
             </Link>
           ))}

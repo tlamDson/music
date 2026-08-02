@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
 import { usePlayer } from './PlayerProvider';
 import { VolumeLoudIcon, VolumeLowIcon, VolumeMutedIcon } from './icons';
@@ -16,6 +17,7 @@ const MUTED_TEXT = 'var(--color-foreground-60)';
  * nếu ở đây không có `flex` cứng đè lại.
  */
 export default function VolumeControl({ className = 'flex' }: { className?: string }) {
+  const t = useTranslations('player');
   const { volume, changeVolume } = usePlayer();
   const previousVolumeRef = useRef(volume > 0 ? volume : 1);
 
@@ -41,7 +43,7 @@ export default function VolumeControl({ className = 'flex' }: { className?: stri
       <button
         onClick={handleToggleMute}
         aria-pressed={isMuted}
-        aria-label={isMuted ? 'Bật tiếng' : 'Tắt tiếng'}
+        aria-label={isMuted ? t('unmute') : t('mute')}
         className="p-1 rounded-full cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-80 focus-visible:outline-none"
       >
         <Icon />
@@ -54,7 +56,7 @@ export default function VolumeControl({ className = 'flex' }: { className?: stri
         value={volume}
         onChange={(e) => changeVolume(Number(e.target.value))}
         className="w-20 h-1 cursor-pointer accent-[var(--color-accent)]"
-        aria-label="Âm lượng"
+        aria-label={t('volume')}
       />
     </div>
   );

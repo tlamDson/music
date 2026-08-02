@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import Dialog from '../ui/Dialog';
 
@@ -27,6 +28,8 @@ export default function TrackMetaDialog({
   onSubmit,
   onClose,
 }: TrackMetaDialogProps) {
+  const t = useTranslations('track.metaDialog');
+  const tCommon = useTranslations('common');
   const [title, setTitle] = useState(defaultTitle);
   const [artist, setArtist] = useState(defaultArtist);
 
@@ -44,9 +47,9 @@ export default function TrackMetaDialog({
     onSubmit({ title: title.trim(), artist: artist.trim() });
   };
 
-  const heading = mode === 'upload' ? 'Thông tin bài hát' : 'Sửa bài hát';
-  const submitLabel = mode === 'upload' ? 'Tải lên' : 'Lưu';
-  const savingLabel = mode === 'upload' ? 'Đang tải lên...' : 'Đang lưu...';
+  const heading = mode === 'upload' ? t('uploadTitle') : t('editTitle');
+  const submitLabel = mode === 'upload' ? t('uploadSubmit') : t('editSubmit');
+  const savingLabel = mode === 'upload' ? t('uploading') : t('saving');
 
   return (
     <Dialog open={open} onClose={onClose} ariaLabel={heading}>
@@ -61,7 +64,7 @@ export default function TrackMetaDialog({
             className="text-sm"
             style={{ color: 'var(--color-foreground-70)' }}
           >
-            Tên bài hát
+            {t('titleLabel')}
           </label>
           <input
             id="track-meta-title"
@@ -75,7 +78,7 @@ export default function TrackMetaDialog({
               color: 'var(--color-foreground)',
               border: '1px solid var(--color-border)',
             }}
-            aria-label="Tên bài hát"
+            aria-label={t('titleLabel')}
           />
         </div>
 
@@ -85,21 +88,21 @@ export default function TrackMetaDialog({
             className="text-sm"
             style={{ color: 'var(--color-foreground-70)' }}
           >
-            Ca sĩ
+            {t('artistLabel')}
           </label>
           <input
             id="track-meta-artist"
             type="text"
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
-            placeholder="Chưa rõ ca sĩ"
+            placeholder={t('artistPlaceholder')}
             className="px-3 py-2 rounded-lg text-sm outline-none"
             style={{
               backgroundColor: 'var(--color-muted)',
               color: 'var(--color-foreground)',
               border: '1px solid var(--color-border)',
             }}
-            aria-label="Ca sĩ"
+            aria-label={t('artistLabel')}
           />
         </div>
 
@@ -110,7 +113,7 @@ export default function TrackMetaDialog({
             className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
             style={{ color: 'var(--color-foreground)' }}
           >
-            Huỷ
+            {tCommon('cancel')}
           </button>
           <button
             type="submit"

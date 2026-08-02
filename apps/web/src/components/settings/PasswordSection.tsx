@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { api, ApiError } from '../../lib/api-client';
@@ -12,6 +13,7 @@ const FIELD_LABEL_STYLE = { color: 'var(--color-foreground-70)' };
  * /me/password khỏi luồng tự đăng xuất trên 401 để lỗi này hiện được tại chỗ.
  */
 export default function PasswordSection() {
+  const t = useTranslations('settings.password');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -23,22 +25,22 @@ export default function PasswordSection() {
     setError('');
 
     if (newPassword !== confirmPassword) {
-      setError('Mật khẩu mới nhập lại không khớp');
+      setError(t('mismatch'));
       return;
     }
 
     setSaving(true);
     try {
       await api.patch('/me/password', { currentPassword, newPassword });
-      toast.success('Đã đổi mật khẩu');
+      toast.success(t('changeSuccess'));
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        setError('Mật khẩu hiện tại không đúng');
+        setError(t('currentPasswordWrong'));
       } else {
-        setError(err instanceof Error && err.message ? err.message : 'Đổi mật khẩu thất bại');
+        setError(err instanceof Error && err.message ? err.message : t('changeFailed'));
       }
     } finally {
       setSaving(false);
@@ -54,13 +56,13 @@ export default function PasswordSection() {
         className="text-lg font-semibold"
         style={{ color: 'var(--color-foreground)', fontFamily: 'Fira Code, monospace' }}
       >
-        Đổi mật khẩu
+        {t('title')}
       </h2>
 
       <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <label htmlFor="current-password" className="text-sm" style={FIELD_LABEL_STYLE}>
-            Mật khẩu hiện tại
+            {t('currentPassword')}
           </label>
           <input
             id="current-password"
@@ -80,7 +82,7 @@ export default function PasswordSection() {
 
         <div className="flex flex-col gap-1">
           <label htmlFor="new-password" className="text-sm" style={FIELD_LABEL_STYLE}>
-            Mật khẩu mới
+            {t('newPassword')}
           </label>
           <input
             id="new-password"
@@ -101,7 +103,7 @@ export default function PasswordSection() {
 
         <div className="flex flex-col gap-1">
           <label htmlFor="confirm-password" className="text-sm" style={FIELD_LABEL_STYLE}>
-            Nhập lại mật khẩu mới
+            {t('confirmPassword')}
           </label>
           <input
             id="confirm-password"
@@ -136,7 +138,7 @@ export default function PasswordSection() {
             opacity: saving ? 0.7 : 1,
           }}
         >
-          {saving ? 'Đang lưu...' : 'Đổi mật khẩu'}
+          {saving ? t('saving') : t('submit')}
         </button>
       </form>
     </section>

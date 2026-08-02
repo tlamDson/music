@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import CoverArt from '../media/CoverArt';
 import { formatTotalDuration } from '../../lib/format';
@@ -35,6 +36,8 @@ export default function PlaylistCard({
   index,
   className = 'w-44 flex-shrink-0',
 }: PlaylistCardProps) {
+  const t = useTranslations('playlist.card');
+  const tCommon = useTranslations('common');
   const trackCount = playlist._count?.playlistTracks ?? 0;
   const staggered = typeof index === 'number' && index < 8;
 
@@ -57,7 +60,7 @@ export default function PlaylistCard({
           onClick={onPlay}
           className="absolute bottom-2 right-2 w-10 h-10 translate-y-2 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 group-hover:translate-y-0 focus-visible:opacity-100 focus-visible:translate-y-0 transition-[opacity,transform,filter] duration-[var(--duration-base)] hover:brightness-110 focus-visible:outline-none"
           style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-          aria-label={`Phát ${playlist.name}`}
+          aria-label={t('play', { name: playlist.name })}
         >
           {isPlaying ? (
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">
@@ -81,7 +84,8 @@ export default function PlaylistCard({
       </Link>
 
       <p className="text-xs mt-1 truncate" style={{ color: 'var(--color-foreground-50)' }}>
-        {trackCount} bài · {formatTotalDuration(playlist.totalDurationMs)}
+        {tCommon('playlistMeta.trackCount', { count: trackCount })} ·{' '}
+        {formatTotalDuration(playlist.totalDurationMs, tCommon)}
       </p>
 
       {onDelete && (
@@ -89,7 +93,7 @@ export default function PlaylistCard({
           onClick={onDelete}
           className="absolute top-2 right-2 p-1.5 rounded cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-[opacity,filter] duration-[var(--duration-base)] hover:brightness-110 focus-visible:outline-none"
           style={{ backgroundColor: 'rgba(15,15,35,0.75)', color: 'var(--color-destructive)' }}
-          aria-label={`Xóa ${playlist.name}`}
+          aria-label={t('delete', { name: playlist.name })}
         >
           <svg
             viewBox="0 0 24 24"

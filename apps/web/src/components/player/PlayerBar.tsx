@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { formatDuration, formatPosition } from '../../lib/format';
@@ -21,6 +22,7 @@ const MUTED_TEXT = 'var(--color-foreground-60)';
  * + tiến trình, phải = hàng chờ/toàn màn hình/âm lượng.
  */
 export default function PlayerBar() {
+  const t = useTranslations('player');
   const { current, durationMs, mode, storeId, queue, seek } = usePlayer();
   // Vị trí phát đọc riêng qua usePlayerPosition() — tách khỏi usePlayer() để
   // rAF cập nhật vài chục lần/giây không kéo theo re-render của mọi consumer
@@ -47,7 +49,7 @@ export default function PlayerBar() {
           borderTop: '1px solid var(--color-border)',
           height: 'calc(var(--player-bar-h) + env(safe-area-inset-bottom))',
         }}
-        aria-label="Trình phát nhạc"
+        aria-label={t('playerBarLabel')}
       >
         {/* Tiến trình trên mobile: một vạch mảnh ở mép trên thay cho thanh kéo —
             kéo seek bằng ngón tay trên thanh 4px là bất khả thi, và thanh
@@ -94,7 +96,7 @@ export default function PlayerBar() {
               aria-valuenow={Math.round(progressPct)}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label="Tiến trình bài hát"
+              aria-label={t('progressLabel')}
             />
             <span className="text-xs tabular-nums" style={{ color: MUTED_TEXT }}>
               {formatDuration(durationMs)}
@@ -107,9 +109,12 @@ export default function PlayerBar() {
           {isStoreQueue && queue && (
             <span
               className="hidden sm:inline-block text-xs px-2 py-1 rounded-full whitespace-nowrap"
-              style={{ backgroundColor: 'var(--color-accent-soft-bg)', color: 'var(--color-accent)' }}
+              style={{
+                backgroundColor: 'var(--color-accent-soft-bg)',
+                color: 'var(--color-accent)',
+              }}
             >
-              Còn {queue.remaining} bài
+              {t('queueRemainingShort', { count: queue.remaining })}
             </span>
           )}
 
@@ -117,8 +122,8 @@ export default function PlayerBar() {
             onClick={() => setIsOverlayOpen(true)}
             className="p-2 rounded-full cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-80 focus-visible:outline-none flex-shrink-0"
             style={{ color: MUTED_TEXT }}
-            aria-label="Xem toàn màn hình"
-            title="Xem toàn màn hình"
+            aria-label={t('expandLabel')}
+            title={t('expandLabel')}
           >
             <ExpandIcon />
           </button>

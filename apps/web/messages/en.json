@@ -1,0 +1,406 @@
+{
+  "common": {
+    "loading": "Loading",
+    "cancel": "Cancel",
+    "duration": {
+      "zeroMinutes": "0 min",
+      "minutes": "{minutes} min",
+      "aboutHours": "about {hours} hr",
+      "hours": "{hours} hr",
+      "hoursMinutes": "{hours} hr {minutes} min"
+    },
+    "playlistMeta": {
+      "trackCount": "{count} tracks",
+      "scopeOrg": "chain-wide",
+      "scopeStore": "this store"
+    },
+    "roles": {
+      "orgAdmin": "Chain admin",
+      "storeAdmin": "Store admin"
+    },
+    "viewToggle": {
+      "groupLabel": "View mode",
+      "listView": "List view",
+      "gridView": "Grid view"
+    },
+    "queueRemaining": "{count} left in the queue",
+    "status": {
+      "playing": "Playing",
+      "paused": "Paused",
+      "stopped": "Silent"
+    }
+  },
+  "auth": {
+    "subtitle": "Sign in to your account",
+    "login": "Login",
+    "emailLabel": "Email",
+    "emailPlaceholder": "admin@cafe.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "••••••••",
+    "loggingIn": "Logging in...",
+    "loginFailed": "Login failed"
+  },
+  "nav": {
+    "overview": "Overview",
+    "playlists": "Playlists",
+    "tracks": "Music Library",
+    "stores": "Stores",
+    "users": "Users",
+    "home": "Home",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu",
+    "mainNav": "Main navigation",
+    "library": "Library",
+    "noPlaylists": "No playlists yet",
+    "playlistScopeOrg": "Chain playlist",
+    "playlistScopeStore": "Store playlist",
+    "settings": "Settings",
+    "logout": "Log out"
+  },
+  "dashboard": {
+    "overview": {
+      "loadingLabel": "Loading store status",
+      "loadingText": "Loading store status...",
+      "empty": "No stores yet.",
+      "connectedScreens": "{count} screens connected",
+      "noScreens": "No screens connected"
+    },
+    "home": {
+      "subtitle": "Music playing at each store in the chain",
+      "playingAtStores": "Playing at stores",
+      "manageStores": "Manage stores",
+      "startPlaying": "Start playing",
+      "startPlayingPrefix": "Tap a store above to pick music and play it over that store's speakers. The",
+      "startPlayingSuffix": "page is preview-only."
+    },
+    "playlistsPage": {
+      "subtitle": "Preview-only here. To play over store speakers, go to the Stores page."
+    },
+    "tracksPage": {
+      "subtitle": "Shared music for the whole chain"
+    },
+    "users": {
+      "title": "Users",
+      "subtitle": "Manage accounts across the chain",
+      "addUser": "+ Add user",
+      "loadingUsersLabel": "Loading users",
+      "loadingUsersText": "Loading users...",
+      "deactivatedBadge": "Deactivated",
+      "edit": "Edit",
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate",
+      "deactivateFailed": "Failed to deactivate account",
+      "noStoreOption": "— No store assigned —",
+      "fields": {
+        "fullName": "Full name",
+        "email": "Email",
+        "password": "Password",
+        "role": "Role",
+        "store": "Store"
+      },
+      "createDialog": {
+        "title": "Add user",
+        "assignStoreLabel": "Assign to store",
+        "creating": "Creating...",
+        "submit": "Create account",
+        "failed": "Failed to create user"
+      },
+      "editDialog": {
+        "title": "Edit user",
+        "saving": "Saving...",
+        "submit": "Save",
+        "failed": "Failed to update user"
+      },
+      "deactivateDialog": {
+        "title": "Deactivate account",
+        "warningPrefix": "The account",
+        "warningSuffix": "will not be able to log in until reactivated.",
+        "typeStorePrefix": "Type the exact store name",
+        "typeUserFallbackPrefix": "This user hasn't been assigned to a store yet — type the user's name",
+        "typeSuffix": "to confirm.",
+        "confirmLabel": "Type to confirm"
+      }
+    },
+    "stores": {
+      "title": "Stores",
+      "subtitle": "Tap a store to pick music and control playback for it",
+      "searchPlaceholder": "Search stores...",
+      "searchAriaLabel": "Search stores",
+      "loadingLabel": "Loading stores",
+      "loadingText": "Loading stores...",
+      "empty": "No stores yet.",
+      "noMatches": "No matching stores found.",
+      "selectMusic": "Pick music →",
+      "createDialog": {
+        "title": "Add store",
+        "nameLabel": "Store name",
+        "namePlaceholder": "e.g. Nguyen Hue Store",
+        "creating": "Creating...",
+        "created": "Store \"{name}\" created",
+        "failed": "Failed to create store"
+      }
+    }
+  },
+  "store": {
+    "playlistsPage": {
+      "subtitle": "Hit play to play this playlist at the store"
+    },
+    "tracksPage": {
+      "subtitle": "Chain-wide tracks plus tracks your store uploaded"
+    },
+    "homePage": {
+      "noStoreAssigned": "Your account isn't assigned to a store yet — ask a chain admin to assign one."
+    },
+    "home": {
+      "fallbackTitle": "My store",
+      "clockOffset": "Clock drift from server: {offset}ms",
+      "disconnected": "Lost connection to server — retrying",
+      "connected": "Connected to server",
+      "playingAtStoreLine": "{status} at the store",
+      "silentHint": "The store is silent — pick a playlist below to play",
+      "nowPlayingHeading": "Now playing",
+      "playAtStoreHeading": "Play at this store",
+      "noPlaylists": "No playlists yet.",
+      "currentBadge": "Now playing",
+      "collapseAriaLabel": "Collapse track list for {name}",
+      "expandAriaLabel": "View track list for {name}",
+      "playAriaLabel": "Play {name}",
+      "playingToast": "Playing \"{name}\" at the store",
+      "playFailed": "Failed to play"
+    },
+    "playlistTracks": {
+      "loadingLabel": "Loading track list",
+      "empty": "Playlist has no tracks yet.",
+      "tracksInPlaylist": "Tracks in {name}"
+    },
+    "detail": {
+      "loadingLabel": "Loading store info",
+      "loadingText": "Loading store info...",
+      "loadFailed": "Couldn't load this store.",
+      "backToList": "Back to stores",
+      "connectedScreens": "{count} screens connected",
+      "noScreensHint": "No screens connected yet — open the TV screen to hear music",
+      "nowPlayingHeading": "Now playing",
+      "unknownArtist": "Unknown artist",
+      "queueSuffix": " · {count} left in the queue",
+      "pause": "Pause",
+      "pauseSuccess": "Paused music at the store",
+      "resume": "Resume",
+      "resumeSuccess": "Resumed music at the store",
+      "previous": "Previous",
+      "previousSuccess": "Went back to the previous track",
+      "next": "Next",
+      "nextSuccess": "Skipped to next track",
+      "stop": "Stop",
+      "stopSuccess": "Stopped music at the store",
+      "actionFailed": "Action failed",
+      "fallbackStoreName": "the store",
+      "playingAtStoreToast": "Playing \"{name}\" at {store}",
+      "silentHint": "The store is silent — pick a playlist below to play.",
+      "playForStoreHeading": "Play for this store",
+      "noPlaylists": "No playlists yet.",
+      "currentBadge": "Now playing",
+      "collapseAriaLabel": "Collapse track list for {name}",
+      "expandAriaLabel": "View track list for {name}",
+      "playAriaLabel": "Play {name} at {store}",
+      "openScreen": "Open store screen",
+      "kioskScreen": "TV screen"
+    }
+  },
+  "player": {
+    "playerBarLabel": "Music player",
+    "progressLabel": "Song progress",
+    "queueRemainingShort": "{count} left",
+    "expandLabel": "View fullscreen",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "volume": "Volume",
+    "nowPlayingFullscreenLabel": "Now playing fullscreen",
+    "closeFullscreenLabel": "Close fullscreen",
+    "transport": {
+      "previewNoQueue": "Previewing a track — no queue to switch through",
+      "shuffleFailed": "Couldn't change shuffle mode",
+      "previousFailed": "Couldn't go back to the previous track",
+      "nextFailed": "Couldn't skip the track",
+      "repeatFailed": "Couldn't change repeat mode",
+      "shuffle": "Shuffle",
+      "previous": "Previous",
+      "play": "Play",
+      "pause": "Pause",
+      "next": "Next",
+      "repeat": "Repeat",
+      "repeatOne": "Repeat one",
+      "repeatAll": "Repeat all"
+    },
+    "kiosk": {
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "noTrack": "Nothing playing yet",
+      "waitingForServer": "Waiting for a signal from the server",
+      "pauseFailed": "Failed to pause"
+    }
+  },
+  "playlist": {
+    "createDialog": {
+      "title": "Create playlist",
+      "nameLabel": "Playlist name",
+      "namePlaceholder": "e.g. Ballad, V-Pop",
+      "creating": "Creating..."
+    },
+    "card": {
+      "play": "Play {name}",
+      "delete": "Delete {name}"
+    },
+    "browse": {
+      "chipAll": "All",
+      "chipOrg": "Chain",
+      "chipStore": "Store",
+      "searchPlaceholder": "What do you want to play?",
+      "searchAriaLabel": "Search playlists",
+      "createButton": "Create playlist",
+      "loadingLabel": "Loading playlists",
+      "loadingText": "Loading...",
+      "noMatches": "No matching playlists.",
+      "sectionRecent": "Recent",
+      "sectionOrgPlaylists": "Chain playlists",
+      "sectionStorePlaylists": "Store playlists",
+      "storeNotAssigned": "This account isn't assigned to a store",
+      "playingAtStore": "Playing \"{name}\" at the store",
+      "playFailed": "Failed to play playlist",
+      "emptyPlaylist": "\"{name}\" has no tracks yet",
+      "previewing": "Previewing \"{name}\"",
+      "created": "Playlist \"{name}\" created",
+      "createFailed": "Failed to create playlist",
+      "deleted": "Playlist deleted",
+      "deleteFailed": "Failed to delete playlist",
+      "nowPlaying": "Now playing",
+      "noQueueHint": "Nothing playing yet. Hit play on a playlist to get started.",
+      "summary": "{count} playlists · {duration}"
+    },
+    "detail": {
+      "loadFailed": "Failed to load playlist",
+      "notFound": "Playlist not found.",
+      "loadingLabel": "Loading playlist",
+      "storeNotAssigned": "This account isn't assigned to a store",
+      "playingAtStore": "Playing at the store",
+      "emptyPlaylist": "Playlist has no tracks yet",
+      "previewing": "Previewing \"{title}\"",
+      "playFailed": "Failed to play",
+      "alreadyInPlaylist": "\"{title}\" is already in the playlist",
+      "added": "Added \"{title}\"",
+      "addFailed": "Failed to add \"{title}\"",
+      "removed": "Removed \"{title}\"",
+      "removeFailed": "Failed to remove \"{title}\"",
+      "reorderSuccess": "Play order updated",
+      "reorderFailed": "Failed to update order",
+      "backAriaLabel": "Back to playlists",
+      "scopeOrg": "Chain playlist",
+      "scopeStore": "Store playlist",
+      "playAriaLabel": "Play playlist",
+      "addTrackButton": "Add track",
+      "tracksAreaLabel": "Track list",
+      "emptyState": "No tracks yet — hit \"Add track\" or drag one in from the music library.",
+      "nowPlaying": "Now playing",
+      "noQueueHint": "Nothing playing yet."
+    },
+    "addTrackDialog": {
+      "dialogTitle": "Add track to playlist",
+      "heading": "Add track",
+      "close": "Close",
+      "searchPlaceholder": "Search the music library...",
+      "searchAriaLabel": "Search tracks",
+      "loadingLabel": "Loading music library",
+      "loadingText": "Loading music library...",
+      "noMatches": "No matching tracks.",
+      "added": "Added",
+      "addAriaLabel": "Add {title}"
+    }
+  },
+  "track": {
+    "table": {
+      "defaultAriaLabel": "Track table",
+      "titleHeader": "Title",
+      "addedAtHeader": "Added",
+      "durationHeader": "Duration",
+      "actionsHeader": "Actions",
+      "play": "Play {title}",
+      "pause": "Pause {title}",
+      "edit": "Edit {title}",
+      "remove": "Remove {title}",
+      "playFailed": "Couldn't play \"{title}\""
+    },
+    "metaDialog": {
+      "uploadTitle": "Track info",
+      "editTitle": "Edit track",
+      "uploadSubmit": "Upload",
+      "editSubmit": "Save",
+      "uploading": "Uploading...",
+      "saving": "Saving...",
+      "titleLabel": "Track title",
+      "artistLabel": "Artist",
+      "artistPlaceholder": "Unknown artist"
+    },
+    "library": {
+      "uploadButton": "Upload a track",
+      "uploading": "Uploading...",
+      "dropHint": "or drag a file here · MP3, M4A, WAV, FLAC, OGG · up to 50MB",
+      "filePickerLabel": "Choose music file",
+      "searchPlaceholder": "Search tracks...",
+      "searchAriaLabel": "Search tracks",
+      "storeUploadNote": "Tracks you upload are only heard by your store; chain-wide tracks are shared across all stores.",
+      "loadingLabel": "Loading music library",
+      "empty": "No tracks yet.",
+      "scopeHeader": "Scope",
+      "scopeStore": "This store",
+      "scopeOrg": "Chain-wide",
+      "uploaded": "Uploaded \"{title}\"",
+      "uploadFailed": "Upload failed",
+      "uploadFailedWithReason": "Upload failed: {reason}",
+      "saved": "Changes saved",
+      "saveFailed": "Failed to save",
+      "saveFailedWithReason": "Failed to save: {reason}",
+      "deleted": "Track deleted",
+      "deleteFailed": "Failed to delete",
+      "playFailed": "Couldn't play \"{title}\""
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Account info, login password, and display language",
+    "language": {
+      "title": "Language",
+      "description": "Choose the display language for the whole app.",
+      "options": {
+        "vi": "Tiếng Việt",
+        "en": "English"
+      }
+    },
+    "profile": {
+      "loadingLabel": "Loading account info",
+      "title": "Account info",
+      "fields": {
+        "fullName": "Full name",
+        "email": "Email",
+        "role": "Role",
+        "store": "Store"
+      },
+      "readOnlyNote": "Email, role, and store can only be changed by a chain admin on the Users page.",
+      "saving": "Saving...",
+      "submit": "Save changes",
+      "saveSuccess": "Account info saved",
+      "saveFailed": "Failed to save account info"
+    },
+    "password": {
+      "title": "Change password",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "mismatch": "New password confirmation doesn't match",
+      "changeSuccess": "Password changed",
+      "currentPasswordWrong": "Current password is incorrect",
+      "changeFailed": "Failed to change password",
+      "saving": "Saving...",
+      "submit": "Change password"
+    }
+  }
+}

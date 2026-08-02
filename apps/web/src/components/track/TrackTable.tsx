@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState, type ReactNode } from 'react';
 import { usePlayer } from '../player/PlayerProvider';
 import TrackRow from './TrackRow';
@@ -58,8 +59,9 @@ export default function TrackTable({
   onReorder,
   showAddedAt = false,
   extraColumns = [],
-  ariaLabel = 'Bảng bài hát',
+  ariaLabel,
 }: TrackTableProps) {
+  const t = useTranslations('track.table');
   const { current, isPlaying } = usePlayer();
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
@@ -73,7 +75,7 @@ export default function TrackTable({
   };
 
   return (
-    <table className="w-full table-fixed text-left" aria-label={ariaLabel}>
+    <table className="w-full table-fixed text-left" aria-label={ariaLabel ?? t('defaultAriaLabel')}>
       <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--color-background)' }}>
         <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
           <th
@@ -82,8 +84,11 @@ export default function TrackTable({
           >
             #
           </th>
-          <th className="px-2 py-2 text-xs font-normal" style={{ color: 'var(--color-foreground-50)' }}>
-            Tiêu đề
+          <th
+            className="px-2 py-2 text-xs font-normal"
+            style={{ color: 'var(--color-foreground-50)' }}
+          >
+            {t('titleHeader')}
           </th>
           {extraColumns.map((column) => (
             <th
@@ -99,7 +104,7 @@ export default function TrackTable({
               className="hidden whitespace-nowrap px-4 py-2 text-xs font-normal md:table-cell md:w-32"
               style={{ color: 'var(--color-foreground-50)' }}
             >
-              Ngày thêm
+              {t('addedAtHeader')}
             </th>
           )}
           <th
@@ -117,9 +122,9 @@ export default function TrackTable({
               <circle cx="12" cy="12" r="9" />
               <path strokeLinecap="round" d="M12 7v5l3 2" />
             </svg>
-            <span className="sr-only">Thời lượng</span>
+            <span className="sr-only">{t('durationHeader')}</span>
           </th>
-          <th className="w-16 px-2 py-2 md:w-24 md:px-4" aria-label="Thao tác" />
+          <th className="w-16 px-2 py-2 md:w-24 md:px-4" aria-label={t('actionsHeader')} />
         </tr>
       </thead>
       <tbody>

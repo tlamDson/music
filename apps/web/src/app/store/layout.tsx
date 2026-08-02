@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
@@ -13,6 +14,8 @@ import type { UserRole } from '@cafe-music/shared';
  * Control, Quán hay Người dùng — quán chỉ lo nhạc của mình.
  */
 export default function StoreLayout({ children }: { children: React.ReactNode }) {
+  const tCommon = useTranslations('common');
+  const tNav = useTranslations('nav');
   const router = useRouter();
   const { user, loading, logout } = useAuth();
 
@@ -29,7 +32,7 @@ export default function StoreLayout({ children }: { children: React.ReactNode })
         <div
           className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
           style={{ borderColor: 'var(--color-accent)' }}
-          aria-label="Đang tải"
+          aria-label={tCommon('loading')}
         />
       </div>
     );
@@ -39,7 +42,7 @@ export default function StoreLayout({ children }: { children: React.ReactNode })
 
   return (
     <AppShell
-      navItems={storeNavItems()}
+      navItems={storeNavItems(tNav)}
       user={{ email: user.email, role: user.role }}
       settingsHref={settingsPathFor(user.role as UserRole)}
       onLogout={() => {

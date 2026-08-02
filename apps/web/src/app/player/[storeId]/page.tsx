@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
@@ -19,6 +20,9 @@ import CoverArt from '../../../components/media/CoverArt';
  * tự `new Audio()` để tránh hai nguồn nhạc phát chồng lên nhau.
  */
 export default function PlayerPage() {
+  const t = useTranslations('player.kiosk');
+  const tPlayer = useTranslations('player');
+  const tCommon = useTranslations('common');
   const { storeId } = useParams<{ storeId: string }>();
   const searchParams = useSearchParams();
   const isKiosk = searchParams.get('kiosk') === '1';
@@ -50,7 +54,7 @@ export default function PlayerPage() {
     try {
       await api.post(`/sync/stores/${storeId}/pause`);
     } catch {
-      toast.error('Tạm dừng thất bại');
+      toast.error(t('pauseFailed'));
     }
   };
 
@@ -74,7 +78,7 @@ export default function PlayerPage() {
               color: isConnected ? 'var(--color-accent)' : 'var(--color-destructive)',
             }}
           >
-            {isConnected ? 'Đã kết nối' : 'Mất kết nối'}
+            {isConnected ? t('connected') : t('disconnected')}
           </span>
         </div>
 
@@ -87,14 +91,14 @@ export default function PlayerPage() {
 
         <div className="text-center">
           <p className="text-sm font-medium" style={{ color: 'var(--color-foreground)' }}>
-            {current ? current.title : 'Chưa phát bài nào'}
+            {current ? current.title : t('noTrack')}
           </p>
           <p className="text-xs mt-1" style={{ color: 'var(--color-foreground-50)' }}>
             {storeQueue
-              ? `Còn ${storeQueue.remaining} bài trong hàng chờ`
+              ? tCommon('queueRemaining', { count: storeQueue.remaining })
               : isPlaying
-                ? 'Đang phát'
-                : 'Đang chờ tín hiệu từ máy chủ'}
+                ? tCommon('status.playing')
+                : t('waitingForServer')}
           </p>
         </div>
 
@@ -104,7 +108,7 @@ export default function PlayerPage() {
             aria-valuenow={Math.round(progressPct)}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label="Tiến trình bài hát"
+            aria-label={tPlayer('progressLabel')}
             className="w-full rounded-full overflow-hidden"
             style={{ height: 4, backgroundColor: 'var(--color-muted)' }}
           >
@@ -148,9 +152,9 @@ export default function PlayerPage() {
               color: 'var(--color-foreground)',
               border: '1px solid var(--color-border)',
             }}
-            aria-label="Tạm dừng"
+            aria-label={tPlayer('transport.pause')}
           >
-            Tạm dừng
+            {tPlayer('transport.pause')}
           </button>
         )}
       </div>

@@ -1,6 +1,9 @@
+import { useTranslations } from 'next-intl';
 import LoginForm from '../../../components/LoginForm';
 
 export default function LoginPage() {
+  const t = useTranslations('auth');
+
   return (
     <main
       className="min-h-screen flex items-center justify-center p-8"
@@ -18,7 +21,7 @@ export default function LoginPage() {
             Cafe Music
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
-            Sign in to your account
+            {t('subtitle')}
           </p>
         </div>
 

@@ -1,15 +1,18 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import ProfileSection from './ProfileSection';
 import PasswordSection from './PasswordSection';
+import LanguageSection from './LanguageSection';
 
 /**
  * Khung trang Cài đặt dùng chung cho `/dashboard/settings` và
  * `/store/settings` — mọi vai trò đăng nhập đều gọi được `/me`, nên không cần
- * tham số vai trò. PR sau cắm thêm mục Giao diện (PR #11) và Ngôn ngữ (PR #12)
- * vào đây, không sửa hai trang gọi component này.
+ * tham số vai trò.
  */
 export default function SettingsSections() {
+  const t = useTranslations('settings');
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -17,15 +20,16 @@ export default function SettingsSections() {
           className="text-2xl font-bold"
           style={{ fontFamily: 'Fira Code, monospace', color: 'var(--color-foreground)' }}
         >
-          Cài đặt
+          {t('title')}
         </h1>
         <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
-          Thông tin tài khoản và mật khẩu đăng nhập
+          {t('subtitle')}
         </p>
       </div>
 
       <ProfileSection />
       <PasswordSection />
+      <LanguageSection />
     </div>
   );
 }

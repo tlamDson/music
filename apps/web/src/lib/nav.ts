@@ -1,4 +1,5 @@
 import type { UserRole } from '@cafe-music/shared';
+import type { Translator } from './format';
 
 export interface NavItem {
   href: string;
@@ -7,19 +8,21 @@ export interface NavItem {
 
 /**
  * Nav của console quản trị. Quán và Người dùng là việc của cả chuỗi nên chỉ
- * ORG_ADMIN thấy — store admin có console riêng ở `/store`.
+ * ORG_ADMIN thấy — store admin có console riêng ở `/store`. `t` là translator
+ * namespace `nav` (`useTranslations('nav')`), truyền từ call site vì đây là
+ * hàm thuần, không phải component/hook.
  */
-export function dashboardNavItems(role: UserRole): NavItem[] {
+export function dashboardNavItems(role: UserRole, t: Translator): NavItem[] {
   const items: NavItem[] = [
-    { href: '/dashboard', label: 'Tổng quan' },
-    { href: '/dashboard/playlists', label: 'Playlists' },
-    { href: '/dashboard/tracks', label: 'Kho nhạc' },
+    { href: '/dashboard', label: t('overview') },
+    { href: '/dashboard/playlists', label: t('playlists') },
+    { href: '/dashboard/tracks', label: t('tracks') },
   ];
 
   if (role === 'ORG_ADMIN' || role === 'SUPER_ADMIN') {
     items.push(
-      { href: '/dashboard/stores', label: 'Quán' },
-      { href: '/dashboard/users', label: 'Người dùng' },
+      { href: '/dashboard/stores', label: t('stores') },
+      { href: '/dashboard/users', label: t('users') },
     );
   }
 
@@ -27,11 +30,11 @@ export function dashboardNavItems(role: UserRole): NavItem[] {
 }
 
 /** Nav của console quán: không quản lý quán khác, không quản lý người dùng. */
-export function storeNavItems(): NavItem[] {
+export function storeNavItems(t: Translator): NavItem[] {
   return [
-    { href: '/store', label: 'Trang chủ' },
-    { href: '/store/playlists', label: 'Playlists' },
-    { href: '/store/tracks', label: 'Kho nhạc' },
+    { href: '/store', label: t('home') },
+    { href: '/store/playlists', label: t('playlists') },
+    { href: '/store/tracks', label: t('tracks') },
   ];
 }
 

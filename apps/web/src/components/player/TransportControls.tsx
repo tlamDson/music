@@ -1,11 +1,10 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
 import { usePlayer } from './PlayerProvider';
 import { PlayIcon, PauseIcon, PreviousIcon, NextIcon, ShuffleIcon, RepeatIcon } from './icons';
-
-const PREVIEW_NO_QUEUE_TITLE = 'Đang nghe thử một bài, không có hàng chờ để chuyển';
 
 /**
  * Cụm shuffle · bài trước · play/pause · bài sau · repeat — dùng chung cho
@@ -23,11 +22,12 @@ export default function TransportControls({
   size?: 'sm' | 'lg';
   className?: string;
 }) {
+  const t = useTranslations('player.transport');
   const { isPlaying, mode, storeId, queue, repeat, shuffle, toggle, togglePreviewRepeat } =
     usePlayer();
 
   const isStoreMode = mode === 'store' && storeId !== null;
-  const disabledTitle = isStoreMode ? undefined : PREVIEW_NO_QUEUE_TITLE;
+  const disabledTitle = isStoreMode ? undefined : t('previewNoQueue');
 
   // Hai đầu hàng chờ thì bỏ nút hẳn, không chỉ làm mờ: bấm "Bài kế tiếp" ở bài
   // cuối từng khiến server dừng hẳn quán và thanh phát biến mất giữa lúc đang
@@ -44,7 +44,7 @@ export default function TransportControls({
     try {
       await api.patch(`/sync/stores/${storeId}/playback-mode`, { shuffle: !shuffle });
     } catch {
-      toast.error('Không đổi được chế độ trộn bài');
+      toast.error(t('shuffleFailed'));
     }
   };
 
@@ -53,7 +53,7 @@ export default function TransportControls({
     try {
       await api.post(`/sync/stores/${storeId}/previous`);
     } catch {
-      toast.error('Không quay lại được bài trước');
+      toast.error(t('previousFailed'));
     }
   };
 
@@ -62,7 +62,7 @@ export default function TransportControls({
     try {
       await api.post(`/sync/stores/${storeId}/next`);
     } catch {
-      toast.error('Không chuyển được bài');
+      toast.error(t('nextFailed'));
     }
   };
 
@@ -77,7 +77,7 @@ export default function TransportControls({
     try {
       await api.patch(`/sync/stores/${storeId}/playback-mode`, { repeat: next });
     } catch {
-      toast.error('Không đổi được chế độ lặp lại');
+      toast.error(t('repeatFailed'));
     }
   };
 
@@ -102,7 +102,7 @@ export default function TransportControls({
         disabled={!isStoreMode}
         title={disabledTitle}
         aria-pressed={shuffle}
-        aria-label="Phát ngẫu nhiên"
+        aria-label={t('shuffle')}
         className={`${buttonBase} ${modeButtonVisibility}`}
         style={{ color: shuffle ? 'var(--color-accent)' : 'var(--color-foreground)' }}
       >
@@ -115,7 +115,7 @@ export default function TransportControls({
           onClick={() => void handlePrevious()}
           disabled={!isStoreMode}
           title={disabledTitle}
-          aria-label="Bài trước"
+          aria-label={t('previous')}
           className={buttonBase}
           style={{ color: 'var(--color-foreground)' }}
         >
@@ -127,7 +127,7 @@ export default function TransportControls({
         onClick={toggle}
         className={`${playButtonSize} rounded-full flex items-center justify-center cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-90 focus-visible:outline-none`}
         style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-        aria-label={isPlaying ? 'Tạm dừng' : 'Phát'}
+        aria-label={isPlaying ? t('pause') : t('play')}
       >
         {isPlaying ? <PauseIcon className={playIconSize} /> : <PlayIcon className={playIconSize} />}
       </button>
@@ -137,7 +137,7 @@ export default function TransportControls({
           onClick={() => void handleNext()}
           disabled={!isStoreMode}
           title={disabledTitle}
-          aria-label="Bài kế tiếp"
+          aria-label={t('next')}
           className={buttonBase}
           style={{ color: 'var(--color-foreground)' }}
         >
@@ -149,7 +149,7 @@ export default function TransportControls({
         onClick={() => void handleRepeat()}
         aria-pressed={repeat !== 'OFF'}
         aria-label={
-          repeat === 'ONE' ? 'Lặp lại một bài' : repeat === 'ALL' ? 'Lặp lại danh sách' : 'Lặp lại'
+          repeat === 'ONE' ? t('repeatOne') : repeat === 'ALL' ? t('repeatAll') : t('repeat')
         }
         className={`${buttonBase} ${modeButtonVisibility}`}
         style={{ color: repeat !== 'OFF' ? 'var(--color-accent)' : 'var(--color-foreground)' }}

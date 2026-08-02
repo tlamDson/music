@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '../../lib/api-client';
@@ -22,6 +23,8 @@ const REFRESH_MS = 15_000;
  * còn mấy bài trong hàng chờ và có màn hình nào đang nghe không.
  */
 export default function StoresOverview() {
+  const t = useTranslations('dashboard.overview');
+  const tCommon = useTranslations('common');
   const [rows, setRows] = useState<StorePlaybackRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,12 +52,12 @@ export default function StoresOverview() {
       <div
         className="flex flex-col gap-3 md:flex-row md:gap-4 md:overflow-x-auto md:pb-2"
         role="status"
-        aria-label="Đang tải trạng thái các quán"
+        aria-label={t('loadingLabel')}
       >
         {[0, 1, 2].map((i) => (
           <div key={i} className="skeleton h-28 w-full md:w-64 md:flex-shrink-0" />
         ))}
-        <span className="sr-only">Đang tải trạng thái các quán...</span>
+        <span className="sr-only">{t('loadingText')}</span>
       </div>
     );
   }
@@ -62,7 +65,7 @@ export default function StoresOverview() {
   if (rows.length === 0) {
     return (
       <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
-        Chưa có quán nào.
+        {t('empty')}
       </p>
     );
   }
@@ -93,8 +96,8 @@ export default function StoresOverview() {
               </p>
               <p className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
                 {row.connectedScreens > 0
-                  ? `${row.connectedScreens} màn hình đang kết nối`
-                  : 'Chưa có màn hình nào'}
+                  ? t('connectedScreens', { count: row.connectedScreens })
+                  : t('noScreens')}
               </p>
             </div>
           </div>
@@ -103,21 +106,30 @@ export default function StoresOverview() {
             <span
               className="w-2 h-2 rounded-full flex-shrink-0"
               style={{
-                backgroundColor: row.isPlaying ? 'var(--color-accent)' : 'var(--color-foreground-25)',
+                backgroundColor: row.isPlaying
+                  ? 'var(--color-accent)'
+                  : 'var(--color-foreground-25)',
               }}
               aria-hidden="true"
             />
             <span className="text-xs" style={{ color: 'var(--color-foreground-60)' }}>
-              {row.isPlaying ? 'Đang phát' : row.status === 'PAUSED' ? 'Tạm dừng' : 'Đang im lặng'}
+              {row.isPlaying
+                ? tCommon('status.playing')
+                : row.status === 'PAUSED'
+                  ? tCommon('status.paused')
+                  : tCommon('status.stopped')}
             </span>
           </div>
 
           {row.queueRemaining !== null && (
             <span
               className="text-xs px-2 py-1 rounded-full self-start"
-              style={{ backgroundColor: 'var(--color-accent-soft-bg)', color: 'var(--color-accent)' }}
+              style={{
+                backgroundColor: 'var(--color-accent-soft-bg)',
+                color: 'var(--color-accent)',
+              }}
             >
-              Còn {row.queueRemaining} bài trong hàng chờ
+              {tCommon('queueRemaining', { count: row.queueRemaining })}
             </span>
           )}
         </Link>

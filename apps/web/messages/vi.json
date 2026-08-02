@@ -1,0 +1,406 @@
+{
+  "common": {
+    "loading": "Đang tải",
+    "cancel": "Huỷ",
+    "duration": {
+      "zeroMinutes": "0 phút",
+      "minutes": "{minutes} phút",
+      "aboutHours": "khoảng {hours} giờ",
+      "hours": "{hours} giờ",
+      "hoursMinutes": "{hours} giờ {minutes} phút"
+    },
+    "playlistMeta": {
+      "trackCount": "{count} bài",
+      "scopeOrg": "của chuỗi",
+      "scopeStore": "của quán"
+    },
+    "roles": {
+      "orgAdmin": "Quản lý chuỗi",
+      "storeAdmin": "Quản lý quán"
+    },
+    "viewToggle": {
+      "groupLabel": "Chế độ xem",
+      "listView": "Xem dạng danh sách",
+      "gridView": "Xem dạng lưới"
+    },
+    "queueRemaining": "Còn {count} bài trong hàng chờ",
+    "status": {
+      "playing": "Đang phát",
+      "paused": "Tạm dừng",
+      "stopped": "Đang im lặng"
+    }
+  },
+  "auth": {
+    "subtitle": "Đăng nhập vào tài khoản của bạn",
+    "login": "Đăng nhập",
+    "emailLabel": "Email",
+    "emailPlaceholder": "admin@cafe.com",
+    "passwordLabel": "Mật khẩu",
+    "passwordPlaceholder": "••••••••",
+    "loggingIn": "Đang đăng nhập...",
+    "loginFailed": "Đăng nhập thất bại"
+  },
+  "nav": {
+    "overview": "Tổng quan",
+    "playlists": "Playlists",
+    "tracks": "Kho nhạc",
+    "stores": "Quán",
+    "users": "Người dùng",
+    "home": "Trang chủ",
+    "openMenu": "Mở menu điều hướng",
+    "closeMenu": "Đóng menu điều hướng",
+    "mainNav": "Điều hướng chính",
+    "library": "Thư viện",
+    "noPlaylists": "Chưa có playlist nào",
+    "playlistScopeOrg": "Playlist của chuỗi",
+    "playlistScopeStore": "Playlist của quán",
+    "settings": "Cài đặt",
+    "logout": "Đăng xuất"
+  },
+  "dashboard": {
+    "overview": {
+      "loadingLabel": "Đang tải trạng thái các quán",
+      "loadingText": "Đang tải trạng thái các quán...",
+      "empty": "Chưa có quán nào.",
+      "connectedScreens": "{count} màn hình đang kết nối",
+      "noScreens": "Chưa có màn hình nào"
+    },
+    "home": {
+      "subtitle": "Nhạc đang chạy ở từng quán trong chuỗi",
+      "playingAtStores": "Đang phát tại các quán",
+      "manageStores": "Quản lý quán",
+      "startPlaying": "Bắt đầu phát",
+      "startPlayingPrefix": "Bấm vào một quán ở trên để chọn nhạc và phát ra loa quán đó. Trang",
+      "startPlayingSuffix": "chỉ để nghe thử tại chỗ."
+    },
+    "playlistsPage": {
+      "subtitle": "Nghe thử tại chỗ. Muốn phát ra loa quán thì vào trang Quán."
+    },
+    "tracksPage": {
+      "subtitle": "Nhạc dùng chung cho cả chuỗi"
+    },
+    "users": {
+      "title": "Người dùng",
+      "subtitle": "Quản lý tài khoản trong chuỗi",
+      "addUser": "+ Thêm người dùng",
+      "loadingUsersLabel": "Đang tải người dùng",
+      "loadingUsersText": "Đang tải người dùng...",
+      "deactivatedBadge": "Đã vô hiệu hoá",
+      "edit": "Sửa",
+      "deactivate": "Vô hiệu hoá",
+      "reactivate": "Kích hoạt lại",
+      "deactivateFailed": "Vô hiệu hoá tài khoản thất bại",
+      "noStoreOption": "— Chưa gán quán —",
+      "fields": {
+        "fullName": "Họ tên",
+        "email": "Email",
+        "password": "Mật khẩu",
+        "role": "Vai trò",
+        "store": "Quán"
+      },
+      "createDialog": {
+        "title": "Thêm người dùng",
+        "assignStoreLabel": "Gán vào quán",
+        "creating": "Đang tạo...",
+        "submit": "Tạo tài khoản",
+        "failed": "Tạo người dùng thất bại"
+      },
+      "editDialog": {
+        "title": "Sửa người dùng",
+        "saving": "Đang lưu...",
+        "submit": "Lưu",
+        "failed": "Cập nhật người dùng thất bại"
+      },
+      "deactivateDialog": {
+        "title": "Vô hiệu hoá tài khoản",
+        "warningPrefix": "Tài khoản",
+        "warningSuffix": "sẽ không đăng nhập được nữa cho tới khi kích hoạt lại.",
+        "typeStorePrefix": "Gõ đúng tên quán",
+        "typeUserFallbackPrefix": "Người dùng này chưa được gán vào quán nào — gõ tên người dùng",
+        "typeSuffix": "để xác nhận.",
+        "confirmLabel": "Gõ để xác nhận"
+      }
+    },
+    "stores": {
+      "title": "Quán",
+      "subtitle": "Bấm vào một quán để chọn nhạc và điều khiển phát cho quán đó",
+      "searchPlaceholder": "Tìm quán...",
+      "searchAriaLabel": "Tìm quán",
+      "loadingLabel": "Đang tải danh sách quán",
+      "loadingText": "Đang tải danh sách quán...",
+      "empty": "Chưa có quán nào.",
+      "noMatches": "Không tìm thấy quán nào khớp.",
+      "selectMusic": "Chọn nhạc →",
+      "createDialog": {
+        "title": "Thêm quán",
+        "nameLabel": "Tên quán",
+        "namePlaceholder": "VD: Quán Nguyễn Huệ",
+        "creating": "Đang tạo...",
+        "created": "Đã tạo quán \"{name}\"",
+        "failed": "Tạo quán thất bại"
+      }
+    }
+  },
+  "store": {
+    "playlistsPage": {
+      "subtitle": "Bấm phát để phát playlist này tại quán"
+    },
+    "tracksPage": {
+      "subtitle": "Nhạc chung của chuỗi và nhạc riêng quán bạn tải lên"
+    },
+    "homePage": {
+      "noStoreAssigned": "Tài khoản của bạn chưa được gắn với quán nào — nhờ quản trị chuỗi gán giúp."
+    },
+    "home": {
+      "fallbackTitle": "Quán của tôi",
+      "clockOffset": "Lệch đồng hồ với máy chủ: {offset}ms",
+      "disconnected": "Mất kết nối máy chủ — đang thử lại",
+      "connected": "Đã kết nối máy chủ",
+      "playingAtStoreLine": "{status} tại quán",
+      "silentHint": "Quán đang im lặng — chọn playlist bên dưới để phát",
+      "nowPlayingHeading": "Đang phát",
+      "playAtStoreHeading": "Phát tại quán",
+      "noPlaylists": "Chưa có playlist nào.",
+      "currentBadge": "Đang phát",
+      "collapseAriaLabel": "Thu gọn danh sách bài của {name}",
+      "expandAriaLabel": "Xem danh sách bài của {name}",
+      "playAriaLabel": "Phát {name}",
+      "playingToast": "Đang phát \"{name}\" tại quán",
+      "playFailed": "Phát thất bại"
+    },
+    "playlistTracks": {
+      "loadingLabel": "Đang tải danh sách bài",
+      "empty": "Playlist chưa có bài nào.",
+      "tracksInPlaylist": "Danh sách bài trong {name}"
+    },
+    "detail": {
+      "loadingLabel": "Đang tải thông tin quán",
+      "loadingText": "Đang tải thông tin quán...",
+      "loadFailed": "Không tải được quán này.",
+      "backToList": "Quay lại danh sách quán",
+      "connectedScreens": "{count} màn hình đang kết nối",
+      "noScreensHint": "Chưa có màn hình nào kết nối — mở màn chiếu để nghe được nhạc",
+      "nowPlayingHeading": "Đang phát",
+      "unknownArtist": "Chưa rõ nghệ sĩ",
+      "queueSuffix": " · còn {count} bài trong hàng chờ",
+      "pause": "Tạm dừng",
+      "pauseSuccess": "Đã tạm dừng nhạc tại quán",
+      "resume": "Phát tiếp",
+      "resumeSuccess": "Đã phát tiếp tại quán",
+      "previous": "Bài trước",
+      "previousSuccess": "Đã quay lại bài trước",
+      "next": "Bài sau",
+      "nextSuccess": "Đã chuyển bài",
+      "stop": "Dừng hẳn",
+      "stopSuccess": "Đã dừng nhạc tại quán",
+      "actionFailed": "Thao tác thất bại",
+      "fallbackStoreName": "quán",
+      "playingAtStoreToast": "Đang phát \"{name}\" tại {store}",
+      "silentHint": "Quán đang im lặng — chọn một playlist bên dưới để phát.",
+      "playForStoreHeading": "Phát cho quán này",
+      "noPlaylists": "Chưa có playlist nào.",
+      "currentBadge": "Đang phát",
+      "collapseAriaLabel": "Thu gọn danh sách bài của {name}",
+      "expandAriaLabel": "Xem danh sách bài của {name}",
+      "playAriaLabel": "Phát {name} tại {store}",
+      "openScreen": "Mở màn hình quán",
+      "kioskScreen": "Màn chiếu TV"
+    }
+  },
+  "player": {
+    "playerBarLabel": "Trình phát nhạc",
+    "progressLabel": "Tiến trình bài hát",
+    "queueRemainingShort": "Còn {count} bài",
+    "expandLabel": "Xem toàn màn hình",
+    "mute": "Tắt tiếng",
+    "unmute": "Bật tiếng",
+    "volume": "Âm lượng",
+    "nowPlayingFullscreenLabel": "Đang phát toàn màn hình",
+    "closeFullscreenLabel": "Đóng toàn màn hình",
+    "transport": {
+      "previewNoQueue": "Đang nghe thử một bài, không có hàng chờ để chuyển",
+      "shuffleFailed": "Không đổi được chế độ trộn bài",
+      "previousFailed": "Không quay lại được bài trước",
+      "nextFailed": "Không chuyển được bài",
+      "repeatFailed": "Không đổi được chế độ lặp lại",
+      "shuffle": "Phát ngẫu nhiên",
+      "previous": "Bài trước",
+      "play": "Phát",
+      "pause": "Tạm dừng",
+      "next": "Bài kế tiếp",
+      "repeat": "Lặp lại",
+      "repeatOne": "Lặp lại một bài",
+      "repeatAll": "Lặp lại danh sách"
+    },
+    "kiosk": {
+      "connected": "Đã kết nối",
+      "disconnected": "Mất kết nối",
+      "noTrack": "Chưa phát bài nào",
+      "waitingForServer": "Đang chờ tín hiệu từ máy chủ",
+      "pauseFailed": "Tạm dừng thất bại"
+    }
+  },
+  "playlist": {
+    "createDialog": {
+      "title": "Tạo playlist",
+      "nameLabel": "Tên playlist",
+      "namePlaceholder": "VD: Ballad, V-Pop",
+      "creating": "Đang tạo..."
+    },
+    "card": {
+      "play": "Phát {name}",
+      "delete": "Xóa {name}"
+    },
+    "browse": {
+      "chipAll": "Tất cả",
+      "chipOrg": "Chuỗi",
+      "chipStore": "Quán",
+      "searchPlaceholder": "Bạn muốn phát nội dung gì?",
+      "searchAriaLabel": "Tìm playlist",
+      "createButton": "Tạo playlist",
+      "loadingLabel": "Đang tải playlist",
+      "loadingText": "Đang tải...",
+      "noMatches": "Không có playlist nào khớp.",
+      "sectionRecent": "Gần đây",
+      "sectionOrgPlaylists": "Playlist của chuỗi",
+      "sectionStorePlaylists": "Playlist của quán",
+      "storeNotAssigned": "Tài khoản chưa gắn với quán nào",
+      "playingAtStore": "Đang phát \"{name}\" tại quán",
+      "playFailed": "Phát playlist thất bại",
+      "emptyPlaylist": "\"{name}\" chưa có bài nào",
+      "previewing": "Nghe thử \"{name}\"",
+      "created": "Đã tạo playlist \"{name}\"",
+      "createFailed": "Tạo playlist thất bại",
+      "deleted": "Đã xóa playlist",
+      "deleteFailed": "Xóa playlist thất bại",
+      "nowPlaying": "Đang phát",
+      "noQueueHint": "Chưa phát bài nào. Bấm nút phát trên một playlist để bắt đầu.",
+      "summary": "{count} playlist · {duration}"
+    },
+    "detail": {
+      "loadFailed": "Không tải được playlist",
+      "notFound": "Không tìm thấy playlist.",
+      "loadingLabel": "Đang tải playlist",
+      "storeNotAssigned": "Tài khoản chưa gắn với quán nào",
+      "playingAtStore": "Đang phát tại quán",
+      "emptyPlaylist": "Playlist chưa có bài nào",
+      "previewing": "Nghe thử \"{title}\"",
+      "playFailed": "Phát thất bại",
+      "alreadyInPlaylist": "\"{title}\" đã có trong playlist",
+      "added": "Đã thêm \"{title}\"",
+      "addFailed": "Thêm \"{title}\" thất bại",
+      "removed": "Đã xóa \"{title}\"",
+      "removeFailed": "Xóa \"{title}\" thất bại",
+      "reorderSuccess": "Đã cập nhật thứ tự phát",
+      "reorderFailed": "Cập nhật thứ tự thất bại",
+      "backAriaLabel": "Quay lại danh sách playlist",
+      "scopeOrg": "Danh sách phát của chuỗi",
+      "scopeStore": "Danh sách phát của quán",
+      "playAriaLabel": "Phát playlist",
+      "addTrackButton": "Thêm bài hát",
+      "tracksAreaLabel": "Danh sách bài hát",
+      "emptyState": "Chưa có bài nào — bấm \"Thêm bài hát\" hoặc kéo từ kho nhạc vào đây.",
+      "nowPlaying": "Đang phát",
+      "noQueueHint": "Chưa phát bài nào."
+    },
+    "addTrackDialog": {
+      "dialogTitle": "Thêm bài hát vào playlist",
+      "heading": "Thêm bài hát",
+      "close": "Đóng",
+      "searchPlaceholder": "Tìm trong kho nhạc...",
+      "searchAriaLabel": "Tìm bài hát",
+      "loadingLabel": "Đang tải kho nhạc",
+      "loadingText": "Đang tải kho nhạc...",
+      "noMatches": "Không có bài nào khớp.",
+      "added": "Đã thêm",
+      "addAriaLabel": "Thêm {title}"
+    }
+  },
+  "track": {
+    "table": {
+      "defaultAriaLabel": "Bảng bài hát",
+      "titleHeader": "Tiêu đề",
+      "addedAtHeader": "Ngày thêm",
+      "durationHeader": "Thời lượng",
+      "actionsHeader": "Thao tác",
+      "play": "Phát {title}",
+      "pause": "Tạm dừng {title}",
+      "edit": "Sửa {title}",
+      "remove": "Xóa {title}",
+      "playFailed": "Không phát được \"{title}\""
+    },
+    "metaDialog": {
+      "uploadTitle": "Thông tin bài hát",
+      "editTitle": "Sửa bài hát",
+      "uploadSubmit": "Tải lên",
+      "editSubmit": "Lưu",
+      "uploading": "Đang tải lên...",
+      "saving": "Đang lưu...",
+      "titleLabel": "Tên bài hát",
+      "artistLabel": "Ca sĩ",
+      "artistPlaceholder": "Chưa rõ ca sĩ"
+    },
+    "library": {
+      "uploadButton": "Tải bài hát lên",
+      "uploading": "Đang tải lên...",
+      "dropHint": "hoặc kéo file vào đây · MP3, M4A, WAV, FLAC, OGG · tối đa 50MB",
+      "filePickerLabel": "Chọn file nhạc",
+      "searchPlaceholder": "Tìm bài hát...",
+      "searchAriaLabel": "Tìm bài hát",
+      "storeUploadNote": "Nhạc bạn tải lên chỉ quán bạn nghe được; nhạc của chuỗi thì mọi quán dùng chung.",
+      "loadingLabel": "Đang tải kho nhạc",
+      "empty": "Chưa có bài hát nào.",
+      "scopeHeader": "Phạm vi",
+      "scopeStore": "Của quán",
+      "scopeOrg": "Của chuỗi",
+      "uploaded": "Đã tải lên \"{title}\"",
+      "uploadFailed": "Tải lên thất bại",
+      "uploadFailedWithReason": "Tải lên thất bại: {reason}",
+      "saved": "Đã lưu thay đổi",
+      "saveFailed": "Lưu thất bại",
+      "saveFailedWithReason": "Lưu thất bại: {reason}",
+      "deleted": "Đã xóa bài hát",
+      "deleteFailed": "Xóa thất bại",
+      "playFailed": "Không phát được \"{title}\""
+    }
+  },
+  "settings": {
+    "title": "Cài đặt",
+    "subtitle": "Thông tin tài khoản, mật khẩu đăng nhập và ngôn ngữ hiển thị",
+    "language": {
+      "title": "Ngôn ngữ",
+      "description": "Chọn ngôn ngữ hiển thị cho toàn bộ ứng dụng.",
+      "options": {
+        "vi": "Tiếng Việt",
+        "en": "English"
+      }
+    },
+    "profile": {
+      "loadingLabel": "Đang tải thông tin tài khoản",
+      "title": "Thông tin tài khoản",
+      "fields": {
+        "fullName": "Họ tên",
+        "email": "Email",
+        "role": "Vai trò",
+        "store": "Quán"
+      },
+      "readOnlyNote": "Email, vai trò và quán chỉ quản lý chuỗi mới đổi được, ở trang Người dùng.",
+      "saving": "Đang lưu...",
+      "submit": "Lưu thay đổi",
+      "saveSuccess": "Đã lưu thông tin tài khoản",
+      "saveFailed": "Lưu thông tin thất bại"
+    },
+    "password": {
+      "title": "Đổi mật khẩu",
+      "currentPassword": "Mật khẩu hiện tại",
+      "newPassword": "Mật khẩu mới",
+      "confirmPassword": "Nhập lại mật khẩu mới",
+      "mismatch": "Mật khẩu mới nhập lại không khớp",
+      "changeSuccess": "Đã đổi mật khẩu",
+      "currentPasswordWrong": "Mật khẩu hiện tại không đúng",
+      "changeFailed": "Đổi mật khẩu thất bại",
+      "saving": "Đang lưu...",
+      "submit": "Đổi mật khẩu"
+    }
+  }
+}

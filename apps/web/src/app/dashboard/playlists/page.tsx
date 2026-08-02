@@ -1,10 +1,13 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useAuth } from '../../../hooks/useAuth';
 import PlaylistBrowse from '../../../components/playlist/PlaylistBrowse';
 import type { UserRole } from '@cafe-music/shared';
 
 export default function PlaylistsPage() {
+  const t = useTranslations('dashboard.playlistsPage');
+  const tNav = useTranslations('nav');
   const { user } = useAuth();
 
   if (!user) return null;
@@ -16,10 +19,10 @@ export default function PlaylistsPage() {
           className="text-2xl font-bold"
           style={{ fontFamily: 'Fira Code, monospace', color: 'var(--color-foreground)' }}
         >
-          Playlists
+          {tNav('playlists')}
         </h1>
         <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
-          Nghe thử tại chỗ. Muốn phát ra loa quán thì vào trang Quán.
+          {t('subtitle')}
         </p>
       </div>
 

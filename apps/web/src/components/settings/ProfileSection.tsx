@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
@@ -21,6 +22,8 @@ const MUTED_TEXT_STYLE = { color: 'var(--color-foreground-50)' };
 
 /** Sửa Họ tên (PATCH /me); Email/Vai trò/Quán chỉ đọc — chỉ ORG_ADMIN đổi được qua trang Người dùng. */
 export default function ProfileSection() {
+  const t = useTranslations('settings.profile');
+  const tCommon = useTranslations('common');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -45,9 +48,9 @@ export default function ProfileSection() {
     try {
       const updated = await api.patch<Profile>('/me', { name: name.trim() });
       setProfile((prev) => (prev ? { ...prev, name: updated.name } : prev));
-      toast.success('Đã lưu thông tin tài khoản');
+      toast.success(t('saveSuccess'));
     } catch (err) {
-      toast.error(err instanceof Error && err.message ? err.message : 'Lưu thông tin thất bại');
+      toast.error(err instanceof Error && err.message ? err.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -58,7 +61,7 @@ export default function ProfileSection() {
       <section
         className="p-6 rounded-xl flex flex-col gap-4"
         style={{ backgroundColor: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
-        aria-label="Đang tải thông tin tài khoản"
+        aria-label={t('loadingLabel')}
       >
         <div className="skeleton h-6 w-40" />
         <div className="skeleton h-10 w-full" />
@@ -77,13 +80,13 @@ export default function ProfileSection() {
         className="text-lg font-semibold"
         style={{ color: 'var(--color-foreground)', fontFamily: 'Fira Code, monospace' }}
       >
-        Thông tin tài khoản
+        {t('title')}
       </h2>
 
       <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <label htmlFor="profile-name" className="text-sm" style={FIELD_LABEL_STYLE}>
-            Họ tên
+            {t('fields.fullName')}
           </label>
           <input
             id="profile-name"
@@ -103,20 +106,20 @@ export default function ProfileSection() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
             <span className="text-sm" style={FIELD_LABEL_STYLE}>
-              Email
+              {t('fields.email')}
             </span>
             <p style={{ color: 'var(--color-foreground)' }}>{profile.email}</p>
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-sm" style={FIELD_LABEL_STYLE}>
-              Vai trò
+              {t('fields.role')}
             </span>
-            <p style={{ color: 'var(--color-foreground)' }}>{roleLabel(profile.role)}</p>
+            <p style={{ color: 'var(--color-foreground)' }}>{roleLabel(profile.role, tCommon)}</p>
           </div>
           {profile.store && (
             <div className="flex flex-col gap-1">
               <span className="text-sm" style={FIELD_LABEL_STYLE}>
-                Quán
+                {t('fields.store')}
               </span>
               <p style={{ color: 'var(--color-foreground)' }}>{profile.store.name}</p>
             </div>
@@ -124,7 +127,7 @@ export default function ProfileSection() {
         </div>
 
         <p className="text-xs" style={MUTED_TEXT_STYLE}>
-          Email, vai trò và quán chỉ quản lý chuỗi mới đổi được, ở trang Người dùng.
+          {t('readOnlyNote')}
         </p>
 
         <button
@@ -137,7 +140,7 @@ export default function ProfileSection() {
             opacity: saving ? 0.7 : 1,
           }}
         >
-          {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+          {saving ? t('saving') : t('submit')}
         </button>
       </form>
     </section>

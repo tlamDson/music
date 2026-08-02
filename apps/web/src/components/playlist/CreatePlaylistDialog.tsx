@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import Dialog from '../ui/Dialog';
 
@@ -19,6 +20,8 @@ export default function CreatePlaylistDialog({
   onClose,
   onCreate,
 }: CreatePlaylistDialogProps) {
+  const t = useTranslations('playlist.createDialog');
+  const tCommon = useTranslations('common');
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
 
@@ -41,10 +44,10 @@ export default function CreatePlaylistDialog({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} ariaLabel="Tạo playlist">
+    <Dialog open={open} onClose={handleClose} ariaLabel={t('title')}>
       <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-          Tạo playlist
+          {t('title')}
         </h2>
 
         <div className="flex flex-col gap-1">
@@ -53,14 +56,14 @@ export default function CreatePlaylistDialog({
             className="text-sm"
             style={{ color: 'var(--color-foreground-70)' }}
           >
-            Tên playlist
+            {t('nameLabel')}
           </label>
           <input
             id="new-playlist-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="VD: Ballad, V-Pop"
+            placeholder={t('namePlaceholder')}
             required
             className="px-3 py-2 rounded-lg text-sm outline-none"
             style={{
@@ -68,7 +71,7 @@ export default function CreatePlaylistDialog({
               color: 'var(--color-foreground)',
               border: '1px solid var(--color-border)',
             }}
-            aria-label="Tên playlist"
+            aria-label={t('nameLabel')}
           />
         </div>
 
@@ -79,7 +82,7 @@ export default function CreatePlaylistDialog({
             className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
             style={{ color: 'var(--color-foreground)' }}
           >
-            Huỷ
+            {tCommon('cancel')}
           </button>
           <button
             type="submit"
@@ -91,7 +94,7 @@ export default function CreatePlaylistDialog({
               opacity: creating ? 0.7 : 1,
             }}
           >
-            {creating ? 'Đang tạo...' : 'Tạo playlist'}
+            {creating ? t('creating') : t('title')}
           </button>
         </div>
       </form>

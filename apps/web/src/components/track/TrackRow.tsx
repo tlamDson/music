@@ -1,5 +1,6 @@
 'use client';
 
+import { useLocale, useTranslations } from 'next-intl';
 import CoverArt from '../media/CoverArt';
 import { formatAddedAt, formatDuration } from '../../lib/format';
 import type { TrackTableExtraColumn, TrackTableRow } from './TrackTable';
@@ -39,6 +40,8 @@ export default function TrackRow({
   onDragStart,
   onDropAt,
 }: TrackRowProps) {
+  const t = useTranslations('track.table');
+  const locale = useLocale();
   const { track } = row;
   const showRemove = Boolean(onRemove) && canRemove(row);
   const showEdit = Boolean(onEdit) && canEdit(row);
@@ -101,7 +104,7 @@ export default function TrackRow({
                 onClick={() => onPlay(row, index)}
                 className="absolute inset-0 flex items-center justify-center rounded opacity-0 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100 group-focus-within:opacity-100"
                 style={{ color: 'var(--color-accent)' }}
-                aria-label={`Tạm dừng ${track.title}`}
+                aria-label={t('pause', { title: track.title })}
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
                   <rect x="6" y="5" width="4" height="14" rx="1" />
@@ -121,7 +124,7 @@ export default function TrackRow({
                 onClick={() => onPlay(row, index)}
                 className="absolute inset-0 flex items-center justify-center rounded opacity-0 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100 group-focus-within:opacity-100"
                 style={{ color: 'var(--color-accent)' }}
-                aria-label={`Phát ${track.title}`}
+                aria-label={t('play', { title: track.title })}
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
                   <path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86a1 1 0 00-1.5.86z" />
@@ -171,7 +174,7 @@ export default function TrackRow({
           className="hidden whitespace-nowrap px-4 py-3 text-sm tabular-nums md:table-cell"
           style={{ color: 'var(--color-foreground-50)' }}
         >
-          {formatAddedAt(row.addedAt)}
+          {formatAddedAt(row.addedAt, locale === 'en' ? 'en' : 'vi')}
         </td>
       )}
 
@@ -189,7 +192,7 @@ export default function TrackRow({
               onClick={() => onEdit?.(row, index)}
               className="rounded p-2 opacity-100 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none md:opacity-0 md:group-hover:opacity-100"
               style={{ color: 'var(--color-foreground)' }}
-              aria-label={`Sửa ${track.title}`}
+              aria-label={t('edit', { title: track.title })}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -211,7 +214,7 @@ export default function TrackRow({
               onClick={() => onRemove?.(row, index)}
               className="rounded p-2 opacity-100 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none md:opacity-0 md:group-hover:opacity-100"
               style={{ color: 'var(--color-destructive)' }}
-              aria-label={`Xóa ${track.title}`}
+              aria-label={t('remove', { title: track.title })}
             >
               <svg
                 viewBox="0 0 24 24"
