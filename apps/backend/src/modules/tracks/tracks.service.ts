@@ -7,7 +7,11 @@ import {
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { S3Service } from './s3.service';
-import { JwtPayload, CreateTrackMetaDto } from '@cafe-music/shared';
+import {
+  JwtPayload,
+  CreateTrackMetaDto,
+  UpdateTrackMetaDto,
+} from '@cafe-music/shared';
 import { MAX_FILE_SIZE, ALLOWED_MIMETYPES } from './upload.options';
 
 // Multer đã chặn sẵn theo cùng bộ hằng số này (upload.options.ts); service vẫn
@@ -97,6 +101,29 @@ export class TracksService {
     ]);
 
     return { data, meta: { page, limit, total } };
+  }
+
+  async update(trackId: string, dto: UpdateTrackMetaDto, user: JwtPayload) {
+    const track = await this.prisma.track.findFirst({
+      where: { id: trackId, ...this.scopeFor(user) },
+    });
+
+    if (!track) throw new NotFoundException('Track not found');
+
+    // Store admin thấy được track chung của chuỗi nhưng không được sửa nó —
+    // đổi tên track chung là đổi cho cả chuỗi (cùng luật với remove()).
+    if (user.role === 'STORE_ADMIN' && track.storeId !== user.storeId) {
+      throw new ForbiddenException(
+        'Store admins can only update tracks of their own store',
+      );
+    }
+
+    const data: { title?: string; artist?: string | null } = {};
+    if (dto.title !== undefined) data.title = dto.title.trim();
+    if (dto.artist !== undefined)
+      data.artist = dto.artist === '' ? null : dto.artist;
+
+    return this.prisma.track.update({ where: { id: trackId }, data });
   }
 
   async remove(trackId: string, user: JwtPayload) {

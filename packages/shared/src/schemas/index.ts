@@ -66,6 +66,15 @@ export const CreateTrackMetaSchema = z.object({
 
 export type CreateTrackMetaDto = z.infer<typeof CreateTrackMetaSchema>;
 
+// `artist` nullable (không chỉ optional) để UI xoá được ca sĩ về "chưa rõ" —
+// gửi `artist: null` xoá, không gửi field thì giữ nguyên giá trị cũ.
+export const UpdateTrackMetaSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  artist: z.string().max(200).nullable().optional(),
+});
+
+export type UpdateTrackMetaDto = z.infer<typeof UpdateTrackMetaSchema>;
+
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
 export const StorePlaySchema = z.object({

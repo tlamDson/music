@@ -297,6 +297,106 @@ describe('TracksService', () => {
     });
   });
 
+  // PATCH /tracks/:id — trước đây không có cách nào sửa tên bài/ca sĩ sau khi
+  // upload (title mặc định lấy từ tên file, artist luôn null).
+  describe('update', () => {
+    const storeAdmin = {
+      sub: 'user-2',
+      email: 'store1@cafe.com',
+      role: 'STORE_ADMIN' as const,
+      organizationId: 'org-1',
+      storeId: 'store-1',
+    };
+
+    it('lets an org admin rename any track in the organization', async () => {
+      prisma.track.findFirst.mockResolvedValue(mockTrack as any);
+      prisma.track.update.mockResolvedValue({
+        ...mockTrack,
+        title: 'New Title',
+        artist: 'New Artist',
+      } as any);
+
+      const result = await service.update(
+        'track-1',
+        { title: 'New Title', artist: 'New Artist' },
+        mockJwtPayload,
+      );
+
+      expect(prisma.track.update).toHaveBeenCalledWith({
+        where: { id: 'track-1' },
+        data: { title: 'New Title', artist: 'New Artist' },
+      });
+      expect(result).toMatchObject({
+        title: 'New Title',
+        artist: 'New Artist',
+      });
+    });
+
+    it('lets a store admin rename their own store track', async () => {
+      prisma.track.findFirst.mockResolvedValue({
+        ...mockTrack,
+        storeId: 'store-1',
+      } as any);
+      prisma.track.update.mockResolvedValue({
+        ...mockTrack,
+        storeId: 'store-1',
+        title: 'Renamed',
+      } as any);
+
+      await service.update('track-1', { title: 'Renamed' }, storeAdmin);
+
+      expect(prisma.track.update).toHaveBeenCalledWith({
+        where: { id: 'track-1' },
+        data: { title: 'Renamed' },
+      });
+    });
+
+    it('refuses to let a store admin rename a shared org track', async () => {
+      prisma.track.findFirst.mockResolvedValue({
+        ...mockTrack,
+        storeId: null,
+      } as any);
+
+      await expect(
+        service.update('track-1', { title: 'Hijacked' }, storeAdmin),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.track.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the track does not exist in scope', async () => {
+      prisma.track.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.update('missing-track', { title: 'X' }, mockJwtPayload),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.track.update).not.toHaveBeenCalled();
+    });
+
+    it('trims the title before saving', async () => {
+      prisma.track.findFirst.mockResolvedValue(mockTrack as any);
+      prisma.track.update.mockResolvedValue(mockTrack as any);
+
+      await service.update('track-1', { title: '  Trimmed  ' }, mockJwtPayload);
+
+      expect(prisma.track.update).toHaveBeenCalledWith({
+        where: { id: 'track-1' },
+        data: { title: 'Trimmed' },
+      });
+    });
+
+    it('converts an empty artist string to null', async () => {
+      prisma.track.findFirst.mockResolvedValue(mockTrack as any);
+      prisma.track.update.mockResolvedValue(mockTrack as any);
+
+      await service.update('track-1', { artist: '' }, mockJwtPayload);
+
+      expect(prisma.track.update).toHaveBeenCalledWith({
+        where: { id: 'track-1' },
+        data: { artist: null },
+      });
+    });
+  });
+
   describe('getStreamUrl', () => {
     it('should return presigned URL for own org track', async () => {
       prisma.track.findFirst.mockResolvedValue(mockTrack as any);
