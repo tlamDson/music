@@ -21,6 +21,7 @@ const stores = [
 describe('StoresPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.localStorage.clear();
     mockApi.get.mockResolvedValue({ data: stores });
   });
 
@@ -62,5 +63,21 @@ describe('StoresPage', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Thêm quán' }));
 
     await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith('/stores', { name: 'Quán mới' }));
+  });
+
+  it('remembers the chosen view mode across remounts', async () => {
+    const { unmount } = render(<StoresPage />);
+    await screen.findByText('Quán Nguyễn Huệ');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Xem dạng lưới' }));
+    expect(window.localStorage.getItem('cafe-music:view:stores')).toBe('grid');
+    unmount();
+
+    render(<StoresPage />);
+    await screen.findByText('Quán Nguyễn Huệ');
+    expect(screen.getByRole('button', { name: 'Xem dạng lưới' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 });

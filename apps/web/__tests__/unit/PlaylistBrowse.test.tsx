@@ -205,6 +205,22 @@ describe('PlaylistBrowse', () => {
     expect(screen.getByRole('button', { name: /xóa nhạc quán nguyễn huệ/i })).toBeInTheDocument();
   });
 
+  it('remembers the chosen view mode across remounts', async () => {
+    const { unmount } = renderBrowse();
+    await screen.findByText('Nhạc Lofi Chill Việt Nam');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Xem dạng danh sách' }));
+    expect(window.localStorage.getItem('cafe-music:view:playlists')).toBe('list');
+    unmount();
+
+    renderBrowse();
+    await screen.findByText('Nhạc Lofi Chill Việt Nam');
+    expect(screen.getByRole('button', { name: 'Xem dạng danh sách' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('remembers what was played recently', async () => {
     mockApi.post.mockResolvedValue({});
     renderBrowse();

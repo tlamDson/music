@@ -1,13 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
 import { usePlayer } from '../player/PlayerProvider';
 import { readRecentPlaylists, rememberRecentPlaylist } from '../../lib/recent-playlists';
 import { formatTotalDuration } from '../../lib/format';
+import { useViewMode } from '../../hooks/useViewMode';
 import PlaylistCard, { type BrowsePlaylist } from './PlaylistCard';
 import CreatePlaylistDialog from './CreatePlaylistDialog';
+import ViewToggle from '../ui/ViewToggle';
 import CoverArt from '../media/CoverArt';
 import type { ApiResponse, UserRole } from '@cafe-music/shared';
 
@@ -26,6 +29,82 @@ const CHIPS: Array<{ value: ScopeFilter; label: string }> = [
   { value: 'STORE', label: 'Quán' },
 ];
 
+interface PlaylistListRowProps {
+  playlist: BrowsePlaylist;
+  href: string;
+  isPlaying: boolean;
+  onPlay: () => void;
+  onDelete?: () => void;
+}
+
+/** Hàng gọn cho chế độ danh sách — cùng thông tin với `PlaylistCard`, khác cách trình bày. */
+function PlaylistListRow({ playlist, href, isPlaying, onPlay, onDelete }: PlaylistListRowProps) {
+  const trackCount = playlist._count?.playlistTracks ?? 0;
+
+  return (
+    <div
+      className="group flex items-center gap-3 p-3 rounded-xl transition-[filter] duration-[var(--duration-fast)] hover:brightness-125"
+      style={{ backgroundColor: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
+    >
+      <Link
+        href={href}
+        className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-none"
+      >
+        <CoverArt seed={playlist.id} label={playlist.name} size={44} />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium" style={{ color: 'var(--color-foreground)' }}>
+            {playlist.name}
+          </p>
+          <p className="truncate text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
+            {trackCount} bài · {formatTotalDuration(playlist.totalDurationMs)}
+          </p>
+        </div>
+      </Link>
+
+      <button
+        onClick={onPlay}
+        className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
+        style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
+        aria-label={`Phát ${playlist.name}`}
+      >
+        {isPlaying ? (
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+            <rect x="6" y="5" width="4" height="14" rx="1" />
+            <rect x="14" y="5" width="4" height="14" rx="1" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+            <path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86a1 1 0 00-1.5.86z" />
+          </svg>
+        )}
+      </button>
+
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          className="flex-shrink-0 p-2 rounded opacity-0 transition-[opacity,filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100"
+          style={{ color: 'var(--color-destructive)' }}
+          aria-label={`Xóa ${playlist.name}`}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrowseProps) {
   const [playlists, setPlaylists] = useState<BrowsePlaylist[]>([]);
   const [scope, setScope] = useState<ScopeFilter>('ALL');
@@ -33,6 +112,7 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [view, setView] = useViewMode('playlists', 'grid');
 
   const { current, isPlaying, queue, playTrack } = usePlayer();
 
@@ -185,6 +265,8 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
             }}
           />
 
+          <ViewToggle value={view} onChange={setView} />
+
           <button
             type="button"
             onClick={() => setShowCreateDialog(true)}
@@ -227,19 +309,39 @@ export default function PlaylistBrowse({ role, storeId, basePath }: PlaylistBrow
                 >
                   {row.title}
                 </h2>
-                <div className="flex gap-4 overflow-x-auto pb-2">
-                  {row.items.map((playlist, index) => (
-                    <PlaylistCard
-                      key={`${row.title}-${playlist.id}`}
-                      playlist={playlist}
-                      href={`${basePath}/${playlist.id}`}
-                      isPlaying={isPlaying && current?.id === playlist.id}
-                      onPlay={() => void handlePlay(playlist)}
-                      onDelete={canDelete(playlist) ? () => void handleDelete(playlist) : undefined}
-                      index={index}
-                    />
-                  ))}
-                </div>
+                {view === 'grid' ? (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {row.items.map((playlist, index) => (
+                      <PlaylistCard
+                        key={`${row.title}-${playlist.id}`}
+                        playlist={playlist}
+                        href={`${basePath}/${playlist.id}`}
+                        isPlaying={isPlaying && current?.id === playlist.id}
+                        onPlay={() => void handlePlay(playlist)}
+                        onDelete={
+                          canDelete(playlist) ? () => void handleDelete(playlist) : undefined
+                        }
+                        index={index}
+                        className="w-full"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {row.items.map((playlist) => (
+                      <PlaylistListRow
+                        key={`${row.title}-${playlist.id}`}
+                        playlist={playlist}
+                        href={`${basePath}/${playlist.id}`}
+                        isPlaying={Boolean(isPlaying && current?.id === playlist.id)}
+                        onPlay={() => void handlePlay(playlist)}
+                        onDelete={
+                          canDelete(playlist) ? () => void handleDelete(playlist) : undefined
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
               </section>
             ))
         )}
