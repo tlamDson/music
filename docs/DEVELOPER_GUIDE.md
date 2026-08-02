@@ -379,11 +379,17 @@ pnpm --filter @cafe-music/web test:e2e
 
 Ba job của PR chạy song song:
 
-| Job                    | Kiểm tra gì                                                            |
-| ---------------------- | ---------------------------------------------------------------------- |
-| `Lint + Unit Tests`    | ESLint + unit test backend/web — **check bắt buộc để merge**           |
-| `Typecheck + Build`    | `tsc --noEmit` và `turbo build` cả 3 package                           |
-| `Backend Docker Build` | Build image sẽ deploy lên Railway — hỏng ở đây nghĩa là deploy sẽ hỏng |
+| Job                    | Kiểm tra gì                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| `Lint + Unit Tests`    | ESLint + unit test backend/web — **check bắt buộc để merge**                                     |
+| `Typecheck + Build`    | `tsc --noEmit` và `turbo build` cả 3 package                                                     |
+| `Backend Docker Build` | Build image sẽ deploy lên Railway — hỏng ở đây nghĩa là deploy sẽ hỏng. **Chỉ build khi cần**, ↓ |
+
+Ngoài ra có job phụ `Detect changed paths` (`dorny/paths-filter`, vài giây) — **không** thêm vào required status check.
+
+`Backend Docker Build` chỉ build image thật khi PR chạm `apps/backend/**`, `packages/shared/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, `turbo.json`, `.dockerignore`, `.github/workflows/ci-pr.yml`, hoặc khi PR target `main`. PR chỉ sửa web/docs thì job **vẫn chạy và vẫn báo xanh** trong ~15s, chỉ bỏ qua bước build (trước đây tốn 3–5 phút vô ích trên mọi PR).
+
+> **Đừng gate bằng `paths:` hay `if:` ở cấp job.** Cả hai làm required check không báo Success đúng nghĩa — `paths:` khiến workflow không chạy và check treo _Expected_ vĩnh viễn, PR không merge được. Gate phải nằm ở cấp **step**, xem `docker.env.SHOULD_BUILD` trong `ci-pr.yml`.
 
 ### Viewing Test Results
 
@@ -527,9 +533,9 @@ cafe-music/
 | Path                                 | Mô tả                                                                 |
 | ------------------------------------ | --------------------------------------------------------------------- |
 | `apps/backend/src/modules/`          | Mỗi domain một module NestJS (service, controller, test riêng)        |
-| `apps/backend/prisma/schema.prisma`  | Schema DB: org, store, playlist, track, lịch phát                               |
+| `apps/backend/prisma/schema.prisma`  | Schema DB: org, store, playlist, track, lịch phát                     |
 | `apps/web/src/app/player/`           | Trang phát nhạc tại quầy — kết nối WebSocket                          |
-| `apps/web/src/app/dashboard/`        | Admin điều khiển playlist, phát nhạc ra quán                                 |
+| `apps/web/src/app/dashboard/`        | Admin điều khiển playlist, phát nhạc ra quán                          |
 | `packages/shared/`                   | DTO Zod + TypeScript types dùng chung — đổi ở đây, BE và FE cùng sync |
 | `design-system/cafe-music/MASTER.md` | Nguồn sự thật UI — đọc trước khi code frontend                        |
 | `.cursor/rules/`                     | Quy tắc bắt buộc cho AI assistant trong Cursor                        |

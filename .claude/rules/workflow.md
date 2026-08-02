@@ -72,6 +72,16 @@ gh pr checks <PR-number>          # xem trạng thái từng check
 gh pr merge <PR-number> --squash  # chỉ chạy khi tất cả check xanh
 ```
 
+### Sửa `ci-pr.yml` — đừng làm mất required check
+
+Tên ba job trong [.github/workflows/ci-pr.yml](../../.github/workflows/ci-pr.yml) **chính là** định danh required status check phía GitHub (branch protection không có file config trong repo). Vì vậy:
+
+- **Không đổi tên** `Lint + Unit Tests` / `Typecheck + Build` / `Backend Docker Build`. Cần tách việc thì thêm job mới tên khác.
+- **Không thêm `paths:` vào `on: pull_request`** — workflow sẽ không chạy, check treo ở _Expected_ vĩnh viễn và PR **không merge được**.
+- **Không đặt `if:` ở cấp job** cho ba job này. Muốn bỏ qua việc nặng thì gate ở cấp **step**, để job vẫn chạy và vẫn kết thúc Success.
+
+Mẫu đang dùng: job `changes` (`dorny/paths-filter`, pin theo commit SHA) xuất `outputs.backend`; job `docker` đặt `env.SHOULD_BUILD` rồi gắn `if: env.SHOULD_BUILD == 'true'` lên từng step build, kèm một step `echo` cho nhánh còn lại. PR chỉ sửa web/docs vì thế xanh trong ~15s thay vì 3–5 phút. PR target `main` luôn build thật, không tin vào filter.
+
 > `gh` có thể chưa được auth trên máy. Khi đó dùng GitHub MCP server (`pull_request_read` với method `get_check_runs`) hoặc gọi thẳng REST API bằng `$GITHUB_PAT`.
 
 ## TDD (Red → Green → Refactor) — bắt buộc cho mọi feature/fix
