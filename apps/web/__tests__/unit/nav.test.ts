@@ -1,4 +1,4 @@
-import { dashboardNavItems, storeNavItems, homePathFor } from '../../src/lib/nav';
+import { dashboardNavItems, storeNavItems, homePathFor, settingsPathFor } from '../../src/lib/nav';
 
 describe('nav items by role', () => {
   const labels = (items: { label: string }[]) => items.map((item) => item.label);
@@ -24,5 +24,10 @@ describe('nav items by role', () => {
   it('sends a store admin to their own console after login', () => {
     expect(homePathFor('STORE_ADMIN')).toBe('/store');
     expect(homePathFor('ORG_ADMIN')).toBe('/dashboard');
+  });
+
+  it('sends each role to its own settings page', () => {
+    expect(settingsPathFor('STORE_ADMIN')).toBe('/store/settings');
+    expect(settingsPathFor('ORG_ADMIN')).toBe('/dashboard/settings');
   });
 });

@@ -12,6 +12,8 @@ interface AppShellProps {
   navItems: NavItem[];
   user: { email: string; role: string };
   onLogout?: () => void;
+  /** Đường dẫn trang Cài đặt cá nhân — khác nhau theo vai trò (`lib/nav.ts` `settingsPathFor`). */
+  settingsHref?: string;
   children: React.ReactNode;
 }
 
@@ -32,7 +34,13 @@ const BACKDROP_EXIT_MS = 200;
  * thanh cuộn riêng và cuộn mất cả header lẫn nút đăng xuất. Riêng danh sách
  * playlist trong thư viện **vẫn** cuộn được — nó là phần duy nhất dài vô hạn.
  */
-export default function AppShell({ navItems, user, onLogout, children }: AppShellProps) {
+export default function AppShell({
+  navItems,
+  user,
+  onLogout,
+  settingsHref,
+  children,
+}: AppShellProps) {
   const pathname = usePathname();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -215,12 +223,40 @@ export default function AppShell({ navItems, user, onLogout, children }: AppShel
           className="flex-shrink-0 px-3 py-2 border-t pb-[max(0.5rem,env(safe-area-inset-bottom))]"
           style={{ borderColor: 'var(--color-border)' }}
         >
-          <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
-            {user.email}
-          </p>
-          <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--color-accent)' }}>
-            {user.role}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                {user.email}
+              </p>
+              <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--color-accent)' }}>
+                {user.role}
+              </p>
+            </div>
+            {settingsHref && (
+              <Link
+                href={settingsHref}
+                aria-label="Cài đặt"
+                className="flex-shrink-0 p-2 rounded-lg cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 focus-visible:outline-none"
+                style={{ color: 'var(--color-foreground)' }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </Link>
+            )}
+          </div>
           {onLogout && (
             <button
               onClick={onLogout}
