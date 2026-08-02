@@ -6,11 +6,8 @@ import { api } from '../../lib/api-client';
 import { measureAudioDuration } from '../../lib/format';
 import { usePlayer } from '../player/PlayerProvider';
 import TrackTable, { type TrackTableRow } from './TrackTable';
+import TrackMetaDialog from './TrackMetaDialog';
 import type { ApiResponse, Track, UserRole } from '@cafe-music/shared';
-
-interface LibraryTrack extends Track {
-  storeId?: string | null;
-}
 
 interface TrackLibraryProps {
   role: UserRole;
@@ -18,11 +15,14 @@ interface TrackLibraryProps {
 }
 
 export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
-  const [tracks, setTracks] = useState<LibraryTrack[]>([]);
+  const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [search, setSearch] = useState('');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { current, playTrack, toggle } = usePlayer();
@@ -30,7 +30,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
 
   const fetchTracks = () => {
     api
-      .get<ApiResponse<LibraryTrack[]>>('/tracks')
+      .get<ApiResponse<Track[]>>('/tracks?limit=100')
       .then((res) => setTracks(res.data))
       .catch(() => setTracks([]))
       .finally(() => setLoading(false));
@@ -38,19 +38,21 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
 
   useEffect(fetchTracks, []);
 
-  const uploadFile = async (file: File) => {
-    setUploading(true);
+  const uploadFile = async (file: File, title: string, artist: string) => {
+    setSaving(true);
     try {
       // Backend không parse audio — trình duyệt đo hộ trước khi gửi
       const durationMs = await measureAudioDuration(file);
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('title', file.name.replace(/\.[^.]+$/, ''));
+      formData.append('title', title);
+      if (artist) formData.append('artist', artist);
       formData.append('durationMs', String(durationMs));
 
       await api.postMultipart('/tracks', formData);
       fetchTracks();
-      toast.success(`Đã tải lên "${file.name}"`);
+      toast.success(`Đã tải lên "${title}"`);
+      setPendingFile(null);
     } catch (err) {
       toast.error(
         err instanceof Error && err.message
@@ -58,11 +60,36 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
           : 'Tải lên thất bại',
       );
     } finally {
+      setSaving(false);
       setUploading(false);
     }
   };
 
-  const handleDelete = async (track: LibraryTrack) => {
+  const handlePickFile = (file: File) => {
+    setUploading(true);
+    setPendingFile(file);
+  };
+
+  const handleUpdate = async (title: string, artist: string) => {
+    if (!editingTrack) return;
+    setSaving(true);
+    try {
+      await api.patch(`/tracks/${editingTrack.id}`, { title, artist: artist || null });
+      setTracks((prev) =>
+        prev.map((t) => (t.id === editingTrack.id ? { ...t, title, artist: artist || null } : t)),
+      );
+      toast.success('Đã lưu thay đổi');
+      setEditingTrack(null);
+    } catch (err) {
+      toast.error(
+        err instanceof Error && err.message ? `Lưu thất bại: ${err.message}` : 'Lưu thất bại',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (track: Track) => {
     try {
       await api.delete(`/tracks/${track.id}`);
       setTracks((prev) => prev.filter((t) => t.id !== track.id));
@@ -72,7 +99,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
     }
   };
 
-  const handlePlay = async (track: LibraryTrack) => {
+  const handlePlay = async (track: Track) => {
     if (current?.id === track.id) {
       toggle();
       return;
@@ -95,8 +122,8 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
     }
   };
 
-  // Quán chỉ được xóa nhạc của chính quán; track chung là của cả chuỗi
-  const canDelete = (track: LibraryTrack) => !isStore || track.storeId === storeId;
+  // Quán chỉ được sửa/xóa nhạc của chính quán; track chung là của cả chuỗi
+  const canModify = (track: Track) => !isStore || track.storeId === storeId;
 
   const visible = tracks.filter((track) =>
     `${track.title} ${track.artist ?? ''}`.toLowerCase().includes(search.trim().toLowerCase()),
@@ -131,7 +158,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
             e.preventDefault();
             setDragOver(false);
             const file = e.dataTransfer.files[0];
-            if (file) void uploadFile(file);
+            if (file) handlePickFile(file);
           }}
           className="px-4 py-2 rounded-full text-xs transition-colors duration-[var(--duration-base)]"
           style={{
@@ -151,7 +178,8 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
           aria-label="Chọn file nhạc"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) void uploadFile(file);
+            if (file) handlePickFile(file);
+            e.target.value = '';
           }}
         />
 
@@ -190,9 +218,11 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
         <div className="rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
           <TrackTable
             rows={trackTableRows}
-            onPlay={(row) => void handlePlay(row.track as LibraryTrack)}
-            onRemove={(row) => void handleDelete(row.track as LibraryTrack)}
-            canRemove={(row) => canDelete(row.track as LibraryTrack)}
+            onPlay={(row) => void handlePlay(row.track)}
+            onEdit={(row) => setEditingTrack(row.track)}
+            canEdit={(row) => canModify(row.track)}
+            onRemove={(row) => void handleDelete(row.track)}
+            canRemove={(row) => canModify(row.track)}
             extraColumns={[
               {
                 key: 'scope',
@@ -200,16 +230,18 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
                 headerClassName: 'w-32 px-4 py-2 text-xs font-normal',
                 cellClassName: 'px-4 py-3',
                 render: (row) => {
-                  const storeId = (row.track as LibraryTrack).storeId;
+                  const rowStoreId = row.track.storeId;
                   return (
                     <span
                       className="text-xs px-2 py-1 rounded-full whitespace-nowrap"
                       style={{
-                        backgroundColor: storeId ? 'rgba(67,56,202,0.25)' : 'rgba(34,197,94,0.15)',
-                        color: storeId ? 'var(--color-secondary)' : 'var(--color-accent)',
+                        backgroundColor: rowStoreId
+                          ? 'rgba(67,56,202,0.25)'
+                          : 'rgba(34,197,94,0.15)',
+                        color: rowStoreId ? 'var(--color-secondary)' : 'var(--color-accent)',
                       }}
                     >
-                      {storeId ? 'Của quán' : 'Của chuỗi'}
+                      {rowStoreId ? 'Của quán' : 'Của chuỗi'}
                     </span>
                   );
                 },
@@ -218,6 +250,31 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
           />
         </div>
       )}
+
+      <TrackMetaDialog
+        open={pendingFile !== null}
+        mode="upload"
+        defaultTitle={pendingFile ? pendingFile.name.replace(/\.[^.]+$/, '') : ''}
+        defaultArtist=""
+        saving={saving}
+        onSubmit={({ title, artist }) => {
+          if (pendingFile) void uploadFile(pendingFile, title, artist);
+        }}
+        onClose={() => {
+          setPendingFile(null);
+          setUploading(false);
+        }}
+      />
+
+      <TrackMetaDialog
+        open={editingTrack !== null}
+        mode="edit"
+        defaultTitle={editingTrack?.title ?? ''}
+        defaultArtist={editingTrack?.artist ?? ''}
+        saving={saving}
+        onSubmit={({ title, artist }) => void handleUpdate(title, artist)}
+        onClose={() => setEditingTrack(null)}
+      />
     </div>
   );
 }

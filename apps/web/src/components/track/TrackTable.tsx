@@ -29,6 +29,10 @@ interface TrackTableProps {
   onRemove?: (row: TrackTableRow, index: number) => void;
   /** Mặc định cho phép xoá mọi hàng khi `onRemove` có mặt. */
   canRemove?: (row: TrackTableRow) => boolean;
+  /** Sửa tên bài/ca sĩ — chỉ kho nhạc dùng (PATCH /tracks/:id). */
+  onEdit?: (row: TrackTableRow, index: number) => void;
+  /** Mặc định cho phép sửa mọi hàng khi `onEdit` có mặt. */
+  canEdit?: (row: TrackTableRow) => boolean;
   /** Bật kéo-thả để đổi thứ tự phát (chỉ playlist dùng). */
   draggable?: boolean;
   onReorder?: (fromIndex: number, toIndex: number) => void;
@@ -48,6 +52,8 @@ export default function TrackTable({
   onPlay,
   onRemove,
   canRemove = () => true,
+  onEdit,
+  canEdit = () => true,
   draggable = false,
   onReorder,
   showAddedAt = false,
@@ -67,11 +73,11 @@ export default function TrackTable({
   };
 
   return (
-    <table className="w-full text-left" aria-label={ariaLabel}>
+    <table className="w-full table-fixed text-left" aria-label={ariaLabel}>
       <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--color-background)' }}>
         <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
           <th
-            className="w-12 px-4 py-2 text-xs font-normal"
+            className="w-10 px-2 py-2 text-xs font-normal md:w-12 md:px-4"
             style={{ color: 'rgba(248,250,252,0.5)' }}
           >
             #
@@ -82,7 +88,7 @@ export default function TrackTable({
           {extraColumns.map((column) => (
             <th
               key={column.key}
-              className={column.headerClassName ?? 'px-4 py-2 text-xs font-normal'}
+              className={`hidden md:table-cell ${column.headerClassName ?? 'px-4 py-2 text-xs font-normal'}`}
               style={{ color: 'rgba(248,250,252,0.5)' }}
             >
               {column.header}
@@ -90,14 +96,14 @@ export default function TrackTable({
           ))}
           {showAddedAt && (
             <th
-              className="whitespace-nowrap px-4 py-2 text-xs font-normal"
+              className="hidden whitespace-nowrap px-4 py-2 text-xs font-normal md:table-cell md:w-32"
               style={{ color: 'rgba(248,250,252,0.5)' }}
             >
               Ngày thêm
             </th>
           )}
           <th
-            className="w-24 px-4 py-2 text-right text-xs font-normal"
+            className="w-16 px-2 py-2 text-right text-xs font-normal md:w-24 md:px-4"
             style={{ color: 'rgba(248,250,252,0.5)' }}
           >
             <svg
@@ -113,7 +119,7 @@ export default function TrackTable({
             </svg>
             <span className="sr-only">Thời lượng</span>
           </th>
-          <th className="w-24 px-4 py-2" aria-label="Thao tác" />
+          <th className="w-16 px-2 py-2 md:w-24 md:px-4" aria-label="Thao tác" />
         </tr>
       </thead>
       <tbody>
@@ -128,6 +134,8 @@ export default function TrackTable({
             onPlay={onPlay}
             onRemove={onRemove}
             canRemove={canRemove}
+            onEdit={onEdit}
+            canEdit={canEdit}
             draggable={draggable}
             isDragging={dragIndex === index}
             onDragStart={setDragIndex}

@@ -107,6 +107,8 @@ export interface Track {
   externalProvider: ExternalProvider | null;
   externalId: string | null;
   organizationId: string;
+  // `storeId = null` là kho chung của chuỗi; có giá trị là nhạc riêng của quán đó.
+  storeId: string | null;
   createdAt: string;
 }
 

@@ -39,6 +39,7 @@ const track = (
   externalProvider: null,
   externalId: null,
   organizationId: 'org-1',
+  storeId: null,
   createdAt: '',
 });
 
@@ -152,6 +153,35 @@ describe('TrackTable', () => {
     fireEvent.drop(dataRows[1]); // thả vào hàng đầu (Song One, index 0)
 
     expect(onReorder).toHaveBeenCalledWith(1, 0);
+  });
+
+  it('shows the edit button when onEdit is provided and calls it with the row', async () => {
+    const onEdit = jest.fn();
+    renderTable(<TrackTable rows={rows} onPlay={jest.fn()} onEdit={onEdit} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /sửa song one/i }));
+
+    expect(onEdit).toHaveBeenCalledWith(rows[0], 0);
+  });
+
+  it('does not render an edit button at all when onEdit is not provided', () => {
+    renderTable(<TrackTable rows={rows} onPlay={jest.fn()} />);
+
+    expect(screen.queryByRole('button', { name: /sửa/i })).not.toBeInTheDocument();
+  });
+
+  it('only shows the edit button when canEdit allows it', () => {
+    renderTable(
+      <TrackTable
+        rows={rows}
+        onPlay={jest.fn()}
+        onEdit={jest.fn()}
+        canEdit={(row) => row.id !== 'track-2'}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /sửa song one/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /sửa song two/i })).not.toBeInTheDocument();
   });
 
   it('renders page-specific extra columns passed in by the caller', () => {
