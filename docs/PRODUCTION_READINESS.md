@@ -233,6 +233,7 @@ GitHub secrets (cho workflow backup): `PROD_DATABASE_URL` (phải là `DATABASE_
 
 1. **PR chuẩn bị** vào `develop` — title `chore: prepare the vX.Y.Z release`. Bump `"version"` ở **ba** file `apps/backend/package.json`, `apps/web/package.json`, `packages/shared/package.json` (root `package.json` là `private`, **không có** field `version`), viết mục mới trong `CHANGELOG.md`, cập nhật `CLAUDE.md` + file này nếu trạng thái đổi. Merge khi cả 3 CI job xanh.
 2. **PR release** `develop → main` — title `chore: release vX.Y.Z to production`.
+   → ⚠️ **Merge bằng "Create a merge commit", TUYỆT ĐỐI không squash.** Squash làm `main` mất liên kết lịch sử với `develop`, và lần release **kế tiếp** sẽ conflict hàng chục file kèm việc GitHub Actions **không chạy job nào** (`mergeable_state: dirty` → không dựng được merge ref → 3 required check không xuất hiện). Đã dẫm phải ở `v0.1.0`, phải gỡ bằng PR #96. Chi tiết + cách chẩn đoán: [.claude/rules/workflow.md](../.claude/rules/workflow.md) mục _Merge policy_.
    → **Chỉ chủ repo được merge vào `main`.** PR nhắm `main` **luôn** build Docker image thật (`ci-pr.yml` có `github.base_ref == 'main'` trong `SHOULD_BUILD`), đừng tin vào paths-filter.
    → Merge xong: Railway build + tự chạy `prisma migrate deploy` qua entrypoint (cạm bẫy #15 — đừng chạy tay), Vercel build production.
 

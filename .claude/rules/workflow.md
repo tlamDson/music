@@ -72,6 +72,28 @@ gh pr checks <PR-number>          # xem trạng thái từng check
 gh pr merge <PR-number> --squash  # chỉ chạy khi tất cả check xanh
 ```
 
+#### PR release `develop → main` phải merge bằng MERGE COMMIT, không squash
+
+Squash là mặc định đúng cho PR feature vào `develop`, nhưng **sai cho PR release vào `main`** — và hậu quả chỉ lộ ra ở lần release **kế tiếp**.
+
+Đã dẫm phải thật: PR #75 (`chore: release v0.1.0 to production`) merge bằng squash, nên `main` chỉ có **một** commit không hề liên quan tới 40 commit riêng lẻ của `develop`. Git tính lại merge-base thành `d33a7d9` — commit **trước** lúc release — nên khi mở PR release `v0.2.0` (#95), hai phía trông như cùng viết lại y hệt các file đó:
+
+- **~65 file conflict** dù nội dung hai bên giống hệt nhau.
+- **GitHub Actions không chạy một job nào** — PR ở trạng thái `mergeable_state: dirty` thì GitHub không dựng được merge ref, nên cả 3 required check không bao giờ xuất hiện (không phải "đang chờ", mà là **không tồn tại**). Chỉ app ngoài như GitGuardian/Vercel báo cáo.
+- Tab _Files changed_ hiện **401 file** thay vì 104 file thật, vì GitHub dùng diff ba chấm tính từ merge-base cũ. Người review tưởng release kéo theo cả đợt đã phát hành trước đó.
+
+**Cách nhận ra:** `mergeable_state` là `dirty`, và `GET /repos/:o/:r/actions/runs?head_sha=<sha>` trả `total_count: 0`.
+
+**Cách gỡ nếu đã lỡ squash** (đã làm ở PR #96): tạo nhánh từ `develop`, `git merge -s ours origin/main`, PR vào `develop`, merge bằng **merge commit**. Strategy `ours` chỉ an toàn khi chứng minh được `main` không có nội dung nào `develop` thiếu — kiểm bằng cách so tree hash của `main` với commit `develop` lúc cắt release:
+
+```bash
+git rev-parse origin/main^{tree} <commit-cắt-release>^{tree}   # hai hash phải bằng nhau
+git merge-base --is-ancestor <commit-cắt-release> origin/develop
+git diff --stat origin/develop HEAD   # sau khi merge phải RỖNG — không đổi file nào
+```
+
+Hai lệnh đầu bằng nhau/đúng thì `main` không đóng góp nội dung gì, `-s ours` không mất gì. **Đừng chạy `-s ours` mà bỏ qua bước kiểm này** — nếu ai đó từng hotfix thẳng lên `main`, nó sẽ nuốt mất hotfix đó mà không báo gì.
+
 ### Sửa `ci-pr.yml` — đừng làm mất required check
 
 Tên ba job trong [.github/workflows/ci-pr.yml](../../.github/workflows/ci-pr.yml) **chính là** định danh required status check phía GitHub (branch protection không có file config trong repo). Vì vậy:
