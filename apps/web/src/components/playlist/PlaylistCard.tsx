@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import CoverArt from '../media/CoverArt';
 import { formatTotalDuration } from '../../lib/format';
@@ -21,6 +22,9 @@ interface PlaylistCardProps {
   onDelete?: () => void;
   /** Thứ tự trong danh sách — chỉ 8 card đầu được stagger lúc vào, xem globals.css `.animate-stagger-item`. */
   index?: number;
+  /** Độ rộng card — mặc định `w-44 flex-shrink-0` cho rail ngang, trang dùng
+   * grid truyền `w-full` để card giãn theo cột thay vì giữ bề ngang cố định. */
+  className?: string;
 }
 
 export default function PlaylistCard({
@@ -30,13 +34,16 @@ export default function PlaylistCard({
   onPlay,
   onDelete,
   index,
+  className = 'w-44 flex-shrink-0',
 }: PlaylistCardProps) {
+  const t = useTranslations('playlist.card');
+  const tCommon = useTranslations('common');
   const trackCount = playlist._count?.playlistTracks ?? 0;
   const staggered = typeof index === 'number' && index < 8;
 
   return (
     <div
-      className={`group relative w-44 flex-shrink-0 p-3 rounded-xl shadow-[var(--shadow-md)] transition-[transform,box-shadow] duration-[var(--duration-base)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)] ${
+      className={`group relative ${className} p-3 rounded-xl shadow-[var(--shadow-md)] transition-[transform,box-shadow] duration-[var(--duration-base)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)] ${
         staggered ? 'animate-stagger-item' : ''
       }`}
       style={{
@@ -53,7 +60,7 @@ export default function PlaylistCard({
           onClick={onPlay}
           className="absolute bottom-2 right-2 w-10 h-10 translate-y-2 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 group-hover:translate-y-0 focus-visible:opacity-100 focus-visible:translate-y-0 transition-[opacity,transform,filter] duration-[var(--duration-base)] hover:brightness-110 focus-visible:outline-none"
           style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-          aria-label={`Phát ${playlist.name}`}
+          aria-label={t('play', { name: playlist.name })}
         >
           {isPlaying ? (
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">
@@ -76,8 +83,9 @@ export default function PlaylistCard({
         {playlist.name}
       </Link>
 
-      <p className="text-xs mt-1 truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
-        {trackCount} bài · {formatTotalDuration(playlist.totalDurationMs)}
+      <p className="text-xs mt-1 truncate" style={{ color: 'var(--color-foreground-50)' }}>
+        {tCommon('playlistMeta.trackCount', { count: trackCount })} ·{' '}
+        {formatTotalDuration(playlist.totalDurationMs, tCommon)}
       </p>
 
       {onDelete && (
@@ -85,7 +93,7 @@ export default function PlaylistCard({
           onClick={onDelete}
           className="absolute top-2 right-2 p-1.5 rounded cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-[opacity,filter] duration-[var(--duration-base)] hover:brightness-110 focus-visible:outline-none"
           style={{ backgroundColor: 'rgba(15,15,35,0.75)', color: 'var(--color-destructive)' }}
-          aria-label={`Xóa ${playlist.name}`}
+          aria-label={t('delete', { name: playlist.name })}
         >
           <svg
             viewBox="0 0 24 24"

@@ -44,7 +44,7 @@ export default function CoverArt({ seed, label, size = 40, className }: CoverArt
     >
       <span
         className="font-semibold"
-        style={{ color: 'rgba(248,250,252,0.9)', fontSize: Math.max(11, size / 3) }}
+        style={{ color: 'var(--color-foreground-90)', fontSize: Math.max(11, size / 3) }}
       >
         {label.slice(0, 1).toUpperCase()}
       </span>

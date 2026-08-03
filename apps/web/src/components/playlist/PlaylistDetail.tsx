@@ -1,10 +1,11 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
-import { formatTotalDurationExact } from '../../lib/format';
+import { formatPlaylistMeta } from '../../lib/format';
 import { usePlayer } from '../player/PlayerProvider';
 import CoverArt from '../media/CoverArt';
 import AddTrackDialog from './AddTrackDialog';
@@ -37,6 +38,8 @@ export default function PlaylistDetail({
   storeId,
   backHref,
 }: PlaylistDetailProps) {
+  const t = useTranslations('playlist.detail');
+  const tCommon = useTranslations('common');
   const [playlist, setPlaylist] = useState<PlaylistDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -50,11 +53,11 @@ export default function PlaylistDetail({
     try {
       setPlaylist(await api.get<PlaylistDetailData>(`/playlists/${playlistId}`));
     } catch {
-      toast.error('Không tải được playlist');
+      toast.error(t('loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [playlistId]);
+  }, [playlistId, t]);
 
   useEffect(() => {
     void fetchPlaylist();
@@ -77,17 +80,17 @@ export default function PlaylistDetail({
     try {
       if (isStore) {
         if (!storeId) {
-          toast.error('Tài khoản chưa gắn với quán nào');
+          toast.error(t('storeNotAssigned'));
           return;
         }
         await api.post(`/sync/stores/${storeId}/play`, { playlistId, trackIndex });
-        toast.success('Đang phát tại quán');
+        toast.success(t('playingAtStore'));
         return;
       }
 
       const track = rows[trackIndex]?.track;
       if (!track) {
-        toast.error('Playlist chưa có bài nào');
+        toast.error(t('emptyPlaylist'));
         return;
       }
 
@@ -102,24 +105,24 @@ export default function PlaylistDetail({
         },
         { mode: 'preview' },
       );
-      toast.success(`Nghe thử "${track.title}"`);
+      toast.success(t('previewing', { title: track.title }));
     } catch (err) {
-      toast.error(err instanceof Error && err.message ? err.message : 'Phát thất bại');
+      toast.error(err instanceof Error && err.message ? err.message : t('playFailed'));
     }
   };
 
   const addTrack = async (trackId: string, title: string) => {
     if (rows.some((row) => row.trackId === trackId)) {
-      toast.error(`"${title}" đã có trong playlist`);
+      toast.error(t('alreadyInPlaylist', { title }));
       return;
     }
 
     try {
       await api.post(`/playlists/${playlistId}/tracks`, { trackId });
       await fetchPlaylist();
-      toast.success(`Đã thêm "${title}"`);
+      toast.success(t('added', { title }));
     } catch {
-      toast.error(`Thêm "${title}" thất bại`);
+      toast.error(t('addFailed', { title }));
     }
   };
 
@@ -131,9 +134,9 @@ export default function PlaylistDetail({
           ? { ...prev, playlistTracks: prev.playlistTracks.filter((r) => r.trackId !== trackId) }
           : prev,
       );
-      toast.success(`Đã xóa "${title}"`);
+      toast.success(t('removed', { title }));
     } catch {
-      toast.error(`Xóa "${title}" thất bại`);
+      toast.error(t('removeFailed', { title }));
     }
   };
 
@@ -164,16 +167,16 @@ export default function PlaylistDetail({
       await api.patch(`/playlists/${playlistId}/tracks/reorder`, {
         trackIds: next.map((row) => row.trackId),
       });
-      toast.success('Đã cập nhật thứ tự phát');
+      toast.success(t('reorderSuccess'));
     } catch {
-      toast.error('Cập nhật thứ tự thất bại');
+      toast.error(t('reorderFailed'));
       void fetchPlaylist();
     }
   };
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-3" aria-label="Đang tải playlist">
+      <div className="flex flex-col gap-3" aria-label={t('loadingLabel')}>
         <div className="skeleton h-6 w-64" />
         <div className="skeleton h-40 w-full" />
         <div className="skeleton h-40 w-full" />
@@ -184,7 +187,7 @@ export default function PlaylistDetail({
   if (!playlist) {
     return (
       <p className="text-sm" style={{ color: 'var(--color-destructive)' }}>
-        Không tìm thấy playlist.
+        {t('notFound')}
       </p>
     );
   }
@@ -198,7 +201,7 @@ export default function PlaylistDetail({
             href={backHref}
             className="self-start p-2 rounded-lg cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-125 focus-visible:outline-none"
             style={{ color: 'var(--color-foreground)', border: '1px solid var(--color-border)' }}
-            aria-label="Quay lại danh sách playlist"
+            aria-label={t('backAriaLabel')}
           >
             <svg
               viewBox="0 0 24 24"
@@ -216,9 +219,9 @@ export default function PlaylistDetail({
           <div className="min-w-0 pb-1">
             <p
               className="text-xs uppercase tracking-wide"
-              style={{ color: 'rgba(248,250,252,0.6)' }}
+              style={{ color: 'var(--color-foreground-60)' }}
             >
-              {playlist.scope === 'ORG' ? 'Danh sách phát của chuỗi' : 'Danh sách phát của quán'}
+              {playlist.scope === 'ORG' ? t('scopeOrg') : t('scopeStore')}
             </p>
             <h1
               className="text-3xl font-bold mt-2 truncate"
@@ -226,8 +229,8 @@ export default function PlaylistDetail({
             >
               {playlist.name}
             </h1>
-            <p className="text-sm mt-3" style={{ color: 'rgba(248,250,252,0.6)' }}>
-              {rows.length} bài · {formatTotalDurationExact(totalDurationMs)}
+            <p className="text-sm mt-3" style={{ color: 'var(--color-foreground-60)' }}>
+              {formatPlaylistMeta(tCommon, { count: rows.length, durationMs: totalDurationMs })}
             </p>
           </div>
         </div>
@@ -238,7 +241,7 @@ export default function PlaylistDetail({
             onClick={() => void playFrom(0)}
             className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer transition-[filter] duration-[var(--duration-base)] hover:brightness-110 focus-visible:outline-none"
             style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-            aria-label="Phát playlist"
+            aria-label={t('playAriaLabel')}
           >
             <svg viewBox="0 0 24 24" className="w-7 h-7" fill="currentColor" aria-hidden="true">
               <path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86a1 1 0 00-1.5.86z" />
@@ -254,7 +257,7 @@ export default function PlaylistDetail({
               border: '1px solid var(--color-border)',
             }}
           >
-            Thêm bài hát
+            {t('addTrackButton')}
           </button>
         </div>
 
@@ -266,7 +269,7 @@ export default function PlaylistDetail({
           }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleLibraryDrop}
-          aria-label="Danh sách bài hát"
+          aria-label={t('tracksAreaLabel')}
           className="rounded-xl transition-colors duration-[var(--duration-base)]"
           style={{
             border: `1px ${dragOver ? 'dashed' : 'solid'} ${
@@ -276,8 +279,8 @@ export default function PlaylistDetail({
           }}
         >
           {trackTableRows.length === 0 ? (
-            <p className="text-sm p-8 text-center" style={{ color: 'rgba(248,250,252,0.5)' }}>
-              Chưa có bài nào — bấm &quot;Thêm bài hát&quot; hoặc kéo từ kho nhạc vào đây.
+            <p className="text-sm p-8 text-center" style={{ color: 'var(--color-foreground-50)' }}>
+              {t('emptyState')}
             </p>
           ) : (
             <TrackTable
@@ -296,10 +299,10 @@ export default function PlaylistDetail({
       <aside
         className="hidden xl:flex w-72 flex-shrink-0 flex-col gap-4 p-4 rounded-xl h-fit"
         style={{ backgroundColor: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
-        aria-label="Đang phát"
+        aria-label={t('nowPlaying')}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--color-foreground)' }}>
-          Đang phát
+          {t('nowPlaying')}
         </h2>
 
         {current ? (
@@ -310,20 +313,20 @@ export default function PlaylistDetail({
                 {current.title}
               </p>
               {current.artist && (
-                <p className="text-xs mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-foreground-50)' }}>
                   {current.artist}
                 </p>
               )}
             </div>
             {queue && (
               <p className="text-xs" style={{ color: 'var(--color-accent)' }}>
-                Còn {queue.remaining} bài trong hàng chờ
+                {tCommon('queueRemaining', { count: queue.remaining })}
               </p>
             )}
           </>
         ) : (
-          <p className="text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
-            Chưa phát bài nào.
+          <p className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
+            {t('noQueueHint')}
           </p>
         )}
       </aside>

@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { useTranslations } from 'next-intl';
 import AppShell from '../../src/components/layout/AppShell';
 import { dashboardNavItems, storeNavItems } from '../../src/lib/nav';
 import { api } from '../../src/lib/api-client';
@@ -12,6 +13,7 @@ jest.mock('next/navigation', () => ({
 }));
 
 const mockApi = api as jest.Mocked<typeof api>;
+const tNav = useTranslations('nav');
 
 const playlists = [
   { id: 'playlist-1', name: 'Nhạc Lofi Chill Việt Nam', scope: 'ORG' },
@@ -27,7 +29,7 @@ describe('AppShell', () => {
   const renderShell = (role: 'ORG_ADMIN' | 'STORE_ADMIN') =>
     render(
       <AppShell
-        navItems={role === 'STORE_ADMIN' ? storeNavItems() : dashboardNavItems(role)}
+        navItems={role === 'STORE_ADMIN' ? storeNavItems(tNav) : dashboardNavItems(role, tNav)}
         user={{ email: 'admin@cafe.com', role }}
       >
         <p>nội dung trang</p>
@@ -140,6 +142,29 @@ describe('AppShell', () => {
 
     expect(nav.className).not.toEqual(expect.stringContaining('-translate-x-full'));
     expect(screen.getByRole('button', { name: 'Đóng menu điều hướng' })).toBeInTheDocument();
+  });
+
+  it('shows a settings link in the account block when settingsHref is provided', () => {
+    render(
+      <AppShell
+        navItems={dashboardNavItems('ORG_ADMIN', tNav)}
+        user={{ email: 'admin@cafe.com', role: 'ORG_ADMIN' }}
+        settingsHref="/dashboard/settings"
+      >
+        <p>nội dung trang</p>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Cài đặt' })).toHaveAttribute(
+      'href',
+      '/dashboard/settings',
+    );
+  });
+
+  it('does not render a settings link when settingsHref is not provided', () => {
+    renderShell('ORG_ADMIN');
+
+    expect(screen.queryByRole('link', { name: 'Cài đặt' })).not.toBeInTheDocument();
   });
 
   it('closes the mobile sidebar when the backdrop is clicked', () => {

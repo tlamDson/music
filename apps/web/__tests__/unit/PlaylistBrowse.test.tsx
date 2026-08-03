@@ -1,4 +1,4 @@
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PlaylistBrowse from '../../src/components/playlist/PlaylistBrowse';
 import { renderWithPlayer } from '../utils/renderWithPlayer';
@@ -128,9 +128,7 @@ describe('PlaylistBrowse', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /phát nhạc lofi chill việt nam/i }));
 
-    await waitFor(() =>
-      expect(mockApi.get).toHaveBeenCalledWith('/tracks/track-1/stream-url'),
-    );
+    await waitFor(() => expect(mockApi.get).toHaveBeenCalledWith('/tracks/track-1/stream-url'));
     expect(mockApi.post).not.toHaveBeenCalled();
   });
 
@@ -154,8 +152,10 @@ describe('PlaylistBrowse', () => {
     mockApi.post.mockResolvedValue({ id: 'playlist-3' });
     renderBrowse('ORG_ADMIN');
 
-    await userEvent.type(await screen.findByLabelText(/tên playlist/i), 'Ballad');
-    await userEvent.click(screen.getByRole('button', { name: /tạo playlist/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /^tạo playlist$/i }));
+    const dialog = await screen.findByRole('dialog', { name: /tạo playlist/i });
+    await userEvent.type(within(dialog).getByLabelText(/tên playlist/i), 'Ballad');
+    await userEvent.click(within(dialog).getByRole('button', { name: /^tạo playlist$/i }));
 
     await waitFor(() =>
       expect(mockApi.post).toHaveBeenCalledWith('/playlists', {
@@ -169,8 +169,10 @@ describe('PlaylistBrowse', () => {
     mockApi.post.mockResolvedValue({ id: 'playlist-3' });
     renderBrowse('STORE_ADMIN');
 
-    await userEvent.type(await screen.findByLabelText(/tên playlist/i), 'Nhạc sáng');
-    await userEvent.click(screen.getByRole('button', { name: /tạo playlist/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /^tạo playlist$/i }));
+    const dialog = await screen.findByRole('dialog', { name: /tạo playlist/i });
+    await userEvent.type(within(dialog).getByLabelText(/tên playlist/i), 'Nhạc sáng');
+    await userEvent.click(within(dialog).getByRole('button', { name: /^tạo playlist$/i }));
 
     await waitFor(() =>
       expect(mockApi.post).toHaveBeenCalledWith('/playlists', {
@@ -201,6 +203,22 @@ describe('PlaylistBrowse', () => {
       screen.queryByRole('button', { name: /xóa nhạc lofi chill việt nam/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /xóa nhạc quán nguyễn huệ/i })).toBeInTheDocument();
+  });
+
+  it('remembers the chosen view mode across remounts', async () => {
+    const { unmount } = renderBrowse();
+    await screen.findByText('Nhạc Lofi Chill Việt Nam');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Xem dạng danh sách' }));
+    expect(window.localStorage.getItem('cafe-music:view:playlists')).toBe('list');
+    unmount();
+
+    renderBrowse();
+    await screen.findByText('Nhạc Lofi Chill Việt Nam');
+    expect(screen.getByRole('button', { name: 'Xem dạng danh sách' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('remembers what was played recently', async () => {

@@ -98,9 +98,10 @@ DATABASE_URL='<scratch>' pnpm --filter @cafe-music/backend exec prisma migrate s
 psql '<scratch>' -c 'SELECT count(*) FROM "User";'                                      # → khớp nguồn
 ```
 
-| Lần test restore gần nhất | Kết quả                                                                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| 2026-07-30                | ✅ Dump → upload → retention → restore chạy hết; số row khớp nguồn và `prisma migrate status` báo up to date |
+| Lần test restore gần nhất | Kết quả                                                                                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-01                | ✅ **DB production thật**: dump → restore vào PG18 scratch; 1 org + 1 ORG_ADMIN đúng như prod, 5 migration, `prisma migrate status` báo up to date |
+| 2026-07-30                | ✅ Dump → upload → retention → restore chạy hết (bucket MinIO local); số row khớp nguồn                                                            |
 
 ## Sức khoẻ hệ thống
 

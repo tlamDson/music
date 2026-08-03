@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../lib/api-client';
@@ -22,6 +23,7 @@ export default function TrackPlayButton({
   artist,
   durationMs,
 }: TrackPlayButtonProps) {
+  const t = useTranslations('track.table');
   const { current, isPlaying, playTrack, toggle } = usePlayer();
   const [loading, setLoading] = useState(false);
 
@@ -39,7 +41,7 @@ export default function TrackPlayButton({
       const { url } = await api.get<{ url: string }>(`/tracks/${trackId}/stream-url`);
       playTrack({ id: trackId, title, artist, url, durationMs }, { mode: 'preview' });
     } catch {
-      toast.error(`Không phát được "${title}"`);
+      toast.error(t('playFailed', { title }));
     } finally {
       setLoading(false);
     }
@@ -51,7 +53,7 @@ export default function TrackPlayButton({
       disabled={loading}
       className="p-2 rounded cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80 focus-visible:outline-none"
       style={{ color: 'var(--color-accent)', opacity: loading ? 0.5 : 1 }}
-      aria-label={playing ? `Pause ${title}` : `Play ${title}`}
+      aria-label={playing ? t('pause', { title }) : t('play', { title })}
     >
       {playing ? (
         <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">

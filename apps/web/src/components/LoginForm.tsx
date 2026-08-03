@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../hooks/useAuth';
@@ -7,6 +8,7 @@ import { homePathFor } from '../lib/nav';
 import type { UserRole } from '@cafe-music/shared';
 
 export default function LoginForm() {
+  const t = useTranslations('auth');
   const router = useRouter();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -22,7 +24,7 @@ export default function LoginForm() {
       const user = await login({ email, password });
       router.push(user ? homePathFor(user.role as UserRole) : '/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : t('loginFailed'));
     } finally {
       setLoading(false);
     }
@@ -31,7 +33,7 @@ export default function LoginForm() {
   return (
     <form
       onSubmit={(e) => void handleSubmit(e)}
-      aria-label="Login"
+      aria-label={t('login')}
       role="form"
       className="flex flex-col gap-4"
       noValidate
@@ -42,7 +44,7 @@ export default function LoginForm() {
           className="text-sm font-medium"
           style={{ color: 'var(--color-foreground)' }}
         >
-          Email
+          {t('emailLabel')}
         </label>
         <input
           id="email"
@@ -51,14 +53,14 @@ export default function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="email"
-          placeholder="admin@cafe.com"
+          placeholder={t('emailPlaceholder')}
           className="px-4 py-2 rounded-lg text-sm outline-none transition-shadow duration-[var(--duration-fast)] focus:ring-2"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-foreground)',
             border: '1px solid var(--color-border)',
           }}
-          aria-label="Email"
+          aria-label={t('emailLabel')}
         />
       </div>
 
@@ -68,7 +70,7 @@ export default function LoginForm() {
           className="text-sm font-medium"
           style={{ color: 'var(--color-foreground)' }}
         >
-          Password
+          {t('passwordLabel')}
         </label>
         <input
           id="password"
@@ -77,14 +79,14 @@ export default function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
           autoComplete="current-password"
-          placeholder="••••••••"
+          placeholder={t('passwordPlaceholder')}
           className="px-4 py-2 rounded-lg text-sm outline-none transition-shadow duration-[var(--duration-fast)] focus:ring-2"
           style={{
             backgroundColor: 'var(--color-primary)',
             color: 'var(--color-foreground)',
             border: '1px solid var(--color-border)',
           }}
-          aria-label="Password"
+          aria-label={t('passwordLabel')}
         />
       </div>
 
@@ -105,7 +107,7 @@ export default function LoginForm() {
           fontFamily: 'Fira Sans, sans-serif',
         }}
       >
-        {loading ? 'Logging in...' : 'Login'}
+        {loading ? t('loggingIn') : t('login')}
       </button>
     </form>
   );

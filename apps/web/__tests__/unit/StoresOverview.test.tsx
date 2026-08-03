@@ -64,4 +64,15 @@ describe('StoresOverview', () => {
     const link = await screen.findByRole('link', { name: /quán nguyễn huệ/i });
     expect(link).toHaveAttribute('href', '/dashboard/stores/store-1');
   });
+
+  // QC iPhone: quán chạy ngang buộc phải vuốt để thấy hết trên màn hình nhỏ —
+  // dưới `md` phải xếp dọc, chỉ chạy ngang lại từ `md` trở lên.
+  it('xếp quán dọc dưới md, chỉ chạy ngang từ md trở lên', async () => {
+    renderWithPlayer(<StoresOverview />);
+
+    const link = await screen.findByRole('link', { name: /quán nguyễn huệ/i });
+    const container = link.parentElement;
+    expect(container).toHaveClass('flex-col', 'md:flex-row');
+    expect(link).toHaveClass('w-full', 'md:w-64');
+  });
 });

@@ -1,9 +1,13 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import StoresOverview from '../../components/store/StoresOverview';
 
 export default function DashboardPage() {
+  const t = useTranslations('dashboard.home');
+  const tNav = useTranslations('nav');
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -11,24 +15,24 @@ export default function DashboardPage() {
           className="text-2xl font-bold"
           style={{ fontFamily: 'Fira Code, monospace', color: 'var(--color-foreground)' }}
         >
-          Tổng quan
+          {tNav('overview')}
         </h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
-          Nhạc đang chạy ở từng quán trong chuỗi
+        <p className="text-sm mt-1" style={{ color: 'var(--color-foreground-50)' }}>
+          {t('subtitle')}
         </p>
       </div>
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-            Đang phát tại các quán
+            {t('playingAtStores')}
           </h2>
           <Link
             href="/dashboard/stores"
             className="text-xs cursor-pointer underline transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
             style={{ color: 'var(--color-secondary)' }}
           >
-            Quản lý quán
+            {t('manageStores')}
           </Link>
         </div>
 
@@ -37,18 +41,18 @@ export default function DashboardPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-          Bắt đầu phát
+          {t('startPlaying')}
         </h2>
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-          Bấm vào một quán ở trên để chọn nhạc và phát ra loa quán đó. Trang{' '}
+        <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
+          {t('startPlayingPrefix')}{' '}
           <Link
             href="/dashboard/playlists"
             className="underline cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none"
             style={{ color: 'var(--color-secondary)' }}
           >
-            Playlists
+            {tNav('playlists')}
           </Link>{' '}
-          chỉ để nghe thử tại chỗ.
+          {t('startPlayingSuffix')}
         </p>
       </section>
     </div>

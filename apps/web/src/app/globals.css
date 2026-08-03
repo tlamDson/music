@@ -13,6 +13,27 @@
   --color-destructive: #ef4444;
   --color-ring: #1e1b4b;
 
+  /* Thang chữ mờ dần trên `--color-foreground` — nguồn duy nhất cho mọi
+     `rgba(248,250,252,X)` từng viết rải rác trong style inline của component.
+     Giá trị giữ NGUYÊN các opacity đang dùng thật (đo từ code, không làm tròn)
+     nên đổi sang token không lệch một pixel màu nào. Cần thêm mức mới thì khai
+     báo ở đây, đừng viết `rgba(248,250,252,*)` thẳng vào component — bảng màu
+     sáng (PR #11) chỉ cần đổi giá trị các token này ở `:root[data-theme='light']`,
+     không phải rà lại từng file. */
+  --color-foreground-90: rgba(248, 250, 252, 0.9);
+  --color-foreground-70: rgba(248, 250, 252, 0.7);
+  --color-foreground-60: rgba(248, 250, 252, 0.6);
+  --color-foreground-50: rgba(248, 250, 252, 0.5);
+  --color-foreground-40: rgba(248, 250, 252, 0.4);
+  --color-foreground-25: rgba(248, 250, 252, 0.25);
+  --color-foreground-08: rgba(248, 250, 252, 0.08);
+
+  /* Nền pill/badge tô nhạt theo accent hoặc secondary — dùng ở nhiều nơi
+     (trạng thái kết nối, phạm vi track, vai trò...) nên gom về một chỗ thay vì
+     mỗi file tự viết lại đúng cặp số này. */
+  --color-accent-soft-bg: rgba(34, 197, 94, 0.15);
+  --color-secondary-soft-bg: rgba(67, 56, 202, 0.25);
+
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;
   --space-md: 1rem;
@@ -216,7 +237,7 @@ body {
   background: linear-gradient(
     90deg,
     var(--color-muted) 25%,
-    rgba(248, 250, 252, 0.08) 50%,
+    var(--color-foreground-08) 50%,
     var(--color-muted) 75%
   );
   background-size: 200% 100%;

@@ -66,6 +66,34 @@ export const CreateTrackMetaSchema = z.object({
 
 export type CreateTrackMetaDto = z.infer<typeof CreateTrackMetaSchema>;
 
+// `artist` nullable (không chỉ optional) để UI xoá được ca sĩ về "chưa rõ" —
+// gửi `artist: null` xoá, không gửi field thì giữ nguyên giá trị cũ.
+export const UpdateTrackMetaSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  artist: z.string().max(200).nullable().optional(),
+});
+
+export type UpdateTrackMetaDto = z.infer<typeof UpdateTrackMetaSchema>;
+
+// ─── Me (hồ sơ tự phục vụ) ──────────────────────────────────────────────────
+
+// Chỉ `name` — không cho tự đổi role/storeId/isActive qua route này, đó là
+// leo thang đặc quyền / tự bật lại tài khoản vừa bị vô hiệu hoá.
+export const UpdateProfileSchema = z.object({
+  name: z.string().min(1).max(100),
+});
+
+export type UpdateProfileDto = z.infer<typeof UpdateProfileSchema>;
+
+// max(72) vì bcrypt cắt im lặng sau 72 byte — chặn ở validation thay vì để
+// phần vượt quá bị bỏ qua vô tình.
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(8),
+  newPassword: z.string().min(8).max(72),
+});
+
+export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;
+
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
 export const StorePlaySchema = z.object({

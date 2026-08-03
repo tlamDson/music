@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef } from 'react';
 import { usePlayer, usePlayerPosition } from './PlayerProvider';
 import CoverArt from '../media/CoverArt';
@@ -9,7 +10,7 @@ import VolumeControl from './VolumeControl';
 import { formatDuration, formatPosition } from '../../lib/format';
 import { CloseIcon } from './icons';
 
-const MUTED_TEXT = 'rgba(248,250,252,0.6)';
+const MUTED_TEXT = 'var(--color-foreground-60)';
 
 interface NowPlayingOverlayProps {
   onClose: () => void;
@@ -27,6 +28,7 @@ interface NowPlayingOverlayProps {
  * kẹt UI ở giữa hai trạng thái.
  */
 export default function NowPlayingOverlay({ onClose }: NowPlayingOverlayProps) {
+  const t = useTranslations('player');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const { current, durationMs } = usePlayer();
   const positionMs = usePlayerPosition();
@@ -75,13 +77,13 @@ export default function NowPlayingOverlay({ onClose }: NowPlayingOverlayProps) {
       style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-foreground)' }}
       role="dialog"
       aria-modal="true"
-      aria-label="Đang phát toàn màn hình"
+      aria-label={t('nowPlayingFullscreenLabel')}
     >
       <button
         onClick={handleClose}
         className="absolute top-6 right-6 p-2 rounded-full cursor-pointer transition-opacity duration-[var(--duration-base)] hover:opacity-80 focus-visible:outline-none"
         style={{ color: 'var(--color-foreground)' }}
-        aria-label="Đóng toàn màn hình"
+        aria-label={t('closeFullscreenLabel')}
       >
         <CloseIcon />
       </button>
@@ -103,7 +105,7 @@ export default function NowPlayingOverlay({ onClose }: NowPlayingOverlayProps) {
           aria-valuenow={Math.round(progressPct)}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label="Tiến trình bài hát"
+          aria-label={t('progressLabel')}
           className="w-full h-1 rounded-full overflow-hidden"
           style={{ backgroundColor: 'var(--color-muted)' }}
         >

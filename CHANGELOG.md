@@ -2,6 +2,47 @@
 
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/); phiên bản theo [Semantic Versioning](https://semver.org/lang/vi/).
 
+## [0.2.0] — 2026-08-03
+
+Đợt QC responsive trên iPhone + kho nhạc + tài khoản tự phục vụ. **Không có migration database** — schema giữ nguyên như `0.1.0`.
+
+### Đa ngôn ngữ
+
+- **Giao diện song ngữ tiếng Việt / tiếng Anh** cho toàn bộ web app (`next-intl`). Ngôn ngữ lưu ở cookie `NEXT_LOCALE`, mặc định tiếng Việt, đổi ngay trong trang Cài đặt mà không phải tải lại trang. Cây route giữ nguyên, không thêm tiền tố `/en` vào URL.
+
+### Tài khoản tự phục vụ
+
+- **Trang Cài đặt** (`/dashboard/settings` cho chuỗi, `/store/settings` cho quán): xem và sửa hồ sơ, đổi mật khẩu, đổi ngôn ngữ.
+- `GET /me`, `PATCH /me` (chỉ đổi được `name` — không cho tự nâng quyền hay tự bật lại tài khoản đã bị vô hiệu hoá) và `PATCH /me/password` (kiểm mật khẩu hiện tại, giới hạn 5 lần/phút theo từng tài khoản qua Redis).
+- Gõ sai mật khẩu hiện tại giờ hiện lỗi ngay tại form thay vì đá người dùng về màn đăng nhập.
+
+### Quản lý nhạc
+
+- **Thêm tên ca sĩ cho bài hát.** Nhập tên bài + ca sĩ trong dialog trước khi upload, sửa lại sau qua `PATCH /tracks/:id`.
+- Bảng kho nhạc không còn tràn ngang trên điện thoại khi tên bài dài.
+
+### Giao diện & responsive
+
+- **Ô tìm kiếm ở trang Quán và Playlist giờ là ô lọc thuần**; tạo mới chuyển hẳn sang dialog riêng. Trước đây dùng chung một ô cho cả lọc lẫn tạo mới nên dễ hiểu nhầm.
+- Trang Người dùng dịch sang tiếng Việt, hai nút "Sửa" / "Vô hiệu hoá" không còn lệch nhau trên màn hình hẹp.
+- Chuyển đổi xem dạng **danh sách hoặc lưới** cho Quán và Playlist, ghi nhớ lựa chọn theo từng trang.
+- Dashboard quán xếp dọc trên điện thoại thay vì bắt cuộn ngang.
+- Toàn bộ màu chữ mờ và nền pill rút về token semantic trong `globals.css` (thuần dọn dẹp, không đổi giao diện) — chuẩn bị cho bảng màu sáng.
+
+### Vận hành
+
+- Sửa lỗi script backup không nhận đúng endpoint R2 ở một số định dạng URL. **Cron backup hằng đêm chạy từ `main` nên bản vá này chỉ có hiệu lực từ release này.**
+- CI bỏ qua bước build Docker image cho PR không đụng tới backend — PR chỉ sửa web/docs xong trong ~15 giây thay vì 3–5 phút. PR nhắm vào `main` vẫn luôn build thật.
+- Ghi lại các cạm bẫy gặp khi provision production lần đầu (port của Railway "Generate Domain", tên service Postgres/Redis sinh ngẫu nhiên) vào `docs/PRODUCTION_READINESS.md`.
+
+### Giới hạn đã biết
+
+Giữ nguyên toàn bộ giới hạn của `0.1.0` (chưa có bảng `Artist`; track `durationMs = 0` không tự chuyển bài; timer chuyển bài chỉ đúng khi chạy 1 instance backend; `SchedulerService.matchesCron` bỏ qua phần ngày/tháng/thứ; refresh token chưa thu hồi được; rate limit theo tài khoản không chặn kiểu rải mật khẩu qua nhiều tài khoản), cộng thêm:
+
+- **Đổi mật khẩu không thu hồi phiên đăng nhập cũ** — token đang còn hạn ở thiết bị khác vẫn dùng được tới khi hết hạn tự nhiên.
+- **Thông báo lỗi do backend trả về chưa qua lớp đa ngôn ngữ**, hiện nguyên văn ngôn ngữ backend dùng.
+- **Chưa có bảng màu sáng** — giao diện vẫn chỉ có một tông tối.
+
 ## [0.1.0] — 2026-08-01
 
 Bản phát hành production đầu tiên.

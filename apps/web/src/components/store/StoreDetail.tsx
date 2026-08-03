@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -40,6 +41,8 @@ const REFRESH_MS = 10_000;
  * làm phao cứu sinh khi socket rớt.
  */
 export default function StoreDetail({ storeId }: { storeId: string }) {
+  const t = useTranslations('store.detail');
+  const tCommon = useTranslations('common');
   const [store, setStore] = useState<StoreDetailData | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,23 +96,23 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
     } catch (err) {
       // Hiện lỗi thật của backend thay vì đoán bừa — đoán sai che mất nguyên
       // nhân (playlist rỗng, track chưa có file, quán không thuộc tổ chức...).
-      toast.error(err instanceof Error && err.message ? err.message : 'Thao tác thất bại');
+      toast.error(err instanceof Error && err.message ? err.message : t('actionFailed'));
     }
   };
 
   const playPlaylistFrom = (playlistId: string, trackIndex: number, name: string) =>
     run(
       () => api.post(`/sync/stores/${storeId}/play`, { playlistId, trackIndex }),
-      `Đang phát "${name}" tại ${store?.name ?? 'quán'}`,
+      t('playingAtStoreToast', { name, store: store?.name ?? t('fallbackStoreName') }),
     );
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-3" role="status" aria-label="Đang tải thông tin quán">
+      <div className="flex flex-col gap-3" role="status" aria-label={t('loadingLabel')}>
         <div className="skeleton h-6 w-48" />
         <div className="skeleton h-32 w-full" />
         <div className="skeleton h-32 w-full" />
-        <span className="sr-only">Đang tải thông tin quán...</span>
+        <span className="sr-only">{t('loadingText')}</span>
       </div>
     );
   }
@@ -118,14 +121,14 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
     return (
       <div className="flex flex-col gap-3 items-start">
         <p className="text-sm" style={{ color: 'var(--color-destructive)' }}>
-          Không tải được quán này.
+          {t('loadFailed')}
         </p>
         <Link
           href="/dashboard/stores"
           className="text-sm underline cursor-pointer"
           style={{ color: 'var(--color-secondary)' }}
         >
-          Quay lại danh sách quán
+          {t('backToList')}
         </Link>
       </div>
     );
@@ -150,7 +153,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
           className="text-xs uppercase tracking-wide cursor-pointer hover:brightness-125 transition-[filter] duration-[var(--duration-fast)] w-fit"
           style={{ color: 'var(--color-secondary)' }}
         >
-          ← Quay lại danh sách quán
+          ← {t('backToList')}
         </Link>
         <h1
           className="text-2xl font-bold"
@@ -158,10 +161,10 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
         >
           {store.name}
         </h1>
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
           {store.connectedScreens > 0
-            ? `${store.connectedScreens} màn hình đang kết nối`
-            : 'Chưa có màn hình nào kết nối — mở màn chiếu để nghe được nhạc'}
+            ? t('connectedScreens', { count: store.connectedScreens })
+            : t('noScreensHint')}
         </p>
       </div>
 
@@ -171,7 +174,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
         style={{ backgroundColor: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
       >
         <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-          Đang phát
+          {t('nowPlayingHeading')}
         </h2>
 
         {nowPlaying ? (
@@ -185,11 +188,9 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                 >
                   {nowPlaying.track.title}
                 </p>
-                <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
-                  {nowPlaying.track.artist ?? 'Chưa rõ nghệ sĩ'}
-                  {nowPlaying.queue
-                    ? ` · còn ${nowPlaying.queue.remaining} bài trong hàng chờ`
-                    : ''}
+                <p className="text-xs truncate" style={{ color: 'var(--color-foreground-50)' }}>
+                  {nowPlaying.track.artist ?? t('unknownArtist')}
+                  {nowPlaying.queue ? t('queueSuffix', { count: nowPlaying.queue.remaining }) : ''}
                 </p>
               </div>
             </div>
@@ -198,10 +199,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
               {nowPlaying.isPlaying ? (
                 <button
                   onClick={() =>
-                    void run(
-                      () => api.post(`/sync/stores/${storeId}/pause`),
-                      'Đã tạm dừng nhạc tại quán',
-                    )
+                    void run(() => api.post(`/sync/stores/${storeId}/pause`), t('pauseSuccess'))
                   }
                   className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                   style={{
@@ -210,20 +208,17 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                     border: '1px solid var(--color-border)',
                   }}
                 >
-                  Tạm dừng
+                  {t('pause')}
                 </button>
               ) : (
                 <button
                   onClick={() =>
-                    void run(
-                      () => api.post(`/sync/stores/${storeId}/resume`),
-                      'Đã phát tiếp tại quán',
-                    )
+                    void run(() => api.post(`/sync/stores/${storeId}/resume`), t('resumeSuccess'))
                   }
                   className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                   style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
                 >
-                  Phát tiếp
+                  {t('resume')}
                 </button>
               )}
 
@@ -232,7 +227,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                   onClick={() =>
                     void run(
                       () => api.post(`/sync/stores/${storeId}/previous`),
-                      'Đã quay lại bài trước',
+                      t('previousSuccess'),
                     )
                   }
                   className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
@@ -242,14 +237,14 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                     border: '1px solid var(--color-border)',
                   }}
                 >
-                  Bài trước
+                  {t('previous')}
                 </button>
               )}
 
               {showNext && (
                 <button
                   onClick={() =>
-                    void run(() => api.post(`/sync/stores/${storeId}/next`), 'Đã chuyển bài')
+                    void run(() => api.post(`/sync/stores/${storeId}/next`), t('nextSuccess'))
                   }
                   className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                   style={{
@@ -258,13 +253,13 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                     border: '1px solid var(--color-border)',
                   }}
                 >
-                  Bài sau
+                  {t('next')}
                 </button>
               )}
 
               <button
                 onClick={() =>
-                  void run(() => api.post(`/sync/stores/${storeId}/stop`), 'Đã dừng nhạc tại quán')
+                  void run(() => api.post(`/sync/stores/${storeId}/stop`), t('stopSuccess'))
                 }
                 className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-[filter] duration-[var(--duration-fast)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                 style={{
@@ -273,7 +268,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                   border: '1px solid var(--color-destructive)',
                 }}
               >
-                Dừng hẳn
+                {t('stop')}
               </button>
             </div>
 
@@ -295,8 +290,8 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
             </div>
           </>
         ) : (
-          <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-            Quán đang im lặng — chọn một playlist bên dưới để phát.
+          <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
+            {t('silentHint')}
           </p>
         )}
       </section>
@@ -304,12 +299,12 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
       {/* Playlist để phát cho quán */}
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-          Phát cho quán này
+          {t('playForStoreHeading')}
         </h2>
 
         {playlists.length === 0 ? (
-          <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-            Chưa có playlist nào.
+          <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
+            {t('noPlaylists')}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -345,18 +340,25 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                             <span
                               className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
                               style={{
-                                backgroundColor: 'rgba(34,197,94,0.15)',
+                                backgroundColor: 'var(--color-accent-soft-bg)',
                                 color: 'var(--color-accent)',
                               }}
                             >
-                              Đang phát
+                              {t('currentBadge')}
                             </span>
                           )}
                         </p>
-                        <p className="text-xs truncate" style={{ color: 'rgba(248,250,252,0.5)' }}>
-                          {playlist._count?.playlistTracks ?? 0} bài ·{' '}
-                          {formatTotalDuration(playlist.totalDurationMs)} ·{' '}
-                          {playlist.scope === 'ORG' ? 'của chuỗi' : 'của quán'}
+                        <p
+                          className="text-xs truncate"
+                          style={{ color: 'var(--color-foreground-50)' }}
+                        >
+                          {tCommon('playlistMeta.trackCount', {
+                            count: playlist._count?.playlistTracks ?? 0,
+                          })}{' '}
+                          · {formatTotalDuration(playlist.totalDurationMs, tCommon)} ·{' '}
+                          {playlist.scope === 'ORG'
+                            ? tCommon('playlistMeta.scopeOrg')
+                            : tCommon('playlistMeta.scopeStore')}
                         </p>
                       </div>
                     </div>
@@ -369,8 +371,8 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                           style={{ color: 'var(--color-foreground)' }}
                           aria-label={
                             isExpanded
-                              ? `Thu gọn danh sách bài của ${playlist.name}`
-                              : `Xem danh sách bài của ${playlist.name}`
+                              ? t('collapseAriaLabel', { name: playlist.name })
+                              : t('expandAriaLabel', { name: playlist.name })
                           }
                           aria-expanded={isExpanded}
                         >
@@ -392,7 +394,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
                         onClick={() => void playPlaylistFrom(playlist.id, 0, playlist.name)}
                         className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-[filter] duration-[var(--duration-base)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2"
                         style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-                        aria-label={`Phát ${playlist.name} tại ${store.name}`}
+                        aria-label={t('playAriaLabel', { name: playlist.name, store: store.name })}
                       >
                         <svg
                           viewBox="0 0 24 24"
@@ -436,7 +438,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
             border: '1px solid var(--color-border)',
           }}
         >
-          Mở màn hình quán
+          {t('openScreen')}
         </a>
         <a
           href={`/player/${storeId}?kiosk=1`}
@@ -449,7 +451,7 @@ export default function StoreDetail({ storeId }: { storeId: string }) {
             border: '1px solid var(--color-border)',
           }}
         >
-          Màn chiếu TV
+          {t('kioskScreen')}
         </a>
       </section>
     </div>

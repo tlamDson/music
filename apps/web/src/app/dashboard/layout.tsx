@@ -1,14 +1,17 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
 import AppShell from '../../components/layout/AppShell';
 import StoresSyncBridge from '../../components/sync/StoresSyncBridge';
-import { dashboardNavItems } from '../../lib/nav';
+import { dashboardNavItems, settingsPathFor } from '../../lib/nav';
 import type { UserRole } from '@cafe-music/shared';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const tCommon = useTranslations('common');
+  const tNav = useTranslations('nav');
   const router = useRouter();
   const { user, loading, logout } = useAuth();
 
@@ -34,7 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div
           className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
           style={{ borderColor: 'var(--color-accent)' }}
-          aria-label="Đang tải"
+          aria-label={tCommon('loading')}
         />
       </div>
     );
@@ -44,8 +47,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <AppShell
-      navItems={dashboardNavItems(user.role as UserRole)}
+      navItems={dashboardNavItems(user.role as UserRole, tNav)}
       user={{ email: user.email, role: user.role }}
+      settingsHref={settingsPathFor(user.role as UserRole)}
       onLogout={() => {
         logout();
         router.push('/login');

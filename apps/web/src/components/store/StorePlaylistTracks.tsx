@@ -1,9 +1,10 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api-client';
 import TrackTable, { type TrackTableRow } from '../track/TrackTable';
-import { formatTotalDurationExact } from '../../lib/format';
+import { formatPlaylistMeta } from '../../lib/format';
 import type { Playlist, Track } from '@cafe-music/shared';
 
 interface PlaylistTrackRow {
@@ -41,6 +42,8 @@ export default function StorePlaylistTracks({
   onPlayTrack,
   ariaLabel,
 }: StorePlaylistTracksProps) {
+  const t = useTranslations('store.playlistTracks');
+  const tCommon = useTranslations('common');
   const [playlist, setPlaylist] = useState<PlaylistDetailData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,7 +70,7 @@ export default function StorePlaylistTracks({
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-2 p-2" aria-label="Đang tải danh sách bài">
+      <div className="flex flex-col gap-2 p-2" aria-label={t('loadingLabel')}>
         <div className="skeleton h-10 w-full rounded-lg" />
         <div className="skeleton h-10 w-full rounded-lg" />
         <div className="skeleton h-10 w-full rounded-lg" />
@@ -77,8 +80,8 @@ export default function StorePlaylistTracks({
 
   if (!playlist || playlist.playlistTracks.length === 0) {
     return (
-      <p className="text-sm p-4" style={{ color: 'rgba(248,250,252,0.5)' }}>
-        Playlist chưa có bài nào.
+      <p className="text-sm p-4" style={{ color: 'var(--color-foreground-50)' }}>
+        {t('empty')}
       </p>
     );
   }
@@ -91,13 +94,13 @@ export default function StorePlaylistTracks({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs px-1" style={{ color: 'rgba(248,250,252,0.5)' }}>
-        {rows.length} bài · {formatTotalDurationExact(totalDurationMs)}
+      <p className="text-xs px-1" style={{ color: 'var(--color-foreground-50)' }}>
+        {formatPlaylistMeta(tCommon, { count: rows.length, durationMs: totalDurationMs })}
       </p>
       <TrackTable
         rows={rows}
         onPlay={(_row, index) => onPlayTrack(index, playlist.name)}
-        ariaLabel={ariaLabel ?? `Danh sách bài trong ${playlist.name}`}
+        ariaLabel={ariaLabel ?? t('tracksInPlaylist', { name: playlist.name })}
       />
     </div>
   );

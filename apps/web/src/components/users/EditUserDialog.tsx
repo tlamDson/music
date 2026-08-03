@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { api } from '../../lib/api-client';
 import Dialog from '../ui/Dialog';
@@ -35,6 +36,8 @@ export default function EditUserDialog({
   onClose,
   onSaved,
 }: EditUserDialogProps) {
+  const t = useTranslations('dashboard.users');
+  const tCommon = useTranslations('common');
   const [name, setName] = useState(user.name);
   const [role, setRole] = useState(user.role);
   const [storeId, setStoreId] = useState(user.storeId ?? '');
@@ -53,22 +56,26 @@ export default function EditUserDialog({
       });
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update user');
+      setError(err instanceof Error ? err.message : t('editDialog.failed'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} ariaLabel="Sửa người dùng">
+    <Dialog open={open} onClose={onClose} ariaLabel={t('editDialog.title')}>
       <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-          Sửa người dùng
+          {t('editDialog.title')}
         </h2>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="edit-name" className="text-sm" style={{ color: 'rgba(248,250,252,0.7)' }}>
-            Họ tên
+          <label
+            htmlFor="edit-name"
+            className="text-sm"
+            style={{ color: 'var(--color-foreground-70)' }}
+          >
+            {t('fields.fullName')}
           </label>
           <input
             id="edit-name"
@@ -90,9 +97,9 @@ export default function EditUserDialog({
             <label
               htmlFor="edit-role"
               className="text-sm"
-              style={{ color: 'rgba(248,250,252,0.7)' }}
+              style={{ color: 'var(--color-foreground-70)' }}
             >
-              Vai trò
+              {t('fields.role')}
             </label>
             <select
               id="edit-role"
@@ -105,8 +112,8 @@ export default function EditUserDialog({
                 border: '1px solid var(--color-border)',
               }}
             >
-              <option value="STORE_ADMIN">STORE_ADMIN</option>
-              <option value="ORG_ADMIN">ORG_ADMIN</option>
+              <option value="STORE_ADMIN">{tCommon('roles.storeAdmin')}</option>
+              <option value="ORG_ADMIN">{tCommon('roles.orgAdmin')}</option>
             </select>
           </div>
 
@@ -115,9 +122,9 @@ export default function EditUserDialog({
               <label
                 htmlFor="edit-store"
                 className="text-sm"
-                style={{ color: 'rgba(248,250,252,0.7)' }}
+                style={{ color: 'var(--color-foreground-70)' }}
               >
-                Quán
+                {t('fields.store')}
               </label>
               <select
                 id="edit-store"
@@ -130,7 +137,7 @@ export default function EditUserDialog({
                   border: '1px solid var(--color-border)',
                 }}
               >
-                <option value="">— Chưa gán quán —</option>
+                <option value="">{t('noStoreOption')}</option>
                 {stores.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -154,7 +161,7 @@ export default function EditUserDialog({
             className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
             style={{ color: 'var(--color-foreground)' }}
           >
-            Huỷ
+            {tCommon('cancel')}
           </button>
           <button
             type="submit"
@@ -166,7 +173,7 @@ export default function EditUserDialog({
               opacity: saving ? 0.7 : 1,
             }}
           >
-            {saving ? 'Đang lưu...' : 'Lưu'}
+            {saving ? t('editDialog.saving') : t('editDialog.submit')}
           </button>
         </div>
       </form>

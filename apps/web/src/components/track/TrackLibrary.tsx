@@ -1,16 +1,14 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../lib/api-client';
 import { measureAudioDuration } from '../../lib/format';
 import { usePlayer } from '../player/PlayerProvider';
 import TrackTable, { type TrackTableRow } from './TrackTable';
+import TrackMetaDialog from './TrackMetaDialog';
 import type { ApiResponse, Track, UserRole } from '@cafe-music/shared';
-
-interface LibraryTrack extends Track {
-  storeId?: string | null;
-}
 
 interface TrackLibraryProps {
   role: UserRole;
@@ -18,11 +16,15 @@ interface TrackLibraryProps {
 }
 
 export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
-  const [tracks, setTracks] = useState<LibraryTrack[]>([]);
+  const t = useTranslations('track.library');
+  const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [search, setSearch] = useState('');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { current, playTrack, toggle } = usePlayer();
@@ -30,7 +32,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
 
   const fetchTracks = () => {
     api
-      .get<ApiResponse<LibraryTrack[]>>('/tracks')
+      .get<ApiResponse<Track[]>>('/tracks?limit=100')
       .then((res) => setTracks(res.data))
       .catch(() => setTracks([]))
       .finally(() => setLoading(false));
@@ -38,41 +40,72 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
 
   useEffect(fetchTracks, []);
 
-  const uploadFile = async (file: File) => {
-    setUploading(true);
+  const uploadFile = async (file: File, title: string, artist: string) => {
+    setSaving(true);
     try {
       // Backend không parse audio — trình duyệt đo hộ trước khi gửi
       const durationMs = await measureAudioDuration(file);
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('title', file.name.replace(/\.[^.]+$/, ''));
+      formData.append('title', title);
+      if (artist) formData.append('artist', artist);
       formData.append('durationMs', String(durationMs));
 
       await api.postMultipart('/tracks', formData);
       fetchTracks();
-      toast.success(`Đã tải lên "${file.name}"`);
+      toast.success(t('uploaded', { title }));
+      setPendingFile(null);
     } catch (err) {
       toast.error(
         err instanceof Error && err.message
-          ? `Tải lên thất bại: ${err.message}`
-          : 'Tải lên thất bại',
+          ? t('uploadFailedWithReason', { reason: err.message })
+          : t('uploadFailed'),
       );
     } finally {
+      setSaving(false);
       setUploading(false);
     }
   };
 
-  const handleDelete = async (track: LibraryTrack) => {
+  const handlePickFile = (file: File) => {
+    setUploading(true);
+    setPendingFile(file);
+  };
+
+  const handleUpdate = async (title: string, artist: string) => {
+    if (!editingTrack) return;
+    setSaving(true);
     try {
-      await api.delete(`/tracks/${track.id}`);
-      setTracks((prev) => prev.filter((t) => t.id !== track.id));
-      toast.success('Đã xóa bài hát');
-    } catch {
-      toast.error('Xóa thất bại');
+      await api.patch(`/tracks/${editingTrack.id}`, { title, artist: artist || null });
+      setTracks((prev) =>
+        prev.map((row) =>
+          row.id === editingTrack.id ? { ...row, title, artist: artist || null } : row,
+        ),
+      );
+      toast.success(t('saved'));
+      setEditingTrack(null);
+    } catch (err) {
+      toast.error(
+        err instanceof Error && err.message
+          ? t('saveFailedWithReason', { reason: err.message })
+          : t('saveFailed'),
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handlePlay = async (track: LibraryTrack) => {
+  const handleDelete = async (track: Track) => {
+    try {
+      await api.delete(`/tracks/${track.id}`);
+      setTracks((prev) => prev.filter((row) => row.id !== track.id));
+      toast.success(t('deleted'));
+    } catch {
+      toast.error(t('deleteFailed'));
+    }
+  };
+
+  const handlePlay = async (track: Track) => {
     if (current?.id === track.id) {
       toggle();
       return;
@@ -91,12 +124,12 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
         { mode: 'preview' },
       );
     } catch {
-      toast.error(`Không phát được "${track.title}"`);
+      toast.error(t('playFailed', { title: track.title }));
     }
   };
 
-  // Quán chỉ được xóa nhạc của chính quán; track chung là của cả chuỗi
-  const canDelete = (track: LibraryTrack) => !isStore || track.storeId === storeId;
+  // Quán chỉ được sửa/xóa nhạc của chính quán; track chung là của cả chuỗi
+  const canModify = (track: Track) => !isStore || track.storeId === storeId;
 
   const visible = tracks.filter((track) =>
     `${track.title} ${track.artist ?? ''}`.toLowerCase().includes(search.trim().toLowerCase()),
@@ -118,7 +151,7 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
             opacity: uploading ? 0.7 : 1,
           }}
         >
-          {uploading ? 'Đang tải lên...' : 'Tải bài hát lên'}
+          {uploading ? t('uploading') : t('uploadButton')}
         </button>
 
         <div
@@ -131,16 +164,16 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
             e.preventDefault();
             setDragOver(false);
             const file = e.dataTransfer.files[0];
-            if (file) void uploadFile(file);
+            if (file) handlePickFile(file);
           }}
           className="px-4 py-2 rounded-full text-xs transition-colors duration-[var(--duration-base)]"
           style={{
             border: `1px dashed ${dragOver ? 'var(--color-accent)' : 'var(--color-border)'}`,
             backgroundColor: dragOver ? 'rgba(34,197,94,0.05)' : 'transparent',
-            color: 'rgba(248,250,252,0.5)',
+            color: 'var(--color-foreground-50)',
           }}
         >
-          hoặc kéo file vào đây · MP3, M4A, WAV, FLAC, OGG · tối đa 50MB
+          {t('dropHint')}
         </div>
 
         <input
@@ -148,10 +181,11 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
           type="file"
           accept="audio/*"
           className="hidden"
-          aria-label="Chọn file nhạc"
+          aria-label={t('filePickerLabel')}
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) void uploadFile(file);
+            if (file) handlePickFile(file);
+            e.target.value = '';
           }}
         />
 
@@ -159,8 +193,8 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm bài hát..."
-          aria-label="Tìm bài hát"
+          placeholder={t('searchPlaceholder')}
+          aria-label={t('searchAriaLabel')}
           className="flex-1 min-w-48 px-4 py-2 rounded-full text-sm outline-none"
           style={{
             backgroundColor: 'var(--color-muted)',
@@ -171,45 +205,49 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
       </div>
 
       {isStore && (
-        <p className="text-xs" style={{ color: 'rgba(248,250,252,0.5)' }}>
-          Nhạc bạn tải lên chỉ quán bạn nghe được; nhạc của chuỗi thì mọi quán dùng chung.
+        <p className="text-xs" style={{ color: 'var(--color-foreground-50)' }}>
+          {t('storeUploadNote')}
         </p>
       )}
 
       {loading ? (
-        <div className="flex flex-col gap-2" aria-label="Đang tải kho nhạc">
+        <div className="flex flex-col gap-2" aria-label={t('loadingLabel')}>
           <div className="skeleton h-12 w-full" />
           <div className="skeleton h-12 w-full" />
           <div className="skeleton h-12 w-full" />
         </div>
       ) : visible.length === 0 ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.5)' }}>
-          Chưa có bài hát nào.
+        <p className="text-sm" style={{ color: 'var(--color-foreground-50)' }}>
+          {t('empty')}
         </p>
       ) : (
         <div className="rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
           <TrackTable
             rows={trackTableRows}
-            onPlay={(row) => void handlePlay(row.track as LibraryTrack)}
-            onRemove={(row) => void handleDelete(row.track as LibraryTrack)}
-            canRemove={(row) => canDelete(row.track as LibraryTrack)}
+            onPlay={(row) => void handlePlay(row.track)}
+            onEdit={(row) => setEditingTrack(row.track)}
+            canEdit={(row) => canModify(row.track)}
+            onRemove={(row) => void handleDelete(row.track)}
+            canRemove={(row) => canModify(row.track)}
             extraColumns={[
               {
                 key: 'scope',
-                header: 'Phạm vi',
+                header: t('scopeHeader'),
                 headerClassName: 'w-32 px-4 py-2 text-xs font-normal',
                 cellClassName: 'px-4 py-3',
                 render: (row) => {
-                  const storeId = (row.track as LibraryTrack).storeId;
+                  const rowStoreId = row.track.storeId;
                   return (
                     <span
                       className="text-xs px-2 py-1 rounded-full whitespace-nowrap"
                       style={{
-                        backgroundColor: storeId ? 'rgba(67,56,202,0.25)' : 'rgba(34,197,94,0.15)',
-                        color: storeId ? 'var(--color-secondary)' : 'var(--color-accent)',
+                        backgroundColor: rowStoreId
+                          ? 'var(--color-secondary-soft-bg)'
+                          : 'var(--color-accent-soft-bg)',
+                        color: rowStoreId ? 'var(--color-secondary)' : 'var(--color-accent)',
                       }}
                     >
-                      {storeId ? 'Của quán' : 'Của chuỗi'}
+                      {rowStoreId ? t('scopeStore') : t('scopeOrg')}
                     </span>
                   );
                 },
@@ -218,6 +256,31 @@ export default function TrackLibrary({ role, storeId }: TrackLibraryProps) {
           />
         </div>
       )}
+
+      <TrackMetaDialog
+        open={pendingFile !== null}
+        mode="upload"
+        defaultTitle={pendingFile ? pendingFile.name.replace(/\.[^.]+$/, '') : ''}
+        defaultArtist=""
+        saving={saving}
+        onSubmit={({ title, artist }) => {
+          if (pendingFile) void uploadFile(pendingFile, title, artist);
+        }}
+        onClose={() => {
+          setPendingFile(null);
+          setUploading(false);
+        }}
+      />
+
+      <TrackMetaDialog
+        open={editingTrack !== null}
+        mode="edit"
+        defaultTitle={editingTrack?.title ?? ''}
+        defaultArtist={editingTrack?.artist ?? ''}
+        saving={saving}
+        onSubmit={({ title, artist }) => void handleUpdate(title, artist)}
+        onClose={() => setEditingTrack(null)}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import Dialog from '../ui/Dialog';
 
@@ -29,6 +30,8 @@ export default function DeactivateUserDialog({
   onClose,
   onConfirmed,
 }: DeactivateUserDialogProps) {
+  const t = useTranslations('dashboard.users');
+  const tCommon = useTranslations('common');
   const [confirmText, setConfirmText] = useState('');
 
   const expected = storeName ?? user.name;
@@ -40,24 +43,25 @@ export default function DeactivateUserDialog({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} ariaLabel="Vô hiệu hoá tài khoản">
+    <Dialog open={open} onClose={handleClose} ariaLabel={t('deactivateDialog.title')}>
       <h2 className="text-lg font-semibold" style={{ color: 'var(--color-foreground)' }}>
-        Vô hiệu hoá tài khoản
+        {t('deactivateDialog.title')}
       </h2>
 
-      <p className="text-sm" style={{ color: 'rgba(248,250,252,0.7)' }}>
-        Tài khoản <strong>{user.name}</strong> sẽ không đăng nhập được nữa cho tới khi kích hoạt
-        lại.
+      <p className="text-sm" style={{ color: 'var(--color-foreground-70)' }}>
+        {t('deactivateDialog.warningPrefix')} <strong>{user.name}</strong>{' '}
+        {t('deactivateDialog.warningSuffix')}
       </p>
 
       {storeName ? (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.7)' }}>
-          Gõ đúng tên quán <strong>{storeName}</strong> để xác nhận.
+        <p className="text-sm" style={{ color: 'var(--color-foreground-70)' }}>
+          {t('deactivateDialog.typeStorePrefix')} <strong>{storeName}</strong>{' '}
+          {t('deactivateDialog.typeSuffix')}
         </p>
       ) : (
-        <p className="text-sm" style={{ color: 'rgba(248,250,252,0.7)' }}>
-          Người dùng này chưa được gán vào quán nào — gõ tên người dùng <strong>{user.name}</strong>{' '}
-          để xác nhận.
+        <p className="text-sm" style={{ color: 'var(--color-foreground-70)' }}>
+          {t('deactivateDialog.typeUserFallbackPrefix')} <strong>{user.name}</strong>{' '}
+          {t('deactivateDialog.typeSuffix')}
         </p>
       )}
 
@@ -65,9 +69,9 @@ export default function DeactivateUserDialog({
         <label
           htmlFor="deactivate-confirm-input"
           className="text-sm"
-          style={{ color: 'rgba(248,250,252,0.7)' }}
+          style={{ color: 'var(--color-foreground-70)' }}
         >
-          Gõ để xác nhận
+          {t('deactivateDialog.confirmLabel')}
         </label>
         <input
           id="deactivate-confirm-input"
@@ -91,7 +95,7 @@ export default function DeactivateUserDialog({
           className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-80"
           style={{ color: 'var(--color-foreground)' }}
         >
-          Huỷ
+          {tCommon('cancel')}
         </button>
         <button
           type="button"
@@ -100,7 +104,7 @@ export default function DeactivateUserDialog({
           className="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-opacity duration-[var(--duration-fast)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           style={{ backgroundColor: 'var(--color-destructive)', color: 'white' }}
         >
-          Vô hiệu hoá
+          {t('deactivate')}
         </button>
       </div>
     </Dialog>

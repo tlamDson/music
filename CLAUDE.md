@@ -20,11 +20,13 @@ Chi tiết merge policy: [.claude/rules/workflow.md](.claude/rules/workflow.md).
 
 ## Trạng thái dự án
 
-Đang chuẩn bị release production đầu tiên (`v0.1.0`). **Phase 0 (code readiness) và Phase 1 (staging) đã xong**; **phần code của Phase 2 cũng xong** — còn lại là thao tác hạ tầng. Staging chạy live trên Railway (backend + Postgres + Redis) + Vercel (web, nhánh `develop`) + Cloudflare R2 (track), đã verify end-to-end (login → dashboard).
+**Production đã live.** Launch đầu tiên ra `v0.1.0` (2026-08-01, tag + GitHub Release trên `main`). Phase 0 (code readiness), Phase 1 (staging) và Phase 2 (production) đều xong. Hai môi trường chạy song song: `develop` → staging, `main` → production, mỗi bên có Railway (backend + Postgres + Redis) + Vercel + bucket R2 riêng.
 
-Bốn việc chặn launch đã đóng (PR #68–#72): rate limit login **chặn được brute-force thật** (đã đo trên staging), Sentry cho backend + web, backup DB hai lớp kèm bài test restore đã chạy thật, và `README.md` ghi cách deploy/rollback/restore. Version đã bump `0.1.0` + có `CHANGELOG.md`.
+Release đang cắt: **`v0.2.0`** — đợt QC responsive + kho nhạc + trang Cài đặt + i18n vi/en (PR #76–#93), **không có migration database**.
 
-Xem [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) để biết domain/trạng thái, cạm bẫy, và **checklist Phase 2** (provision R2/Sentry/Railway prod/Vercel → set biến → test restore là GATE → cắt release → bootstrap admin → smoke test). Đọc file đó trước khi bắt tay vào việc liên quan deploy/staging/release.
+**Release luôn là hai PR**, vì không được commit thẳng vào `develop`: PR `chore: prepare the vX.Y.Z release` vào `develop` (bump version ở **ba** `package.json` của `apps/backend`, `apps/web`, `packages/shared` — root không có field `version` — cộng `CHANGELOG.md`), rồi PR `chore: release vX.Y.Z to production` từ `develop` vào `main`. **Chỉ chủ repo merge vào `main`**; PR nhắm `main` luôn build Docker image thật.
+
+Xem [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) để biết domain/trạng thái, cạm bẫy, quy trình **Cắt release** và lịch sử release. Đọc file đó trước khi bắt tay vào việc liên quan deploy/staging/release.
 
 **Deploy staging là tự động, kể cả migration.** Merge vào `develop` → Railway build lại → `apps/backend/docker-entrypoint.sh` chạy `prisma migrate deploy` rồi mới khởi động app. **Đừng báo với người dùng là họ phải chạy `migrate deploy` tay** — chỉ cần khi migration lỗi làm container crash-loop; cách chạy tay ở [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) cạm bẫy #15.
 
@@ -80,6 +82,23 @@ Nợ đã biết (không đổi): chưa có bảng `Artist` nên không có cộ
 - **#72 — hai bug của chính script backup, chỉ lộ ra khi chạy thật trong image của workflow.** `date -d "-30 days"` là cú pháp GNU, BusyBox của Alpine từ chối → retention không bao giờ chạy và job đỏ **sau khi** đã upload xong. Và dump của `pg_dump >= 17` không restore được vào server cũ hơn — mà DB dev trong `docker-compose` là **PG16** còn Railway là **PG18**, nên hướng dẫn restore ở #70 luôn fail. **Bài học: script vận hành phải được chạy thật trong đúng image sẽ chạy nó**, đọc code không thấy hai lỗi này.
 
 **Bài học chung của đợt QC playback:** ba trong bốn lỗi QC là **lỗi phạm vi/lớp, không phải lỗi logic** — một thẻ audio dùng chung mà nhiều nguồn ghi vào, một lệnh không mang `storeId`, một z-index chọn tuỳ file. Khi thêm nguồn sự kiện hay lớp nổi mới, hỏi trước: _ai sở hữu tài nguyên này, và ai được phép ghi vào nó?_
+
+**PR #79–#92 (QC responsive iPhone + kho nhạc + trang Cài đặt, 11/12 PR) đã merge vào `develop`:**
+
+Xuất phát từ QC log trên iPhone 14 Pro Max: trang Users còn tiếng Anh và hai nút lệch cao, ô input trang Quán/Playlist bị hiểu nhầm là ô lọc trong khi thực chất là form tạo mới, kho nhạc tràn ngang vì tên bài dài, dashboard quán chạy ngang trên mobile.
+
+- **#79 — nút "Sửa"/"Vô hiệu hoá" lệch cao vì hàng user không có breakpoint nào**, chữ "Vô hiệu hoá" xuống dòng ở 430px. Fix bằng `flex-col sm:flex-row` + một class `whitespace-nowrap min-h-9` dùng chung cho cả hai nút. Dịch toàn bộ trang sang tiếng Việt, chuyển form tạo user từ panel inline sang `Dialog`.
+- **#80, #83 — ô input trên trang danh sách phải luôn là ô lọc, "Thêm" luôn mở dialog riêng.** Trang Quán và Playlist trước đó dùng chung một ô input cho cả lọc lẫn tạo mới (gõ tên rồi bấm "Thêm quán"/"Tạo playlist" ngay cạnh) — người dùng tưởng gõ để tìm. `CreateStoreDialog`/`CreatePlaylistDialog` tách ra, ô input còn lại là lọc thuần (client-side cho Quán, `?q=` debounce có sẵn cho Playlist).
+- **#84, #85 — kho nhạc tràn ngang vì `table-layout: auto`, không phải vì thiếu CSS cắt chữ.** `TrackRow` có `truncate` sẵn nhưng `<table>` mặc định `table-layout: auto` nên ô tiêu đề tự nở theo nội dung — `truncate` không bao giờ có cơ hội chạy. Đổi sang `table-fixed` mới là fix thật. Tiện thể thêm ca sĩ: `Track.artist` đã có sẵn trong schema từ trước (không cần migration), chỉ thiếu `PATCH /tracks/:id` (#84) và dialog điền tên bài + ca sĩ trước khi upload (#85, `TrackMetaDialog.tsx`, dùng chung cho cả lúc tạo lẫn sửa).
+- **#86 — dashboard quán chạy ngang trên mobile** vì `StoresOverview` dùng `flex overflow-x-auto` với card `w-64` cố định, không breakpoint. Xếp dọc dưới `md`, giữ rail ngang từ `md` trở lên.
+- **#87 — ViewToggle danh sách/lưới cho Quán + Playlist**, nhớ lựa chọn qua `useViewMode` (localStorage theo từng trang, đọc trong `useEffect` không phải lúc render vì SSR không có `localStorage`).
+- **#88 — thêm `/me` (hồ sơ + đổi mật khẩu tự phục vụ), lộ ra một bug thật:** `@CurrentUser()` khai kiểu `JwtPayload` (có field `sub`) nhưng `JwtStrategy.validate()` trả thẳng bản ghi Prisma `User` (có `id`, không có `sub`) — mọi chỗ dùng trước giờ chỉ đọc `role`/`organizationId`/`storeId`/`email` (trùng cả hai phía) nên không ai va phải. Sửa bằng tra theo `user.email` thay vì `user.sub`. Chi tiết ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _`@CurrentUser()` khai kiểu `JwtPayload` nhưng runtime là bản ghi Prisma `User`_.
+- **#89 — trang Cài đặt (`/dashboard/settings`, `/store/settings`), lộ ra một bug thật thứ hai:** `api-client.ts` tự đăng xuất + redirect `/login` trên **mọi** `401` ngoài `/auth/login` — nhưng `PATCH /me/password` trả `401` hợp lệ khi gõ sai mật khẩu hiện tại, không phải phiên hết hạn. Thiếu ngoại lệ thì gõ sai mật khẩu cũ một lần là bị đá thẳng ra màn login thay vì thấy lỗi tại chỗ. Thêm `/me/password` vào danh sách loại trừ, cùng chỗ với `/auth/login`.
+- **#90 — rút 94 chỗ `rgba(248,250,252,*)`/`rgba(34,197,94,0.15)`/`rgba(67,56,202,0.25)` viết tay rải rác ở 34 file ra token semantic** (`--color-foreground-90/70/60/50/40/25/08`, `--color-accent-soft-bg`, `--color-secondary-soft-bg` trong `globals.css`). Thuần refactor, không đổi pixel nào — chuẩn bị cho PR light theme chỉ cần đổi giá trị token ở `:root[data-theme='light']` thay vì rà lại từng file.
+
+- **#92 — i18n song ngữ vi/en cho toàn bộ `apps/web`** (`next-intl`, locale qua cookie `NEXT_LOCALE`, mặc định `vi`, đổi ở trang Cài đặt qua `LanguageSection.tsx` — ghi cookie + `router.refresh()`, không reload cứng). ~40 file / 150+ chuỗi được chuyển sang `useTranslations()`; các hàm thuần không gọi được hook (`lib/nav.ts`, `lib/roles.ts`, `lib/format.ts`) nhận `Translator` làm tham số thay vì tự đọc `messages`. `messages/vi.json` copy nguyên văn chuỗi cũ nên 33 file test hiện có không cần sửa assertion, chỉ 3 file cần sửa vì đổi chữ ký hàm (`nav.test.ts`, `AppShell.test.tsx`) hoặc vì nội dung thật đổi từ tiếng Anh sang tiếng Việt (`LoginForm.test.tsx`). `app/global-error.tsx` **cố tình** giữ tiếng Việt hardcode — là Client Component đứng ngoài layout gốc, không đọc được cookie locale. Chi tiết đầy đủ (namespace, `formatPlaylistMeta`, cạm bẫy approximate-vs-exact duration) ở [.claude/rules/tech-defaults.md](.claude/rules/tech-defaults.md) mục _i18n — song ngữ vi/en_.
+
+**Còn 1/12 PR chưa xong:** PR light theme **đang chờ** người dùng tải bộ color token mã nguồn mở (Radix Colors/Catppuccin/Base16 — đã chốt không tự bịa hay bê theme Notion/Spotify) vào một thư mục trong repo. Xem kế hoạch gốc khi bắt tay vào.
 
 ## MCP Servers
 

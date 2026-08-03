@@ -10,6 +10,13 @@ import { useEffect } from 'react';
  *
  * `global-error` thay thế cả root layout khi nó render, nên phải tự dựng
  * `<html>`/`<body>`.
+ *
+ * **Ngoại lệ có chủ đích, không dùng next-intl ở đây (PR i18n).** File này bắt
+ * buộc là Client Component (Next.js yêu cầu `error`/`reset` props phải vậy) và
+ * đứng ngoài cây layout gốc — không gọi được `cookies()` từ `next/headers` để
+ * đọc locale (server-only). Thêm logic đọc `document.cookie` phía client vào
+ * đúng chỗ ứng dụng đã crash là rủi ro không đáng cho một màn hình hiếm gặp.
+ * Giữ nguyên tiếng Việt hardcode + `lang="vi"`.
  */
 export default function GlobalError({ error }: { error: Error }) {
   useEffect(() => {
