@@ -15,14 +15,20 @@
     "build": "tsc -p tsconfig.build.json",
     "build:watch": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src test",
+    "test:unit": "jest --config jest.config.ts --passWithNoTests",
+    "test:unit:watch": "jest --config jest.config.ts --watch",
+    "test:cov": "jest --config jest.config.ts --coverage"
   },
   "dependencies": {
     "zod": "^3.25.67"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
+    "@types/jest": "^30.0.0",
     "eslint": "^9.18.0",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.4.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.20.0"
   }
