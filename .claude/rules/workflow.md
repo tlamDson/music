@@ -135,6 +135,28 @@ Quy ước bổ sung rút ra khi làm store console:
 
 Coverage >= 80% cho file mới. Test độc lập (reset state trong `beforeEach`/`afterEach`), assertion cụ thể theo hành vi. Không skip test bằng `test.skip` mà không giải thích lý do. Không commit code mới thiếu test.
 
+### Integration test — Postgres + Redis thật, tầng giữa unit và e2e
+
+`apps/backend/test/integration/` (5 suite / 76 test) boot **AppModule thật** với Postgres 5433 + Redis 6380 (`docker compose up -d postgres_test redis_test`), gọi qua HTTP bằng supertest. Chạy: `pnpm --filter @cafe-music/backend test:integration`. CI có job riêng `Integration Tests` (dùng `services:`, **không** nằm trong 3 required check).
+
+**Viết ở tầng này khi câu hỏi là về thứ mock không chứng minh được:**
+
+- Mệnh đề `where` có thật sự lọc theo `organizationId`/`storeId` không (mock Prisma trả đúng thứ bạn bảo nó trả — `where` thiếu điều kiện vẫn xanh).
+- Ràng buộc DB thật: unique constraint (`reorderTracks` hai pha), cascade (`onDelete: Cascade`), `mode: 'insensitive'` (ngữ nghĩa ILIKE của Postgres).
+- Luồng JWT thật: `JwtStrategy.validate()` trả bản ghi Prisma `User` chứ không phải `JwtPayload` (mock không phân biệt hai shape); token còn hạn của tài khoản vừa `isActive: false` phải bị chặn ngay.
+- Phân biệt 404 (không lộ tồn tại) vs 403 (có tồn tại nhưng cấm) qua HTTP thật.
+
+**Cạm bẫy boot AppModule dưới Jest** (đã đóng gói hết trong `test/integration/helpers/app.ts` — dùng `createIntegrationApp()`, đừng tự dựng lại):
+
+- Phải gọi `installBigIntJsonSupport()` + `setGlobalPrefix('api/v1')` — cả hai nằm ở `main.ts`, không nằm trong `AppModule`.
+- `SyncGateway.server` là `undefined` khi chỉ `app.init()` (không `listen`) → override gateway.
+- `RedisService` không có `OnModuleDestroy` → phải `quit()` tay; cả nó lẫn `RedisThrottlerStorage` dùng `lazyConnect` nên `quit()` trên client chưa từng kết nối ném `Connection is closed` (nuốt đúng lỗi đó).
+- Timer auto-next của `SyncService` (map private `advanceTimers`) giữ Jest sống → clear trong teardown.
+- **Tắt rate limit phải stub `RedisThrottlerStorage`, KHÔNG phải `overrideGuard(ThrottlerGuard)`** — guard đăng ký `{ provide: APP_GUARD, useClass: ThrottlerGuard }` nên token là `APP_GUARD`, `overrideGuard` không chạm được (đã thử: suite auth ăn 429 từ throttle 5 login/60s theo email).
+- `setup.ts` chỉ nhận URL chứa `cafe_music_test` — chặn cứng việc TRUNCATE nhầm DB dev; env đầy đủ nằm ở `env.setup.ts` (`setupFiles`), không dựa vào `.env` (CI không có file đó).
+
+**Nợ đã ghim bằng test** (xem `playlists.scope.spec.ts` khối `KNOWN GAP`): `findAll` playlist lọc theo quán cho STORE_ADMIN nhưng `findOne`/`update`/`remove` chỉ lọc `organizationId` — admin quán 1 đọc/sửa/xoá được playlist STORE của quán 2 nếu biết id. Test ghim đúng hiện trạng; sửa hay giữ là quyết định của chủ repo.
+
 ### Coverage được CI enforce (đừng chỉ nhìn `test:unit`)
 
 CI chạy **`pnpm turbo test:cov`**, không phải `test:unit` — cùng bộ test nhưng kèm `--coverage`, nên `coverageThreshold` trong `jest.config.ts` là **điều kiện merge thật sự**. Chạy `pnpm turbo test:cov` ở local trước khi push nếu PR đụng nhiều file nguồn.
