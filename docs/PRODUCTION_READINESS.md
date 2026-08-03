@@ -1,7 +1,7 @@
 # Production Readiness — Trạng thái & Bước tiếp theo
 
 > File này là **điểm bắt đầu** cho bất kỳ ai (người hoặc AI) tiếp tục việc đưa dự án lên production.
-> Cập nhật lần cuối: 2026-07-30 · Nhánh chuẩn: `develop`
+> Cập nhật lần cuối: 2026-08-03 · Nhánh chuẩn: `develop`
 
 ## TL;DR
 
@@ -11,9 +11,9 @@ Hạ tầng đích: **Vercel** (web) · **Railway** (backend + Postgres + Redis)
 | ----- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | **0** | Code readiness — vá blocker config/security, migration, Dockerfile, CI, health check, logging         | ✅ **Xong** (10 PR, #9–#18)                                           |
 | **1** | Staging — dựng Railway env `staging` + R2 bucket + Vercel preview, seed tài khoản, test tay           | ✅ **Live** (2026-07-25) — xem "Trạng thái staging hiện tại" bên dưới |
-| **2** | Production — provision prod, cắt release `v0.1.0` (tag + GitHub Release), bootstrap admin, smoke test | 🔶 **Code đã sẵn sàng** — chờ provision hạ tầng, xem Phase 2 bên dưới |
+| **2** | Production — provision prod, cắt release `v0.1.0` (tag + GitHub Release), bootstrap admin, smoke test | ✅ **Live** (2026-08-01) — checklist Phase 2 giữ lại làm tham chiếu   |
 
-**Việc code chặn launch đã xong hết:** rate limit login đã chặn thật (#68, #69 — đã verify trên staging), Sentry + backup + README deploy/rollback (#70), version bump `0.1.0` + `CHANGELOG.md`. Còn lại là **thao tác hạ tầng**, xem Phase 2.
+**Production đã chạy.** Lần launch đầu ra `v0.1.0` (tag + GitHub Release, commit `7cc84ed` trên `main`). Checklist Phase 2 bên dưới giữ nguyên làm tham chiếu cho lần dựng environment mới; **release lần thứ hai trở đi chỉ cần mục [Cắt release](#4-cắt-release)**.
 
 ---
 
@@ -189,7 +189,9 @@ Biến của web (Vercel): `NEXT_PUBLIC_API_URL` (**có** `/api/v1`) và `NEXT_P
 
 ---
 
-## Phase 2 — Production + release `v0.1.0`
+## Phase 2 — Production + release đầu tiên (`v0.1.0`)
+
+> ✅ **Đã chạy xong 2026-08-01.** Bước 1–3 và 5 là việc **một lần** — giữ lại làm tham chiếu cho lần dựng environment mới, không phải làm lại mỗi release. Release lần thứ hai trở đi: nhảy thẳng tới [bước 4](#4-cắt-release).
 
 Thứ tự dưới đây **quan trọng**: `NEXT_PUBLIC_*` của Vercel bake vào lúc build (cạm bẫy #11) và CORS backend chỉ nhận đúng một origin `WEB_URL`, nên cả hai domain phải biết trước khi merge release.
 
@@ -200,7 +202,7 @@ Thứ tự dưới đây **quan trọng**: `NEXT_PUBLIC_*` của Vercel bake và
 - [ ] **Railway**: environment `production` trong project `awake-endurance`, **Postgres + Redis mới**, service `backend` deploy từ nhánh `main`, healthcheck `/api/v1/health` (**liveness**, không phải `/health/ready` — cạm bẫy #3), **bật Backups cho Postgres**.
 - [ ] **Vercel**: xác nhận Production Branch = `main` và domain production thật (Settings → Domains) — đừng đoán.
 
-⚠️ `main` đang **sau `develop` rất nhiều commit**. Deploy production đầu tiên sẽ build code cũ và có thể fail — bình thường, nó build lại đúng khi release PR merge. Muốn tránh log đỏ thì tạm tắt auto-deploy, bật lại trước bước 3.
+⚠️ Lúc provision lần đầu, `main` còn **sau `develop` rất nhiều commit** nên deploy production đầu tiên build code cũ và có thể fail — bình thường, nó build lại đúng khi release PR merge. Muốn tránh log đỏ thì tạm tắt auto-deploy, bật lại trước bước 3.
 
 ### 2. Set biến môi trường
 
@@ -227,11 +229,23 @@ GitHub secrets (cho workflow backup): `PROD_DATABASE_URL` (phải là `DATABASE_
 
 ### 4. Cắt release
 
-Version đã bump `0.1.0` và `CHANGELOG.md` đã viết. Mở PR `develop → main`, title `chore: release v0.1.0 to production`.
+**Quy trình này dùng lại cho mọi release**, không riêng lần đầu. Luôn là **hai PR**, vì không được commit thẳng vào `develop`:
 
-→ **Chỉ chủ repo được merge vào `main`.** Merge xong: Railway build + tự chạy `prisma migrate deploy` qua entrypoint (cạm bẫy #15 — đừng chạy tay), Vercel build production.
+1. **PR chuẩn bị** vào `develop` — title `chore: prepare the vX.Y.Z release`. Bump `"version"` ở **ba** file `apps/backend/package.json`, `apps/web/package.json`, `packages/shared/package.json` (root `package.json` là `private`, **không có** field `version`), viết mục mới trong `CHANGELOG.md`, cập nhật `CLAUDE.md` + file này nếu trạng thái đổi. Merge khi cả 3 CI job xanh.
+2. **PR release** `develop → main` — title `chore: release vX.Y.Z to production`.
+   → **Chỉ chủ repo được merge vào `main`.** PR nhắm `main` **luôn** build Docker image thật (`ci-pr.yml` có `github.base_ref == 'main'` trong `SHOULD_BUILD`), đừng tin vào paths-filter.
+   → Merge xong: Railway build + tự chạy `prisma migrate deploy` qua entrypoint (cạm bẫy #15 — đừng chạy tay), Vercel build production.
 
-- [ ] Tạo tag + GitHub Release `v0.1.0` làm mốc rollback.
+- [ ] Kiểm trước khi mở PR release: `git diff --name-only origin/main origin/develop -- apps/backend/prisma` — **rỗng nghĩa là release không có migration**, ghi rõ điều đó vào PR body để người merge biết mức rủi ro.
+- [ ] Kiểm biến môi trường mới: `git diff origin/main origin/develop -- apps/backend/src/config/env.schema.ts` — có thay đổi thì **set biến trên Railway/Vercel TRƯỚC khi merge**, không thì backend crash lúc boot vì env validation.
+- [ ] Tạo tag + GitHub Release `vX.Y.Z` trên `main` làm mốc rollback.
+
+**Lịch sử release:**
+
+| Version  | Ngày       | Ghi chú                                                                                    |
+| -------- | ---------- | ------------------------------------------------------------------------------------------ |
+| `v0.1.0` | 2026-08-01 | Launch production đầu tiên (PR #75, commit `7cc84ed`)                                      |
+| `v0.2.0` | 2026-08-03 | QC responsive + kho nhạc + trang Cài đặt + i18n vi/en (PR #76–#93). Không có migration mới |
 
 ### 5. Bootstrap tài khoản đầu tiên
 

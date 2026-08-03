@@ -20,11 +20,13 @@ Chi tiết merge policy: [.claude/rules/workflow.md](.claude/rules/workflow.md).
 
 ## Trạng thái dự án
 
-Đang chuẩn bị release production đầu tiên (`v0.1.0`). **Phase 0 (code readiness) và Phase 1 (staging) đã xong**; **phần code của Phase 2 cũng xong** — còn lại là thao tác hạ tầng. Staging chạy live trên Railway (backend + Postgres + Redis) + Vercel (web, nhánh `develop`) + Cloudflare R2 (track), đã verify end-to-end (login → dashboard).
+**Production đã live.** Launch đầu tiên ra `v0.1.0` (2026-08-01, tag + GitHub Release trên `main`). Phase 0 (code readiness), Phase 1 (staging) và Phase 2 (production) đều xong. Hai môi trường chạy song song: `develop` → staging, `main` → production, mỗi bên có Railway (backend + Postgres + Redis) + Vercel + bucket R2 riêng.
 
-Bốn việc chặn launch đã đóng (PR #68–#72): rate limit login **chặn được brute-force thật** (đã đo trên staging), Sentry cho backend + web, backup DB hai lớp kèm bài test restore đã chạy thật, và `README.md` ghi cách deploy/rollback/restore. Version đã bump `0.1.0` + có `CHANGELOG.md`.
+Release đang cắt: **`v0.2.0`** — đợt QC responsive + kho nhạc + trang Cài đặt + i18n vi/en (PR #76–#93), **không có migration database**.
 
-Xem [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) để biết domain/trạng thái, cạm bẫy, và **checklist Phase 2** (provision R2/Sentry/Railway prod/Vercel → set biến → test restore là GATE → cắt release → bootstrap admin → smoke test). Đọc file đó trước khi bắt tay vào việc liên quan deploy/staging/release.
+**Release luôn là hai PR**, vì không được commit thẳng vào `develop`: PR `chore: prepare the vX.Y.Z release` vào `develop` (bump version ở **ba** `package.json` của `apps/backend`, `apps/web`, `packages/shared` — root không có field `version` — cộng `CHANGELOG.md`), rồi PR `chore: release vX.Y.Z to production` từ `develop` vào `main`. **Chỉ chủ repo merge vào `main`**; PR nhắm `main` luôn build Docker image thật.
+
+Xem [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) để biết domain/trạng thái, cạm bẫy, quy trình **Cắt release** và lịch sử release. Đọc file đó trước khi bắt tay vào việc liên quan deploy/staging/release.
 
 **Deploy staging là tự động, kể cả migration.** Merge vào `develop` → Railway build lại → `apps/backend/docker-entrypoint.sh` chạy `prisma migrate deploy` rồi mới khởi động app. **Đừng báo với người dùng là họ phải chạy `migrate deploy` tay** — chỉ cần khi migration lỗi làm container crash-loop; cách chạy tay ở [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) cạm bẫy #15.
 
