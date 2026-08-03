@@ -11,6 +11,7 @@
     "test": "jest --passWithNoTests",
     "test:unit": "jest --passWithNoTests",
     "test:unit:watch": "jest --watch",
+    "test:cov": "jest --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },

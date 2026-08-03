@@ -23,6 +23,12 @@
       "inputs": ["src/**", "test/unit/**", "__tests__/unit/**"],
       "outputs": ["coverage/**", ".turbo/**"]
     },
+    "test:cov": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "test/unit/**", "__tests__/unit/**"],
+      "outputs": ["coverage/**"]
+    },
     "test:integration": {
       "cache": false,
       "dependsOn": ["^build"]

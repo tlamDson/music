@@ -8,6 +8,7 @@
     "typecheck": "turbo typecheck",
     "test": "turbo test:unit",
     "test:unit": "turbo test:unit",
+    "test:cov": "turbo test:cov",
     "test:integration": "turbo test:integration",
     "test:e2e": "turbo test:e2e",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\" --ignore-path .gitignore"

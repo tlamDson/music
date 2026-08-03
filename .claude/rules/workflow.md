@@ -135,6 +135,18 @@ Quy ước bổ sung rút ra khi làm store console:
 
 Coverage >= 80% cho file mới. Test độc lập (reset state trong `beforeEach`/`afterEach`), assertion cụ thể theo hành vi. Không skip test bằng `test.skip` mà không giải thích lý do. Không commit code mới thiếu test.
 
+### Coverage được CI enforce (đừng chỉ nhìn `test:unit`)
+
+CI chạy **`pnpm turbo test:cov`**, không phải `test:unit` — cùng bộ test nhưng kèm `--coverage`, nên `coverageThreshold` trong `jest.config.ts` là **điều kiện merge thật sự**. Chạy `pnpm turbo test:cov` ở local trước khi push nếu PR đụng nhiều file nguồn.
+
+Trước đây step CI chạy `test:unit` (không có `--coverage`) trong khi config vẫn ghi ngưỡng 80/80/70/80 — **ngưỡng nằm chết, chưa bao giờ được kiểm**, và step upload artifact thì upload thư mục rỗng. Bật lên mới lộ ra số thật: backend `functions` chỉ **71.22%** chứ không phải >= 80%.
+
+**Ngưỡng là sàn chống tụt, không phải mục tiêu.** Đặt bằng số đo thật làm tròn xuống (baseline 2026-08-03 ghi trong [docs/DEVELOPER_GUIDE.md](../../docs/DEVELOPER_GUIDE.md) mục _Coverage_). Khi một PR làm tăng độ phủ thật thì nâng sàn lên theo; đừng đặt sàn cao hơn thực tế rồi để CI đỏ triền miên.
+
+**Coverage không đo chất lượng test** — một test không có `expect` nào vẫn cho 100%. Nó chỉ đúng theo chiều âm: phần có coverage 0 là phần **chưa có bằng chứng nào** rằng nó chạy được. Dùng nó làm máy dò điểm mù, đừng dùng làm điểm số.
+
+`functions` ở backend thấp hơn hẳn statements/lines vì unit test gọi thẳng service nên **method controller gần như không chạy** (`sync.controller.ts` 8.33%). Đó là việc của tầng integration test (gọi qua HTTP), không phải dấu hiệu unit test viết thiếu.
+
 ## Debug bug — verify bằng chrome-devtools MCP
 
 Khi xử lý bug quan sát được qua trình duyệt (lỗi UI, lỗi hành vi frontend, hoặc bug backend chỉ lộ ra khi thao tác trên web app), **bắt buộc dùng MCP `chrome-devtools`** (xem bảng MCP Servers trong `CLAUDE.md`) ở cả hai đầu:
