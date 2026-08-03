@@ -45,8 +45,10 @@ jobs:
         env:
           CI: true
 
-      - name: Unit Tests
-        run: pnpm turbo test:unit
+      # Kèm --coverage để ngưỡng trong jest.config.ts được kiểm thật, xem
+      # giải thích ở ci-pr.yml.
+      - name: Unit Tests + Coverage
+        run: pnpm turbo test:cov
         env:
           CI: true
 

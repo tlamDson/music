@@ -20,12 +20,22 @@ const config: Config = {
   workerIdleMemoryLimit: '512MB',
   collectCoverageFrom: ['src/**/*.ts', '!src/main.ts', '!src/**/*.module.ts'],
   coverageDirectory: 'coverage/unit',
+  // Ngưỡng là SÀN CHỐNG TỤT, không phải mục tiêu — đặt bằng số đo thật ngày
+  // 2026-08-03 làm tròn xuống, để CI đỏ khi coverage giảm chứ không đỏ ngay từ
+  // đầu. Trước PR này ngưỡng ghi 80/80/70/80 nhưng CI chạy `test:unit` không có
+  // `--coverage` nên chưa bao giờ được kiểm; bật lên mới lộ ra `functions` thật
+  // sự là 71.22%.
+  //
+  // `functions` thấp hơn hẳn ba chỉ số kia vì các controller gần như không được
+  // gọi: unit test gọi thẳng service, nên method controller không chạy
+  // (sync.controller 8.33%, tracks/stores.controller 16.66%). Đây đúng phần mà
+  // tầng integration test sẽ phủ — nâng ngưỡng này sau khi tầng đó xong.
   coverageThreshold: {
     global: {
-      lines: 80,
-      functions: 80,
-      branches: 70,
-      statements: 80,
+      lines: 86,
+      functions: 71,
+      branches: 81,
+      statements: 85,
     },
   },
 };

@@ -12,17 +12,16 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@cafe-music/shared(.*)$': '<rootDir>/../../packages/shared/src$1',
   },
-  collectCoverageFrom: [
-    'src/**/*.{ts,tsx}',
-    '!src/**/*.stories.{ts,tsx}',
-    '!src/app/layout.tsx',
-  ],
+  collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.stories.{ts,tsx}', '!src/app/layout.tsx'],
   coverageDirectory: 'coverage',
+  // Sàn chống tụt, đo thật ngày 2026-08-03 rồi làm tròn xuống — xem giải thích
+  // đầy đủ ở apps/backend/jest.config.ts. Ngưỡng cũ ghi 80/80/70/80 nhưng chưa
+  // bao giờ chạy; số thật là 80.2/71.45/79.5/81.69.
   coverageThreshold: {
     global: {
-      lines: 80,
-      functions: 80,
-      branches: 70,
+      lines: 81,
+      functions: 79,
+      branches: 71,
       statements: 80,
     },
   },

@@ -366,7 +366,27 @@ pnpm turbo test:integration
 
 # E2E (Playwright — cần app chạy)
 pnpm --filter @cafe-music/web test:e2e
+
+# Coverage (chạy đúng bộ unit test nhưng kèm --coverage + kiểm ngưỡng)
+pnpm turbo test:cov
 ```
+
+### Coverage
+
+CI chạy `pnpm turbo test:cov` (không phải `test:unit`), nên **ngưỡng `coverageThreshold` trong `jest.config.ts` là điều kiện để merge** — coverage tụt xuống dưới sàn thì job `Lint + Unit Tests` đỏ.
+
+Ngưỡng là **sàn chống tụt, không phải mục tiêu**: đặt bằng số đo thật rồi làm tròn xuống, để CI báo động khi độ phủ giảm chứ không đỏ sẵn từ đầu. Nâng sàn khi có PR làm tăng độ phủ thật.
+
+Baseline đo ngày **2026-08-03** (286 test backend, 252 test web, tất cả pass):
+
+| Package | Statements | Branches | Functions | Lines  |
+| ------- | ---------- | -------- | --------- | ------ |
+| Backend | 85.49%     | 81.50%   | 71.22%    | 86.71% |
+| Web     | 80.20%     | 71.45%   | 79.50%    | 81.69% |
+
+> **Vì sao `functions` thấp hơn hẳn ba chỉ số kia ở backend:** unit test gọi thẳng service nên **method của controller gần như không chạy** — `sync.controller.ts` 8.33%, `tracks.controller.ts` / `stores.controller.ts` 16.66%, `playlists.controller.ts` 22.22%. Đây đúng phần mà tầng integration test (gọi qua HTTP) sẽ phủ; nâng ngưỡng này sau khi tầng đó xong.
+
+Coverage report sinh ra ở `apps/backend/coverage/unit/lcov-report/index.html` và `apps/web/coverage/lcov-report/index.html` (mở bằng trình duyệt), và được upload làm artifact `coverage-<run_id>` trong mỗi CI run.
 
 ### When Does CI Run?
 
@@ -381,7 +401,7 @@ Ba job của PR chạy song song:
 
 | Job                    | Kiểm tra gì                                                                                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------ |
-| `Lint + Unit Tests`    | ESLint + unit test backend/web — **check bắt buộc để merge**                                     |
+| `Lint + Unit Tests`    | ESLint + unit test backend/web **kèm coverage + kiểm ngưỡng** — **check bắt buộc để merge**      |
 | `Typecheck + Build`    | `tsc --noEmit` và `turbo build` cả 3 package                                                     |
 | `Backend Docker Build` | Build image sẽ deploy lên Railway — hỏng ở đây nghĩa là deploy sẽ hỏng. **Chỉ build khi cần**, ↓ |
 

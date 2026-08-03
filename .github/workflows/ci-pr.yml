@@ -69,8 +69,13 @@ jobs:
         env:
           CI: true
 
-      - name: Unit Tests - Backend + Frontend
-        run: pnpm turbo test:unit
+      # `test:cov` chứ không phải `test:unit`: chạy đúng bộ test đó nhưng kèm
+      # `--coverage`, nên ngưỡng `coverageThreshold` trong jest.config.ts mới
+      # thật sự được kiểm. Trước đây step này chạy `test:unit` (không coverage)
+      # nên ngưỡng nằm chết trong config và step upload dưới đây upload thư mục
+      # rỗng. KHÔNG đổi tên job "Lint + Unit Tests" — đó là required status check.
+      - name: Unit Tests + Coverage - Backend + Frontend
+        run: pnpm turbo test:cov
         env:
           CI: true
 
