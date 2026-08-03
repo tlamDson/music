@@ -8,4 +8,14 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    rules: {
+      // Cùng quy ước với apps/backend: tham số/biến bỏ qua có chủ đích đặt tên
+      // bắt đầu bằng `_` (vd tuple của `it.each` chỉ dùng phần tử đầu).
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
 );

@@ -60,6 +60,7 @@ jobs:
           path: |
             apps/backend/coverage/
             apps/web/coverage/
+            packages/shared/coverage/
           retention-days: 14
 
 # Integration + E2E steps sẽ được bật dần khi từng feature có test sẵn sàng.

@@ -87,6 +87,7 @@ jobs:
           path: |
             apps/backend/coverage/
             apps/web/coverage/
+            packages/shared/coverage/
           retention-days: 7
 
   # Tách job riêng để không đổi tên check bắt buộc "Lint + Unit Tests"

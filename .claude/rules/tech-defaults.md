@@ -159,6 +159,19 @@ Hai lớp, vì snapshot của Railway nằm **cùng account** với DB — mất
 - **Script chạy trong container Alpine → `date` là BusyBox, không phải GNU.** `date -d "-30 days"` bị từ chối thẳng; dạng chạy được ở cả hai là `date -u -d "@<epoch>"`. Với `set -e`, lỗi này làm job đỏ **sau khi** đã upload xong: backup vẫn có nhưng retention không bao giờ chạy.
 - Cả hai lỗi trên chỉ lộ ra khi **chạy thật script trong đúng image của workflow** — đọc code không thấy. Dựng lại bằng Postgres + MinIO của `docker-compose` (MinIO là S3-compatible nên không cần credential R2 thật); nhớ dùng **tên service** (`minio`, `postgres`) làm host vì `aws` CLI từ chối hostname có dấu gạch dưới như `cafe_music_minio`.
 
+## `packages/shared` — test cho Zod schema
+
+Package này giờ có suite riêng: `packages/shared/test/unit/{schemas,constants}.spec.ts` (100 test), chạy bằng `pnpm --filter @cafe-music/shared test:unit`. Trước đó nó **không có test nào** dù chứa toàn bộ Zod schema quyết định input hợp lệ hay không.
+
+- **`jest.config.ts` phải trỏ ts-jest vào `tsconfig.build.json`, KHÔNG phải `tsconfig.json`.** Base config của package là `module: ESNext` + `moduleResolution: Bundler` (dành cho bundler của web), ts-jest cần CommonJS — dùng nhầm là suite không chạy được. Backend không dính vì tsconfig của nó vốn đã `commonjs`.
+- **`jest`/`ts-jest`/`@types/jest` phải khai trong `devDependencies` của chính package.** pnpm ở repo này không hoist (`.npmrc` không có `shamefully-hoist`) nên không resolve được từ root.
+- `collectCoverageFrom` **cố tình bỏ `src/types/`** — file đó 100% là type, compile ra module rỗng, gộp vào chỉ kéo tụt `functions` mà không nói lên gì.
+- `tsconfig.json` include thêm `test/**/*` (để `typecheck` phủ luôn file test) và exclude `jest.config.ts`; `tsconfig.build.json` vẫn `include: ["src/**/*"]` nên `dist/` không lẫn test.
+- **Coverage 100% ở package này rẻ và không chứng minh nhiều** — `schemas/index.ts` gần như toàn khai báo, chỉ cần `import` là mọi dòng đã "chạy", nên thêm schema mới mà quên viết test thì vẫn 100%. Giá trị thật nằm ở assertion hành vi (chủ yếu case sai), không ở con số.
+- Cạm bẫy khi viết test: `it.each` với tuple 2 phần tử thì callback **phải nhận đủ hai tham số** (`(value, _reason) => {}`), nếu không `tsc` báo `TS2345` và cả suite không compile.
+
+**Nợ đã ghim bằng test:** `WS_EVENTS` (`src/constants`) thiếu `'store-mode-changed'` trong khi type `WsEventName` (`src/types`) có — backend đang phát event đó bằng chuỗi viết thẳng. `constants.spec.ts` assert đúng hiện trạng, ai bổ sung hằng số thì test đỏ và đó là chỗ nhắc cập nhật cả hai phía.
+
 ## Bản đồ API (`/api/v1`)
 
 | Nhóm     | Endpoint chính                                                                                                                                                                                                                                        |
