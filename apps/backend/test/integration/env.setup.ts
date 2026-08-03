@@ -16,9 +16,10 @@ process.env.DATABASE_URL =
 // Redis riêng ở 6380 (service `redis_test`) — KHÔNG dùng 6379 của dev.
 process.env.REDIS_URL = process.env.REDIS_TEST_URL ?? 'redis://localhost:6380';
 
-// Đủ 32 ký tự, nếu không `env.schema.ts` từ chối.
-process.env.JWT_ACCESS_SECRET = 'integration-test-access-secret-32ch';
-process.env.JWT_REFRESH_SECRET = 'integration-test-refresh-secret-32c';
+// Đủ 32 ký tự (env.schema.ts từ chối ngắn hơn), cùng pattern placeholder với
+// env.schema.spec.ts — chuỗi lặp một ký tự để scanner secret không báo nhầm.
+process.env.JWT_ACCESS_SECRET = 'a'.repeat(32);
+process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 process.env.JWT_ACCESS_TTL = '15m';
 process.env.JWT_REFRESH_TTL = '7d';
 

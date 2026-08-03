@@ -143,8 +143,12 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @cafe-music/backend prisma:generate
 
-      # Gọi thẳng package (không qua turbo): jest map @cafe-music/shared vào
-      # src/ qua moduleNameMapper nên không cần build shared trước.
+      # ts-jest resolve TYPE của @cafe-music/shared qua dist/ (package main/types
+      # trỏ vào đó) — moduleNameMapper chỉ lo runtime. Local luôn có dist/ sẵn
+      # nên thiếu bước build này chỉ lộ ra trên CI: TS2307 ở mọi spec.
+      - name: Build shared package
+        run: pnpm --filter @cafe-music/shared build
+
       - name: Integration Tests
         run: pnpm --filter @cafe-music/backend test:integration
         env:
