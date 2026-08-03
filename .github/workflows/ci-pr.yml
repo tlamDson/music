@@ -90,6 +90,70 @@ jobs:
             packages/shared/coverage/
           retention-days: 7
 
+  # Job MỚI, không nằm trong 3 required check — tên ba job kia là định danh
+  # required status check phía GitHub, không đổi và không nhét thêm việc vào.
+  # Đây là chỗ đầu tiên trong repo dùng `services:`: hai container Postgres +
+  # Redis y hệt cặp postgres_test/redis_test trong docker-compose.yml (cùng cổng
+  # 5433/6380 nên env.setup.ts của suite dùng nguyên giá trị mặc định, không cần
+  # secret hay biến môi trường nào).
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: cafe_music_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @cafe-music/backend prisma:generate
+
+      # ts-jest resolve TYPE của @cafe-music/shared qua dist/ (package main/types
+      # trỏ vào đó) — moduleNameMapper chỉ lo runtime. Local luôn có dist/ sẵn
+      # nên thiếu bước build này chỉ lộ ra trên CI: TS2307 ở mọi spec.
+      - name: Build shared package
+        run: pnpm --filter @cafe-music/shared build
+
+      - name: Integration Tests
+        run: pnpm --filter @cafe-music/backend test:integration
+        env:
+          CI: true
+
   # Tách job riêng để không đổi tên check bắt buộc "Lint + Unit Tests"
   quality:
     name: Typecheck + Build

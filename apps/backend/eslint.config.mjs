@@ -45,6 +45,10 @@ export default tseslint.config(
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
+      // supertest trả `res.body: any` — spec integration đọc member trực tiếp
+      // (res.body.data.map(...)) nên hai rule dưới cũng phải tắt cùng lý do.
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
     },
   },
 );

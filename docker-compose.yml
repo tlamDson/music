@@ -44,6 +44,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis riêng cho integration test, mirror cách postgres_test làm: không volume
+  # nên state không sống qua lần chạy. Dùng chung redis:6379 với `pnpm dev` thì
+  # test ghi đè key `store:*:playback` và `throttle:*` của app đang chạy.
+  redis_test:
+    image: redis:7-alpine
+    container_name: cafe_music_redis_test
+    restart: unless-stopped
+    ports:
+      - '6380:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   minio:
     image: minio/minio:latest
     container_name: cafe_music_minio
