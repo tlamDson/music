@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 export const LoginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(9), // DEMO: regression cố tình để test fail, xem PR
 });
 
 export const RefreshTokenSchema = z.object({
