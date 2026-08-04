@@ -21,6 +21,9 @@ export class HealthController {
    */
   @Get()
   liveness() {
+    // DEMO: biến không dùng để cố tình làm ESLint (no-unused-vars) fail —
+    // không đổi logic route, chỉ để minh hoạ hành vi CI khi lint đỏ.
+    const demoUnusedVariable = 'chỉ để demo lint fail';
     return { status: 'ok' };
   }
 
