@@ -88,6 +88,8 @@ jobs:
       # trước) — khớp qua `restore-keys` (lockfile đổi nhưng còn phần chung)
       # thì vẫn phục hồi được cache nhưng output này báo `false`, vì đó không
       # phải phép so sánh "cùng lockfile" mà bạn muốn đo.
+      # (Lần chạy trước trong PR #101 đã đo miss: 16s — commit này không đổi
+      # pnpm-lock.yaml, chờ xem lần chạy này có hit như dự đoán không.)
       - name: Record cache stats
         if: always()
         run: |
