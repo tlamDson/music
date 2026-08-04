@@ -56,10 +56,53 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          # KHÔNG dùng `cache: pnpm` ở đây — cache pnpm store được quản lý
+          # tường minh bằng actions/cache bên dưới để đo được hit/miss và thời
+          # gian tiết kiệm thật, thay vì bị setup-node giấu kín bên trong.
+
+      - name: Get pnpm store directory
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        id: pnpm-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          # Key bám hash của pnpm-lock.yaml: lockfile không đổi → key không đổi
+          # → cache còn nguyên. Đổi một dependency là đổi hash → miss đúng 1
+          # lần (vẫn phục hồi được phần chung qua restore-keys), các lần sau
+          # lại hit ngay.
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        id: install
+        run: |
+          start=$(date +%s)
+          pnpm install --frozen-lockfile
+          echo "duration=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+
+      # `cache-hit` chỉ là `true` khi khớp ĐÚNG key chính (lockfile y hệt lần
+      # trước) — khớp qua `restore-keys` (lockfile đổi nhưng còn phần chung)
+      # thì vẫn phục hồi được cache nhưng output này báo `false`, vì đó không
+      # phải phép so sánh "cùng lockfile" mà bạn muốn đo.
+      # (Lần chạy trước trong PR #101 đã đo miss: 16s — commit này không đổi
+      # pnpm-lock.yaml, chờ xem lần chạy này có hit như dự đoán không.)
+      - name: Record cache stats
+        if: always()
+        run: |
+          {
+            echo "### 📦 pnpm store cache"
+            echo
+            echo "| Chỉ số | Giá trị |"
+            echo "| --- | --- |"
+            echo "| Cache hit (khớp đúng lockfile) | ${{ steps.pnpm-cache.outputs.cache-hit == 'true' && '✅ có' || '❌ không' }} |"
+            echo "| Thời gian \`pnpm install --frozen-lockfile\` | ${{ steps.install.outputs.duration }}s |"
+            echo
+            echo "So sánh nhanh hơn bao nhiêu giây: đối chiếu dòng này giữa một lần chạy hit và một lần chạy miss (vd PR trước/sau khi đổi \`pnpm-lock.yaml\`) trong tab **Summary** của từng run."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate Prisma Client
         run: pnpm --filter @cafe-music/backend prisma:generate
