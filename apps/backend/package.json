@@ -12,13 +12,13 @@
     "test:unit": "jest --config jest.config.ts --passWithNoTests",
     "test:unit:watch": "jest --config jest.config.ts --watch",
     "test:integration": "jest --config jest.integration.config.ts --passWithNoTests --runInBand",
-    "test:e2e": "jest --config jest.e2e.config.ts --passWithNoTests --runInBand",
     "test:cov": "jest --config jest.config.ts --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:e2e-fixtures": "ts-node prisma/e2e-fixtures.ts",
     "prisma:bootstrap": "ts-node prisma/bootstrap-admin.ts"
   },
   "prisma": {

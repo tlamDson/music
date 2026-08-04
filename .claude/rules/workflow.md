@@ -157,6 +157,16 @@ Coverage >= 80% cho file mới. Test độc lập (reset state trong `beforeEach
 
 **Nợ đã ghim bằng test** (xem `playlists.scope.spec.ts` khối `KNOWN GAP`): `findAll` playlist lọc theo quán cho STORE_ADMIN nhưng `findOne`/`update`/`remove` chỉ lọc `organizationId` — admin quán 1 đọc/sửa/xoá được playlist STORE của quán 2 nếu biết id. Test ghim đúng hiện trạng; sửa hay giữ là quyết định của chủ repo.
 
+### E2E (Playwright) — chạy TAY trước mỗi release, không có job CI
+
+`apps/web/__tests__/e2e/` (auth + store-navigation + dashboard-navigation). Chạy: `docker compose up -d` rồi `pnpm --filter @cafe-music/web test:e2e` — Playwright **tự khởi động cả backend lẫn web** (webServer là mảng 2 phần tử trong `playwright.config.ts`; config cũ chỉ khởi động web nên mọi API call chết lặng). Không có job CI — quyết định có chủ đích: dựng đủ 4 service trong CI vừa chậm vừa flaky; tầng này ít test, chạy tay **trước khi cắt release develop → main** là đủ.
+
+- **Backend không còn tầng "e2e" jest** — `test/app.e2e-spec.ts`, `test/e2e/`, `jest-e2e.json`, `jest.e2e.config.ts` đã xoá (scaffolding chết gọi `GET /` mong "Hello World!" và sai prefix `/api/v1`). Integration test (76 test, PR #99) đã boot AppModule thật; Playwright sở hữu e2e.
+- **Login qua `auth.setup.ts` (project `setup`) một lần rồi dùng `storageState`** — token nằm ở localStorage (không phải cookie). Mỗi test tự login qua form sẽ ăn 429 từ rate limit 5 login/60s theo email. Test cần trạng thái chưa-đăng-nhập (form login) thì không dùng storageState; test sai mật khẩu dùng email không tồn tại để không ăn counter của tài khoản seed.
+- **Selector theo accessible name** (`getByRole('form', { name: 'Đăng nhập' })`, `#email`, `getByRole('alert')`) — khớp convention aria-label tiếng Việt của repo, không rải `data-testid` mới. Cookie `NEXT_LOCALE=vi` được chốt trong storageState.
+- **Fixture: seed KHÔNG có playlist/track nào** — `global-setup.ts` chạy migrate + seed + `prisma:e2e-fixtures` (script mới, idempotent, tạo "E2E Smoke Playlist" + track s3Key giả). E2E dùng **DB dev 5432** (cùng DB với `pnpm dev`), không phải cặp `*_test`.
+- **Nợ có chủ đích: chưa assert nhạc phát thật.** Ba lý do: không có thẻ `<audio>` trong DOM (`new Audio()` nằm trong React ref), track fixture mang s3Key giả (seed không upload file thật lên MinIO), và `audio.play()` được kích bởi WS event chứ không phải click nên dính autoplay policy của Chromium. Muốn làm sau: cần fixture mp3 thật upload qua `POST /tracks` + flag `--autoplay-policy=no-user-gesture-required`, và assert qua `aria-label` của nút play (`Tạm dừng` = `play()` đã resolve) + `aria-valuenow` của progressbar tăng dần.
+
 ### Coverage được CI enforce (đừng chỉ nhìn `test:unit`)
 
 CI chạy **`pnpm turbo test:cov`**, không phải `test:unit` — cùng bộ test nhưng kèm `--coverage`, nên `coverageThreshold` trong `jest.config.ts` là **điều kiện merge thật sự**. Chạy `pnpm turbo test:cov` ở local trước khi push nếu PR đụng nhiều file nguồn.
