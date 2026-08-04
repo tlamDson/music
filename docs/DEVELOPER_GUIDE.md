@@ -342,11 +342,13 @@ Chi tiết: [`.cursor/rules/tdd-workflow.mdc`](../.cursor/rules/tdd-workflow.mdc
 
 ### Test Locations
 
-| Layer       | Backend                                           | Frontend                                       |
-| ----------- | ------------------------------------------------- | ---------------------------------------------- |
-| Unit        | `apps/backend/test/unit/<module>.service.spec.ts` | `apps/web/__tests__/unit/<Component>.test.tsx` |
-| Integration | `apps/backend/test/integration/`                  | `apps/web/__tests__/integration/`              |
-| E2E         | `apps/backend/test/e2e/`                          | `apps/web/__tests__/e2e/` (Playwright)         |
+| Layer       | Ở đâu                                                                                 | Chạy trong CI?                     |
+| ----------- | ------------------------------------------------------------------------------------- | ---------------------------------- |
+| Unit        | `apps/backend/test/unit/` · `apps/web/__tests__/unit/` · `packages/shared/test/unit/` | Có (`Lint + Unit Tests`)           |
+| Integration | `apps/backend/test/integration/` (Postgres 5433 + Redis 6380 thật)                    | Có (job `Integration Tests`)       |
+| E2E         | `apps/web/__tests__/e2e/` (Playwright, browser thật + backend thật)                   | **Không — chạy tay trước release** |
+
+> Backend **không còn** tầng "e2e" jest riêng (`test/e2e/`, `jest.e2e.config.ts` đã xoá): integration test đã boot AppModule thật với DB thật; Playwright sở hữu e2e.
 
 ### Run Tests Locally
 
@@ -361,15 +363,26 @@ pnpm --filter @cafe-music/backend test:unit --watch
 # Frontend only
 pnpm --filter @cafe-music/web test:unit
 
-# Integration (cần Docker: postgres_test + redis)
-pnpm turbo test:integration
+# Integration (cần Docker: postgres_test + redis_test)
+pnpm --filter @cafe-music/backend test:integration
 
-# E2E (Playwright — cần app chạy)
+# E2E (Playwright — chỉ cần Docker dev, backend + web tự khởi động)
 pnpm --filter @cafe-music/web test:e2e
 
 # Coverage (chạy đúng bộ unit test nhưng kèm --coverage + kiểm ngưỡng)
 pnpm turbo test:cov
 ```
+
+### E2E — chạy tay trước mỗi release
+
+`pnpm --filter @cafe-music/web test:e2e` là bước kiểm **bắt buộc trước khi mở PR release `develop → main`**. Playwright tự lo gần hết:
+
+1. `docker compose up -d` (chỉ cần Postgres 5432 + Redis 6379 của dev).
+2. `global-setup.ts` tự chạy migrate + seed + fixture (`prisma:e2e-fixtures` — seed gốc không có playlist/track nào).
+3. `webServer` trong `playwright.config.ts` tự khởi động **cả backend lẫn web** (và dùng lại server đang chạy nếu `pnpm dev` đã bật).
+4. `auth.setup.ts` đăng nhập một lần qua API rồi ghi `storageState` (token localStorage) — tránh rate limit 5 login/60s theo email.
+
+Lần chạy đầu chậm (Next dev compile từng trang); chạy `rm -rf apps/web/.next` trước nếu vừa pull code mới. E2E hiện phủ **login + điều hướng**, chưa assert nhạc phát thật — lý do và điều kiện làm tiếp ghi ở `.claude/rules/workflow.md` mục _E2E_.
 
 ### Coverage
 

@@ -26,6 +26,8 @@ coverage/
 # Playwright
 test-results/
 playwright-report/
+# storageState chứa JWT thật của phiên e2e local
+apps/web/__tests__/e2e/.auth/
 playwright/.cache/
 
 # Logs
