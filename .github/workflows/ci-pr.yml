@@ -48,6 +48,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # DEMO cho báo cáo CI/CD: chứng minh secret không nằm trong repo mà chỉ
+      # tồn tại trong GitHub → Settings → Secrets and variables → Actions, và
+      # GitHub tự động MASK giá trị đó trong log kể cả khi workflow chủ động in
+      # ra — thử echo thẳng giá trị thật vẫn chỉ thấy `***` trong log thật.
+      # Guard bằng `if -z` để thiếu secret không làm cả job đỏ oan.
+      - name: Verify demo secret is readable and masked
+        env:
+          DEMO_API_TOKEN: ${{ secrets.DEMO_API_TOKEN }}
+        run: |
+          if [ -z "$DEMO_API_TOKEN" ]; then
+            echo "::warning::DEMO_API_TOKEN chưa được set — bỏ qua bước demo secret."
+          else
+            echo "Đọc được secret, độ dài: ${#DEMO_API_TOKEN} ký tự"
+            echo "In thẳng giá trị thật (GitHub sẽ tự mask): $DEMO_API_TOKEN"
+          fi
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         # version lấy từ packageManager field trong package.json tự động
